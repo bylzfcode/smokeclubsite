@@ -1,0 +1,3018 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Smoke Club — tabacaria digital com entrega rápida em São Bernardo do Campo e região. Peça pelo WhatsApp.">
+<title>Smoke Club — Tabacaria Digital | SBC e Região</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   SMOKE CLUB — Design System
+   ============================================================ */
+:root{
+  --red:#E3132B; --red-dark:#A80D1F; --red-deep:#7A0A17;
+  --ink:#141416; --ink-2:#1E1E22;
+  --bg:#F4F4F6; --card:#FFFFFF; --line:#E4E4E9;
+  --text:#1B1B1F; --muted:#6E6E78; --green:#25D366;
+  --radius:12px;
+  --shadow:0 2px 10px rgba(20,20,22,.07);
+  --shadow-lg:0 12px 34px rgba(20,20,22,.16);
+  --header-h:64px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased}
+button{font-family:inherit;cursor:pointer}
+input,select,textarea{font-family:inherit}
+img{max-width:100%}
+.container{max-width:1180px;margin:0 auto;padding:0 16px}
+h2.section-title{font-family:'Archivo',sans-serif;font-weight:800;font-size:clamp(1.3rem,3vw,1.7rem);letter-spacing:-.01em;display:flex;align-items:center;gap:12px}
+h2.section-title::after{content:"";flex:1;height:3px;background:linear-gradient(90deg,var(--red),transparent);border-radius:3px}
+.section{padding:34px 0 10px}
+.hidden{display:none!important}
+
+/* ---------- AGE GATE ---------- */
+#ageGate{position:fixed;inset:0;z-index:1000;background:rgba(14,14,16,.97);display:flex;align-items:center;justify-content:center;padding:24px}
+.gate{max-width:400px;width:100%;background:var(--card);border-radius:16px;padding:38px 30px;text-align:center;box-shadow:var(--shadow-lg)}
+.gate .glogo{font-family:'Archivo',sans-serif;font-weight:900;font-size:1.7rem;letter-spacing:-.02em}
+.gate .glogo span{color:var(--red)}
+.gate h2{font-size:1.1rem;margin:16px 0 8px}
+.gate p{color:var(--muted);font-size:.9rem;line-height:1.55;margin-bottom:24px}
+.gate .row{display:flex;gap:10px}
+.gate .row button{flex:1;padding:14px;border-radius:10px;border:none;font-weight:700;font-size:.95rem}
+.gate .yes{background:var(--red);color:#fff}
+.gate .no{background:#fff;color:var(--muted);border:1px solid var(--line)}
+
+/* ---------- TOPBAR / HEADER / NAV ---------- */
+.topbar{background:var(--red);color:#fff;font-size:.78rem;font-weight:600;overflow:hidden;white-space:nowrap}
+.topbar .track{display:inline-flex;gap:48px;padding:8px 0;animation:slide 22s linear infinite;will-change:transform}
+.topbar span{display:inline-flex;align-items:center;gap:7px}
+@keyframes slide{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+@media (prefers-reduced-motion:reduce){.topbar .track{animation:none;flex-wrap:wrap;white-space:normal;justify-content:center;width:100%}}
+header.site{position:sticky;top:0;z-index:90;background:var(--ink);color:#fff;height:var(--header-h);display:flex;align-items:center;box-shadow:0 2px 12px rgba(0,0,0,.25)}
+header.site .container{display:flex;align-items:center;gap:16px;width:100%}
+.logo{font-family:'Archivo',sans-serif;font-weight:900;font-size:1.35rem;letter-spacing:-.02em;color:#fff;text-decoration:none;flex-shrink:0;line-height:1}
+.logo span{color:var(--red)}
+.logo small{display:block;font-family:'Inter',sans-serif;font-weight:600;font-size:.58rem;letter-spacing:.24em;color:#9a9aa4;margin-top:3px}
+.search{flex:1;display:flex;background:var(--ink-2);border:1px solid #333338;border-radius:10px;overflow:hidden;max-width:520px;margin:0 auto}
+.search input{flex:1;background:none;border:none;color:#fff;padding:11px 14px;font-size:.9rem;min-width:0}
+.search input::placeholder{color:#77777f}
+.search input:focus{outline:none}
+.search button{background:var(--red);border:none;color:#fff;padding:0 16px;font-size:1rem}
+.cart-btn{position:relative;background:var(--ink-2);border:1px solid #333338;color:#fff;border-radius:10px;padding:10px 14px;font-size:1.15rem;flex-shrink:0}
+.cart-btn .bubble{position:absolute;top:-7px;right:-7px;min-width:20px;height:20px;padding:0 5px;background:var(--red);color:#fff;border-radius:999px;font-size:.7rem;font-weight:800;display:flex;align-items:center;justify-content:center}
+.cart-btn .bubble.hide{display:none}
+nav.catnav{background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:var(--header-h);z-index:85}
+nav.catnav .container{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none}
+nav.catnav .container::-webkit-scrollbar{display:none}
+.navlink{flex-shrink:0;background:none;border:none;padding:14px 14px 12px;font-size:.88rem;font-weight:600;color:var(--muted);border-bottom:2.5px solid transparent}
+.navlink.active,.navlink:hover{color:var(--red);border-bottom-color:var(--red)}
+
+/* ---------- HERO ---------- */
+.hero{padding:18px 0 6px}
+.slider{position:relative;border-radius:16px;overflow:hidden;box-shadow:var(--shadow-lg)}
+.slides{display:flex;transition:transform .55s cubic-bezier(.6,0,.2,1)}
+.slide{flex:0 0 100%;min-height:230px;padding:34px 30px;color:#fff;display:flex;flex-direction:column;justify-content:center;gap:8px;position:relative;overflow:hidden;background-size:cover;background-position:center}
+.slide .tag{font-size:.72rem;font-weight:800;letter-spacing:.14em;opacity:.85}
+.slide .h{font-family:'Archivo',sans-serif;font-weight:900;font-size:clamp(1.5rem,4.5vw,2.4rem);line-height:1.05;letter-spacing:-.02em;max-width:480px}
+.slide p{font-size:.92rem;opacity:.92;max-width:420px;line-height:1.5}
+.slide .cta{margin-top:12px;align-self:flex-start;background:#fff;color:var(--red-deep);border:none;border-radius:999px;padding:12px 24px;font-weight:800;font-size:.88rem}
+.slide .bgicon{position:absolute;right:-18px;bottom:-30px;font-size:11rem;opacity:.15;transform:rotate(-12deg);pointer-events:none}
+.s1{background-image:linear-gradient(120deg,var(--red-deep),var(--red) 60%,#FF4D5E)}
+.s2{background-image:linear-gradient(120deg,#141416,#2A2A30 55%,#4A1016)}
+.s3{background-image:linear-gradient(120deg,#7A0A17,#B3111F 55%,#E3132B)}
+.dots{position:absolute;bottom:12px;left:0;right:0;display:flex;justify-content:center;gap:7px}
+.dots button{width:8px;height:8px;border-radius:999px;border:none;background:rgba(255,255,255,.45);padding:0}
+.dots button.on{background:#fff;width:22px}
+
+/* ---------- BENEFÍCIOS ---------- */
+.perks{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;padding:22px 0 6px}
+.perk{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:15px 16px;display:flex;gap:12px;align-items:center;box-shadow:var(--shadow)}
+.perk .ic{width:40px;height:40px;flex-shrink:0;border-radius:10px;background:#FDE8EA;color:var(--red);display:flex;align-items:center;justify-content:center;font-size:1.15rem}
+.perk b{display:block;font-size:.85rem}
+.perk small{color:var(--muted);font-size:.76rem;line-height:1.35;display:block;margin-top:1px}
+
+/* ---------- BANNERS DE CATEGORIA ---------- */
+.catgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:16px;padding:16px 0 6px}
+.catbanner{
+  position:relative;height:160px;border-radius:18px;overflow:hidden;border:none;
+  display:flex;align-items:center;text-align:left;padding:0 26px;color:#fff;
+  box-shadow:var(--shadow);transition:transform .18s ease,box-shadow .18s ease;
+}
+.catbanner:hover{transform:translateY(-4px);box-shadow:var(--shadow-lg)}
+.catbanner .cimg{position:absolute;top:0;right:0;bottom:0;width:58%;object-fit:cover;object-position:center}
+.catbanner .cfade{position:absolute;inset:0;background:linear-gradient(90deg,rgba(10,10,12,.55) 22%,rgba(10,10,12,.12) 55%,transparent)}
+.catbanner .cemoji{position:absolute;right:6px;bottom:-16px;font-size:7.5rem;opacity:.3;transform:rotate(-8deg);pointer-events:none}
+.catbanner .cinfo{position:relative;z-index:2}
+.catbanner .cinfo b{display:block;font-family:'Archivo',sans-serif;font-weight:900;font-size:clamp(1.5rem,4vw,2.1rem);letter-spacing:-.02em;line-height:1;text-shadow:0 2px 14px rgba(0,0,0,.35)}
+.catbanner .cinfo small{display:inline-block;margin-top:8px;font-size:.8rem;font-weight:700;background:rgba(255,255,255,.18);backdrop-filter:blur(4px);padding:5px 12px;border-radius:999px}
+/* paletas dos banners de categoria */
+.cg-azul{background:linear-gradient(135deg,#2B62AE,#6FA3DE)}
+.cg-verde{background:linear-gradient(135deg,#4E9A2E,#A3CC49)}
+.cg-vermelho{background:linear-gradient(135deg,#B94A4A,#DE8B7F)}
+.cg-amarelo{background:linear-gradient(135deg,#B99A2B,#DFCB5E)}
+.cg-roxo{background:linear-gradient(135deg,#5F3AA8,#9A72DD)}
+.cg-rosa{background:linear-gradient(135deg,#B93A76,#E07FAE)}
+.cg-escuro{background:linear-gradient(135deg,#17171A,#3C3C46)}
+.cg-fogo{background:linear-gradient(135deg,#7A0A17,#E3132B)}
+
+/* ---------- PRODUTOS ---------- */
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:13px;padding:18px 0 8px}
+@media(min-width:760px){.pgrid{grid-template-columns:repeat(auto-fill,minmax(205px,1fr))}}
+.pcard{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;display:flex;flex-direction:column;box-shadow:var(--shadow);transition:transform .15s ease,box-shadow .15s ease;position:relative}
+.pcard:hover{transform:translateY(-3px);box-shadow:var(--shadow-lg)}
+.pcard .flag{position:absolute;top:10px;left:10px;z-index:2;background:var(--red);color:#fff;font-size:.66rem;font-weight:800;letter-spacing:.06em;padding:4px 9px;border-radius:6px}
+.pcard .pic{height:128px;background:linear-gradient(135deg,#FAFAFB,#EFEFF2);display:flex;align-items:center;justify-content:center;font-size:3rem;overflow:hidden}
+.pcard .pic img{width:100%;height:100%;object-fit:cover}
+.pcard .body{padding:12px 13px 14px;display:flex;flex-direction:column;gap:5px;flex:1}
+.pcard .cat-tag{font-size:.68rem;font-weight:700;color:var(--red);letter-spacing:.05em}
+.pcard .name{font-size:.88rem;font-weight:700;line-height:1.3}
+.pcard .desc{font-size:.75rem;color:var(--muted);line-height:1.4;flex:1}
+.pcard .old{font-size:.74rem;color:var(--muted);text-decoration:line-through;margin-top:3px}
+.pcard .price{font-family:'Archivo',sans-serif;font-weight:900;font-size:1.25rem;color:var(--red);letter-spacing:-.01em}
+.pcard .buy{margin-top:8px;width:100%;padding:11px;border:none;border-radius:9px;background:var(--red);color:#fff;font-weight:700;font-size:.85rem}
+.pcard .buy:hover{background:var(--red-dark)}
+.pcard .qty{margin-top:8px;display:flex;align-items:center;justify-content:space-between;background:var(--ink);border-radius:9px;color:#fff;font-weight:800}
+.pcard .qty button{background:none;border:none;color:#fff;width:42px;height:42px;font-size:1.2rem}
+.empty-msg{color:var(--muted);padding:26px 0;text-align:center;font-size:.9rem}
+
+/* ---------- STRIP / FOOTER / FLUTUANTE ---------- */
+.wa-float{position:fixed;right:16px;bottom:16px;z-index:80;width:56px;height:56px;border-radius:999px;background:var(--green);color:#fff;border:none;font-size:1.7rem;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 22px rgba(18,140,74,.45)}
+.strip{margin:36px 0 10px;border-radius:16px;padding:30px 26px;color:#fff;text-align:center;background:linear-gradient(120deg,var(--ink),#33161a 60%,var(--red-deep))}
+.strip h3{font-family:'Archivo',sans-serif;font-weight:900;font-size:clamp(1.15rem,3vw,1.55rem)}
+.strip p{opacity:.85;font-size:.9rem;margin:8px 0 18px}
+.strip a{display:inline-block;background:var(--green);color:#fff;text-decoration:none;padding:13px 28px;border-radius:999px;font-weight:800;font-size:.9rem}
+footer{background:var(--ink);color:#B9B9C2;margin-top:44px;font-size:.85rem}
+footer .cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:28px;padding:40px 0 26px}
+footer h4{color:#fff;font-family:'Archivo',sans-serif;font-weight:800;font-size:.92rem;margin-bottom:13px}
+footer li{list-style:none;margin-bottom:9px;line-height:1.45}
+footer a{color:#B9B9C2;text-decoration:none}
+footer a:hover{color:#fff}
+.footer-logo{font-family:'Archivo',sans-serif;font-weight:900;font-size:1.3rem;color:#fff}
+.footer-logo span{color:var(--red)}
+.foot-18{border-top:1px solid #2c2c32;padding:16px 0;text-align:center;font-size:.76rem;color:#8a8a94;line-height:1.6}
+.foot-18 b{color:#fff}
+.adm-link{opacity:.5;font-size:.72rem}
+
+/* ---------- DRAWER ---------- */
+.overlay{position:fixed;inset:0;background:rgba(14,14,16,.55);z-index:200;opacity:0;pointer-events:none;transition:opacity .25s}
+.overlay.show{opacity:1;pointer-events:auto}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(410px,100%);z-index:210;background:var(--card);transform:translateX(102%);transition:transform .3s cubic-bezier(.5,0,.2,1);display:flex;flex-direction:column;box-shadow:-10px 0 40px rgba(0,0,0,.2)}
+.drawer.show{transform:none}
+.drawer .dh{display:flex;align-items:center;justify-content:space-between;padding:18px 20px;border-bottom:1px solid var(--line)}
+.drawer .dh b{font-family:'Archivo',sans-serif;font-size:1.05rem}
+.drawer .dh button{background:none;border:none;font-size:1.3rem;color:var(--muted)}
+.dlist{flex:1;overflow-y:auto;padding:10px 20px}
+.ditem{display:flex;gap:12px;padding:13px 0;border-bottom:1px solid var(--line);align-items:center}
+.ditem .dpic{width:52px;height:52px;border-radius:10px;background:#F1F1F4;display:flex;align-items:center;justify-content:center;font-size:1.5rem;flex-shrink:0;overflow:hidden}
+.ditem .dpic img{width:100%;height:100%;object-fit:cover}
+.ditem .din{flex:1;min-width:0}
+.ditem .din b{font-size:.83rem;display:block;line-height:1.3}
+.ditem .din span{font-size:.82rem;color:var(--red);font-weight:800}
+.dqty{display:flex;align-items:center;gap:2px;background:var(--bg);border-radius:8px}
+.dqty button{background:none;border:none;width:30px;height:32px;font-size:1rem;font-weight:700;color:var(--text)}
+.dqty i{font-style:normal;font-size:.85rem;font-weight:700;min-width:18px;text-align:center}
+.dfoot{border-top:1px solid var(--line);padding:16px 20px 20px}
+.dfoot .sub{display:flex;justify-content:space-between;font-size:.95rem;margin-bottom:13px}
+.dfoot .sub b{font-family:'Archivo',sans-serif;font-size:1.15rem}
+.dfoot .go{width:100%;padding:15px;border:none;border-radius:11px;background:var(--red);color:#fff;font-weight:800;font-size:.95rem}
+.dempty{text-align:center;color:var(--muted);padding:50px 10px;font-size:.9rem}
+
+/* ---------- CHECKOUT ---------- */
+#checkout{position:fixed;inset:0;z-index:300;background:var(--bg);overflow-y:auto;display:none;padding:18px 16px 44px}
+#checkout.show{display:block}
+.co{max-width:540px;margin:0 auto}
+.co-top{display:flex;align-items:center;gap:12px;margin-bottom:18px}
+.co-top button{width:42px;height:42px;border-radius:10px;border:1px solid var(--line);background:var(--card);font-size:1.05rem}
+.co-top h2{font-family:'Archivo',sans-serif;font-weight:900;font-size:1.35rem}
+.box{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:17px;margin-bottom:13px;box-shadow:var(--shadow)}
+.box h3{font-size:.95rem;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.box h3 .n{width:22px;height:22px;border-radius:999px;background:var(--red);color:#fff;font-size:.72rem;display:flex;align-items:center;justify-content:center;font-weight:800}
+.ci{display:flex;justify-content:space-between;gap:10px;font-size:.86rem;padding:6px 0;color:var(--muted)}
+.ci b{color:var(--text);font-weight:600}
+label{display:block;font-size:.78rem;font-weight:600;color:var(--muted);margin:12px 0 6px}
+.field{width:100%;padding:13px 14px;border-radius:10px;border:1.5px solid var(--line);background:#FAFAFB;font-size:16px;color:var(--text)}
+.field:focus{outline:none;border-color:var(--red);background:#fff}
+.pills{display:flex;gap:8px;flex-wrap:wrap}
+.pill{padding:10px 16px;border-radius:999px;border:1.5px solid var(--line);background:#FAFAFB;font-size:.84rem;font-weight:600;color:var(--muted)}
+.pill.sel{background:var(--red);border-color:var(--red);color:#fff}
+.note{font-size:.75rem;color:var(--muted);line-height:1.5;margin-top:9px}
+.tt .row{display:flex;justify-content:space-between;padding:5px 0;font-size:.9rem;color:var(--muted)}
+.tt .row.big{border-top:1px solid var(--line);margin-top:9px;padding-top:12px;color:var(--text);font-weight:800;font-size:1.05rem}
+#btnSend{width:100%;margin-top:4px;padding:17px;border:none;border-radius:12px;background:var(--green);color:#fff;font-weight:800;font-size:1rem;display:flex;align-items:center;justify-content:center;gap:9px}
+#btnSend:disabled{opacity:.45;cursor:not-allowed}
+
+/* ---------- EFEITOS VISUAIS ---------- */
+/* typewriter */
+.typewriter-bar{background:var(--ink);color:#fff;text-align:center;padding:8px 16px;font-size:.82rem;font-weight:600;letter-spacing:.01em;overflow:hidden}
+.typewriter-bar span{border-right:2px solid var(--red);padding-right:3px;animation:tw-blink .7s step-end infinite;white-space:nowrap}
+@keyframes tw-blink{50%{border-color:transparent}}
+/* badge online */
+.badge-online{display:inline-flex;align-items:center;gap:7px;background:rgba(37,211,102,.12);border:1px solid rgba(37,211,102,.3);border-radius:999px;padding:5px 13px;font-size:.76rem;font-weight:700;color:#25d366;flex-shrink:0}
+.badge-online .dot{width:8px;height:8px;border-radius:50%;background:#25d366;animation:pulse-dot 1.8s ease infinite}
+@keyframes pulse-dot{0%{box-shadow:0 0 0 0 rgba(37,211,102,.5)}70%{box-shadow:0 0 0 8px rgba(37,211,102,0)}100%{box-shadow:0 0 0 0 rgba(37,211,102,0)}}
+/* badge oferta flutuante */
+.oferta-badge{animation:float-badge 2.4s ease-in-out infinite;display:inline-block}
+@keyframes float-badge{0%,100%{transform:translateY(0) rotate(-2deg)}50%{transform:translateY(-5px) rotate(2deg)}}
+/* ripple */
+.ripple-host{position:relative;overflow:hidden}
+.ripple-host .ripple-wave{position:absolute;border-radius:50%;background:rgba(255,255,255,.32);transform:scale(0);animation:ripple-go .65s linear forwards;pointer-events:none}
+@keyframes ripple-go{to{transform:scale(4.5);opacity:0}}
+/* ---------- MARCAS CARROSSEL ---------- */
+.marca-section{padding:34px 0 24px}
+/* card retangular externo */
+.marca-outer{border-radius:20px;overflow:hidden;padding:22px 0 26px}
+.marca-inner{padding:0 22px}
+.marca-header{display:flex;align-items:center;margin-bottom:16px;gap:12px}
+.marca-titulo-wrap{display:flex;align-items:center;gap:14px;flex:1;min-width:0}
+.marca-logo-txt{font-family:'Archivo',sans-serif;font-weight:900;font-size:clamp(1.6rem,5vw,2.4rem);letter-spacing:-.02em;background:linear-gradient(90deg,var(--mg-a,#E3132B),var(--mg-b,#FF8C2B));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;white-space:nowrap}
+.marca-linha{height:2px;flex:1;border-radius:2px;background:linear-gradient(90deg,var(--mg-a,#E3132B),var(--mg-b,#FF8C2B),transparent)}
+/* carrossel */
+.marca-carousel{position:relative}
+.marca-track-wrap{overflow:hidden;border-radius:12px}
+.marca-track{display:flex;gap:14px;padding:8px 0 12px;transition:transform .42s cubic-bezier(.5,0,.2,1);will-change:transform}
+/* fade nas bordas */
+.marca-fade-l,.marca-fade-r{position:absolute;top:0;bottom:0;width:64px;pointer-events:none;z-index:4;transition:opacity .2s}
+.marca-fade-l{left:0;background:linear-gradient(90deg,var(--mf-fade,#1A1A22) 0%,transparent 100%)}
+.marca-fade-r{right:0;background:linear-gradient(270deg,var(--mf-fade,#1A1A22) 0%,transparent 100%)}
+/* setas flutuantes centralizadas verticalmente */
+.marca-btn-l,.marca-btn-r{position:absolute;top:50%;transform:translateY(-50%);z-index:5;width:42px;height:42px;border-radius:50%;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:1.1rem;font-weight:700;background:rgba(255,255,255,.95);color:#141416;box-shadow:0 4px 16px rgba(0,0,0,.28);transition:all .15s;backdrop-filter:blur(6px)}
+.marca-btn-l{left:10px}
+.marca-btn-r{right:10px}
+.marca-btn-l:hover,.marca-btn-r:hover{background:var(--red);color:#fff;transform:translateY(-50%) scale(1.08)}
+.marca-btn-l:disabled,.marca-btn-r:disabled{opacity:0;pointer-events:none}
+/* cards de modelo */
+.mcard{flex:0 0 190px;background:#FFFFFF;border-radius:16px;overflow:hidden;box-shadow:0 2px 14px rgba(0,0,0,.13);border:none;display:flex;flex-direction:column;transition:transform .18s,box-shadow .18s}
+.mcard:hover{transform:translateY(-5px);box-shadow:0 10px 28px rgba(0,0,0,.22)}
+.mcard .mfita{height:5px;background:var(--mf-cor,#2A2A30);flex-shrink:0}
+.mcard .mpic{height:148px;background:#F7F7F9;display:flex;align-items:center;justify-content:center;font-size:3.5rem;position:relative;overflow:hidden}
+.mcard .mpic img{width:100%;height:100%;object-fit:contain;padding:10px}
+.mcard .mbadge{position:absolute;top:8px;right:8px;font-size:.6rem;font-weight:800;letter-spacing:.06em;padding:4px 8px;border-radius:6px;background:var(--red);color:#fff;animation:float-badge 2.4s ease-in-out infinite}
+.mcard .mbody{padding:13px 13px 15px;display:flex;flex-direction:column;gap:4px;flex:1}
+.mcard .mbrand{font-size:.62rem;font-weight:800;letter-spacing:.12em;color:#aaa}
+.mcard .mname{font-size:.88rem;font-weight:800;line-height:1.25;color:#141416}
+.mcard .mdesc{font-size:.73rem;color:#888;line-height:1.4;flex:1}
+.mcard .mold{font-size:.72rem;color:#aaa;text-decoration:line-through}
+.mcard .mpreco{font-family:'Archivo',sans-serif;font-weight:900;font-size:1.25rem;color:var(--red)}
+.mcard .mbuy{margin-top:8px;width:100%;padding:11px;border:none;border-radius:9px;background:var(--red);color:#fff;font-weight:700;font-size:.82rem;cursor:pointer;position:relative;overflow:hidden}
+.mcard .mbuy:hover{background:var(--red-dark)}
+.mcard .mqty{margin-top:8px;display:flex;align-items:center;justify-content:space-between;background:#141416;border-radius:9px;color:#fff;font-weight:800}
+.mcard .mqty button{background:none;border:none;color:#fff;width:40px;height:40px;font-size:1.1rem;cursor:pointer}
+/* ---------- CHECKOUT MELHORADO ---------- */
+.co-banner{border-radius:12px;overflow:hidden;margin-bottom:14px;min-height:64px;background:linear-gradient(120deg,#7a0a17,#e3132b);display:flex;align-items:center;justify-content:center;padding:14px 18px;text-align:center;color:#fff;font-weight:700;font-size:.85rem;line-height:1.45;position:relative}
+.co-banner img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.5}
+.co-banner span{position:relative;z-index:1}
+.co-item-pic{width:48px;height:48px;border-radius:9px;background:#F1F1F4;display:flex;align-items:center;justify-content:center;font-size:1.5rem;overflow:hidden;flex-shrink:0}
+.co-item-pic img{width:100%;height:100%;object-fit:cover}
+.ci2{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)}
+.ci2:last-child{border-bottom:none}
+.ci2 .ci2-info{flex:1;min-width:0}
+.ci2 .ci2-nome{font-size:.85rem;font-weight:700;line-height:1.3}
+.ci2 .ci2-sub{font-size:.73rem;color:var(--muted);margin-top:2px}
+.ci2 .ci2-preco{font-family:'Archivo',sans-serif;font-weight:900;font-size:1rem;color:var(--red);flex-shrink:0}
+.pay-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-top:4px}
+.pay-opt{border:2px solid var(--line);background:var(--bg);border-radius:12px;padding:12px 8px;text-align:center;cursor:pointer;font-size:.8rem;font-weight:700;color:var(--muted);transition:all .15s;display:flex;flex-direction:column;align-items:center;gap:5px}
+.pay-opt .pay-icon{font-size:1.6rem}
+.pay-opt.sel{border-color:var(--red);background:#FDE8EA;color:var(--red-dark)}
+.dados-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}
+/* ---------- TOAST ---------- */
+#toast{position:fixed;left:50%;bottom:86px;transform:translateX(-50%) translateY(16px);z-index:600;background:var(--ink);color:#fff;font-size:.85rem;font-weight:600;padding:11px 20px;border-radius:999px;opacity:0;pointer-events:none;transition:all .25s;box-shadow:var(--shadow-lg);white-space:nowrap}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ============================================================
+   PAINEL ADMINISTRATIVO
+   ============================================================ */
+#admLogin{position:fixed;inset:0;z-index:900;background:rgba(14,14,16,.92);display:none;align-items:center;justify-content:center;padding:24px}
+#admLogin.show{display:flex}
+.adm-login-box{max-width:360px;width:100%;background:var(--card);border-radius:16px;padding:32px 28px;box-shadow:var(--shadow-lg)}
+.adm-login-box h2{font-family:'Archivo',sans-serif;font-size:1.2rem;margin-bottom:6px}
+.adm-login-box p{color:var(--muted);font-size:.83rem;margin-bottom:18px;line-height:1.5}
+.adm-login-box .field{margin-bottom:12px}
+.adm-login-box .go{width:100%;padding:14px;border:none;border-radius:10px;background:var(--ink);color:#fff;font-weight:800}
+.adm-login-box .cancel{width:100%;padding:12px;border:none;background:none;color:var(--muted);font-size:.84rem;margin-top:6px}
+.adm-err{color:var(--red);font-size:.8rem;margin-bottom:10px;display:none}
+#admBar{position:fixed;left:0;right:0;bottom:0;z-index:500;background:var(--ink);color:#fff;display:none;align-items:center;gap:12px;padding:10px 16px calc(10px + env(safe-area-inset-bottom));box-shadow:0 -4px 20px rgba(0,0,0,.3)}
+#admBar.show{display:flex}
+#admBar b{font-size:.85rem}
+#admBar .spacer{flex:1}
+#admBar button{border:none;border-radius:9px;padding:10px 16px;font-weight:700;font-size:.83rem}
+#admBar .open{background:var(--red);color:#fff}
+#admBar .exit{background:var(--ink-2);color:#B9B9C2;border:1px solid #333}
+#admin{position:fixed;inset:0;z-index:800;background:var(--bg);display:none;flex-direction:column}
+#admin.show{display:flex}
+.adm-head{background:var(--ink);color:#fff;padding:14px 18px;display:flex;align-items:center;gap:12px}
+.adm-head b{font-family:'Archivo',sans-serif;font-size:1rem}
+.adm-head b span{color:var(--red)}
+.adm-head .spacer{flex:1}
+.adm-head button{background:var(--ink-2);border:1px solid #333;color:#fff;border-radius:9px;padding:9px 14px;font-weight:700;font-size:.82rem}
+.adm-tabs{display:flex;gap:4px;background:var(--card);border-bottom:1px solid var(--line);overflow-x:auto;padding:0 12px;scrollbar-width:none}
+.adm-tabs::-webkit-scrollbar{display:none}
+.adm-tab{flex-shrink:0;background:none;border:none;padding:14px 14px 12px;font-size:.86rem;font-weight:700;color:var(--muted);border-bottom:2.5px solid transparent}
+.adm-tab.active{color:var(--red);border-bottom-color:var(--red)}
+.adm-body{flex:1;overflow-y:auto;padding:18px 16px 60px}
+.adm-wrap{max-width:760px;margin:0 auto}
+.adm-card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin-bottom:13px;box-shadow:var(--shadow)}
+.adm-card h4{font-size:.92rem;margin-bottom:4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.adm-card .hint{font-size:.76rem;color:var(--muted);line-height:1.5;margin-bottom:8px}
+.adm-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+@media(max-width:560px){.adm-grid{grid-template-columns:1fr}}
+.adm-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.adm-actions{display:flex;gap:6px;margin-top:12px;flex-wrap:wrap}
+.abtn{border:none;border-radius:8px;padding:9px 13px;font-weight:700;font-size:.79rem}
+.abtn.red{background:var(--red);color:#fff}
+.abtn.dark{background:var(--ink);color:#fff}
+.abtn.soft{background:#F1F1F4;color:var(--text);border:1px solid var(--line)}
+.abtn.danger{background:#FDE8EA;color:var(--red)}
+.abtn.big{padding:14px 20px;font-size:.9rem;border-radius:10px}
+.adm-add{width:100%;padding:15px;border:2px dashed var(--line);background:none;border-radius:var(--radius);color:var(--muted);font-weight:700;font-size:.88rem;margin-bottom:13px}
+.adm-add:hover{border-color:var(--red);color:var(--red)}
+.pv{width:64px;height:64px;border-radius:10px;background:#F1F1F4;display:flex;align-items:center;justify-content:center;font-size:1.7rem;overflow:hidden;flex-shrink:0}
+.pv img{width:100%;height:100%;object-fit:cover}
+.pv.wide{width:110px;height:60px}
+.chk{display:flex;align-items:center;gap:8px;font-size:.83rem;font-weight:600;color:var(--muted);margin-top:12px}
+.chk input{width:18px;height:18px;accent-color:var(--red)}
+.adm-note{background:#FFF7E0;border:1px solid #F0DFA0;color:#7A6215;border-radius:10px;padding:12px 14px;font-size:.8rem;line-height:1.55;margin-bottom:13px}
+.cor-preview{width:34px;height:34px;border-radius:8px;flex-shrink:0}
+.list-item{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.list-item .field{flex:1}
+.file-hide{display:none}
+/* ── ADMIN NOVO ── */
+/* dashboard */
+.dash-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:16px}
+.dash-kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow)}
+.dash-kpi .dk-val{font-family:'Archivo',sans-serif;font-weight:900;font-size:1.7rem;color:var(--text);line-height:1}
+.dash-kpi .dk-lbl{font-size:.72rem;color:var(--muted);margin-top:4px;font-weight:600;letter-spacing:.04em}
+.dash-kpi .dk-sub{font-size:.72rem;color:var(--ok,#7dcf8a);font-weight:700;margin-top:2px}
+.dash-bar{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:12px;box-shadow:var(--shadow)}
+.dash-bar h5{font-size:.78rem;font-weight:700;color:var(--muted);letter-spacing:.05em;margin-bottom:10px}
+.dash-row{display:flex;align-items:center;gap:8px;margin-bottom:7px;font-size:.8rem}
+.dash-row .dr-lbl{flex:1;color:var(--text);font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dash-row .dr-bar{flex:2;height:7px;border-radius:4px;background:#EEEEF2;overflow:hidden}
+.dash-row .dr-fill{height:100%;border-radius:4px;background:var(--red);transition:width .5s ease}
+.dash-row .dr-val{min-width:32px;text-align:right;color:var(--muted);font-size:.75rem}
+/* produto compacto */
+.pc{background:var(--card);border:1px solid var(--line);border-radius:12px;margin-bottom:8px;overflow:hidden;box-shadow:var(--shadow)}
+.pc-head{display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;user-select:none}
+.pc-head:hover{background:#FAFAFA}
+.pc-thumb{width:48px;height:48px;border-radius:9px;background:#F1F1F4;display:flex;align-items:center;justify-content:center;font-size:1.4rem;overflow:hidden;flex-shrink:0}
+.pc-thumb img{width:100%;height:100%;object-fit:cover}
+.pc-info{flex:1;min-width:0}
+.pc-name{font-size:.86rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pc-meta{font-size:.72rem;color:var(--muted);margin-top:2px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.pc-badge{font-size:.64rem;font-weight:700;padding:2px 7px;border-radius:999px}
+.pc-badge.on{background:#e6f9ee;color:#1a7a40}
+.pc-badge.off{background:#fde8ea;color:var(--red)}
+.pc-badge.sem{background:#FFF7E0;color:#7A6215}
+.pc-price{font-family:'Archivo',sans-serif;font-weight:900;color:var(--red);font-size:.95rem;flex-shrink:0}
+.pc-actions{display:flex;gap:4px;flex-shrink:0}
+.pc-actions button{width:30px;height:30px;border:none;border-radius:7px;cursor:pointer;font-size:.85rem;display:flex;align-items:center;justify-content:center}
+.pc-body{border-top:1px solid var(--line);padding:14px;display:none}
+.pc-body.open{display:block}
+.sabor-tag{display:inline-flex;align-items:center;gap:4px;background:#F1F1F4;border:1px solid var(--line);border-radius:999px;padding:4px 10px;font-size:.75rem;font-weight:600;margin:3px}
+.sabor-tag button{background:none;border:none;color:var(--muted);cursor:pointer;font-size:.8rem;line-height:1;padding:0 2px}
+.sabor-tag button:hover{color:var(--red)}
+.sabor-add{display:inline-flex;align-items:center;gap:5px;background:none;border:1.5px dashed var(--line);border-radius:999px;padding:5px 12px;font-size:.75rem;font-weight:600;color:var(--muted);cursor:pointer;margin:3px;vertical-align:middle}
+.sabor-add:hover{border-color:var(--red);color:var(--red)}
+.sabor-input{border:1.5px solid var(--red);background:#fff;border-radius:999px;padding:5px 10px;font-size:.75rem;font-weight:600;outline:none;width:120px;margin:3px;vertical-align:middle}
+/* marcas compactas */
+.mc{background:var(--card);border:1px solid var(--line);border-radius:12px;margin-bottom:8px;overflow:hidden;box-shadow:var(--shadow)}
+.mc-head{display:flex;align-items:center;gap:10px;padding:11px 14px;cursor:pointer}
+.mc-head:hover{background:#FAFAFA}
+.mc-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0}
+.mc-nome{flex:1;font-size:.9rem;font-weight:800}
+.mc-count{font-size:.73rem;color:var(--muted)}
+.mc-chevron{color:var(--muted);font-size:.85rem;transition:transform .2s;flex-shrink:0}
+.mc.open .mc-chevron{transform:rotate(90deg)}
+.mc-body{border-top:1px solid var(--line);padding:12px;display:none;background:#FAFAFC}
+.mc.open .mc-body{display:block}
+.modelo-row{display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:9px 11px;margin-bottom:6px}
+.modelo-row .mr-thumb{width:40px;height:40px;border-radius:8px;background:#F1F1F4;display:flex;align-items:center;justify-content:center;font-size:1.2rem;overflow:hidden;flex-shrink:0}
+.modelo-row .mr-thumb img{width:100%;height:100%;object-fit:cover}
+.modelo-row .mr-info{flex:1;min-width:0}
+.modelo-row .mr-name{font-size:.82rem;font-weight:700}
+.modelo-row .mr-sub{font-size:.7rem;color:var(--muted);margin-top:1px}
+.modelo-row .mr-price{font-family:'Archivo',sans-serif;font-weight:900;color:var(--red);font-size:.88rem;flex-shrink:0}
+.modelo-row .mr-acts{display:flex;gap:4px;flex-shrink:0}
+.modelo-row .mr-acts button{width:28px;height:28px;border:none;border-radius:7px;cursor:pointer;font-size:.8rem;display:flex;align-items:center;justify-content:center}
+.modelo-expand{border-top:1px solid var(--line);padding:10px 11px;display:none;background:#F8F8FA}
+.modelo-expand.open{display:block}
+/* toggle switch */
+.tog{position:relative;width:38px;height:22px;flex-shrink:0}
+.tog input{opacity:0;width:0;height:0;position:absolute}
+.tog-sl{position:absolute;inset:0;background:#ccc;border-radius:22px;cursor:pointer;transition:.2s}
+.tog input:checked+.tog-sl{background:var(--red)}
+.tog-sl::before{content:"";position:absolute;left:3px;top:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:.2s}
+.tog input:checked+.tog-sl::before{transform:translateX(16px)}
+/* color picker inline */
+.cpick{width:32px;height:32px;border-radius:7px;border:1.5px solid var(--line);cursor:pointer;padding:2px;flex-shrink:0}
+/* foto thumb com botões sobrepostos */
+.img-wrap{position:relative;display:inline-block}
+.img-wrap .img-ov{position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);border-radius:9px;display:flex;align-items:center;justify-content:center;gap:6px;opacity:0;transition:opacity .18s;z-index:2}
+.img-wrap:hover .img-ov{opacity:1}
+.img-ov button{width:28px;height:28px;border:none;border-radius:50%;cursor:pointer;font-size:.8rem;display:flex;align-items:center;justify-content:center;font-weight:700}
+.img-ov .ov-edit{background:#fff;color:#141416}
+.img-ov .ov-del{background:#E3132B;color:#fff}
+/* editor modal */
+#imgEditor{position:fixed;inset:0;z-index:3000;background:rgba(14,14,16,.95);display:none;flex-direction:column;align-items:center;justify-content:flex-start;padding:16px}
+#imgEditor.show{display:flex}
+.ied-head{width:100%;max-width:680px;display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-shrink:0}
+.ied-head h3{font-family:'Archivo',sans-serif;font-weight:900;font-size:1rem;color:#fff}
+.ied-head button{background:#2A2A30;border:none;color:#fff;border-radius:8px;padding:8px 14px;font-weight:700;font-size:.82rem;cursor:pointer}
+.ied-head .ied-save{background:var(--red);margin-left:6px}
+.ied-canvas-wrap{flex:1;width:100%;max-width:680px;background:#111;border-radius:14px;overflow:hidden;display:flex;align-items:center;justify-content:center;min-height:0;position:relative}
+#iedCanvas{max-width:100%;max-height:100%;display:block;cursor:crosshair}
+.ied-controls{width:100%;max-width:680px;background:#1E1E22;border-radius:12px;padding:14px 16px;margin-top:10px;flex-shrink:0}
+.ied-tabs{display:flex;gap:4px;margin-bottom:12px;border-bottom:1px solid #333;padding-bottom:8px}
+.ied-tab{background:none;border:none;color:#888;font-size:.8rem;font-weight:700;padding:5px 12px;border-radius:6px;cursor:pointer}
+.ied-tab.on{background:var(--red);color:#fff}
+.ied-panel{display:none}
+.ied-panel.on{display:block}
+.ied-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.ied-row label{font-size:.72rem;font-weight:700;color:#888;min-width:70px}
+.ied-row input[type=range]{flex:1;accent-color:var(--red)}
+.ied-row span{font-size:.72rem;color:#ccc;min-width:32px;text-align:right}
+.ied-btns{display:flex;gap:6px;flex-wrap:wrap}
+.ied-btns button{padding:8px 12px;border:none;border-radius:8px;background:#2A2A30;color:#ccc;font-size:.78rem;font-weight:700;cursor:pointer}
+.ied-btns button:hover{background:#3A3A42;color:#fff}
+.ied-crop-hint{font-size:.72rem;color:#888;margin-top:8px;line-height:1.5}
+.ied-overlay{position:absolute;border:2px dashed rgba(255,255,255,.7);pointer-events:none;z-index:10;box-sizing:border-box;background:rgba(0,0,0,.35)}
+</style>
+</head>
+<body>
+
+<!-- ═══════ DADOS DA LOJA (editados pelo painel admin) ═══════ -->
+<script type="application/json" id="STORE_DATA">
+{
+  "loja": "SMOKE CLUB",
+  "whatsapp": "5511995580546",
+  "waSaudacao": "Olá! Vim pelo site da Smoke Club e gostaria de uma ajuda 😊",
+  "senha": "YWRtaW4xMjM=",
+  "marca": { "p1": "SMOKE", "p2": "CLUB", "slogan": "TABACARIA DIGITAL" },
+  "frete": { "porKm": 1.8, "minimo": 10 },
+  "bairros": [
+    ["Anchieta (SBC)", 1.5], ["Vila Gonçalves (SBC)", 3], ["Centro (SBC)", 3.5],
+    ["Nova Petrópolis (SBC)", 3.5], ["Baeta Neves (SBC)", 4], ["Ferrazópolis (SBC)", 4.5],
+    ["Jordanópolis (SBC)", 5], ["Rudge Ramos (SBC)", 6], ["Assunção (SBC)", 6],
+    ["Alves Dias (SBC)", 6], ["Demarchi (SBC)", 6.5], ["Planalto (SBC)", 7],
+    ["Paulicéia (SBC)", 8], ["Taboão (SBC)", 8], ["Batistini (SBC)", 8.5],
+    ["Riacho Grande (SBC)", 12], ["Centro (São Caetano)", 8], ["Centro (Santo André)", 9],
+    ["Centro (Diadema)", 8], ["Sacomã / Ipiranga (SP)", 12], ["Jabaquara (SP)", 15],
+    ["Outro bairro (combinar frete)", null]
+  ],
+  "categorias": [
+    { "nome": "Essências", "cor": "azul", "img": null },
+    { "nome": "Carvão", "cor": "fogo", "img": null },
+    { "nome": "Sedas & Filtros", "cor": "verde", "img": null },
+    { "nome": "Acessórios", "cor": "amarelo", "img": null }
+  ],
+  "banners": [
+    { "estilo":"s1", "tag":"ENTREGA RÁPIDA NO ABC", "titulo":"Sua tabacaria favorita, agora online", "texto":"Monte seu pedido em segundos e receba em casa via motoboy.", "botao":"Ver produtos", "destino":"Essências", "icone":"🛵", "img":null },
+    { "estilo":"s2", "tag":"PAGAMENTO FACILITADO", "titulo":"Pix, cartão ou dinheiro na entrega", "texto":"Você escolhe como pagar. Rápido, simples e seguro.", "botao":"Montar pedido", "destino":"Carvão", "icone":"💳", "img":null },
+    { "estilo":"s3", "tag":"ATENDIMENTO DIRETO", "titulo":"Pediu, chegou no WhatsApp", "texto":"Seu pedido cai direto na nossa conversa — confirmamos tudo na hora.", "botao":"Como funciona", "destino":null, "icone":"💬", "img":null }
+  ],
+  "textos": {
+    "topbar": ["🛵 Entrega rápida em SBC e região", "💬 Pedido direto pelo WhatsApp", "💠 Pix, cartão ou dinheiro", "🔞 Somente maiores de 18 anos"],
+    "gateTitulo": "Este site é destinado a maiores de 18 anos",
+    "gateTexto": "Vendemos produtos de tabacaria. Ao continuar, você confirma que possui 18 anos ou mais. Venda proibida para menores — Lei 8.069/90 e Lei 10.702/03.",
+    "buscaPlaceholder": "O que você procura?",
+    "perks": [
+      ["🛵", "Entrega rápida", "SBC e região do ABC via motoboy"],
+      ["💬", "Pedido pelo WhatsApp", "Atendimento direto e humano"],
+      ["💠", "Pague como quiser", "Pix, cartão ou dinheiro"],
+      ["🔞", "Venda responsável", "Somente para maiores de 18 anos"]
+    ],
+    "tituloCategorias": "Categorias",
+    "tituloDestaques": "🔥 Destaques",
+    "stripTitulo": "Não achou o que procura?",
+    "stripTexto": "Chama no WhatsApp — a gente te ajuda a encontrar o produto certo.",
+    "stripBotao": "💬 Falar com a gente",
+    "rodapeDescricao": "Tabacaria digital com entrega rápida em São Bernardo do Campo e região do ABC.",
+    "rodapeLinhas": ["🛵 Entrega via motoboy", "📦 Retirada mediante combinação"],
+    "horarios": ["Seg a Sáb — 10h às 22h", "Domingo — 12h às 20h"],
+    "pagamentos": ["✅ Pix (aprovação imediata)", "✅ Cartão de crédito e débito na entrega", "✅ Dinheiro"],
+    "avisoTitulo": "PROIBIDA A VENDA PARA MENORES DE 18 ANOS.",
+    "avisoLegal": "Este produto causa dependência e faz mal à saúde. © 2026 Smoke Club — Todos os direitos reservados.",
+    "typewriterFrases": ["Pediu? Chegou! 🛵", "Entrega rápida no ABC 🔥", "Pix, cartão ou dinheiro 💠", "Qualidade premium 💨", "Tabacaria digital SBC ⚡"],
+    "typewriterAtivo": true,
+    "badgeOnlineTexto": "Atendimento online agora",
+    "badgeOnlineAtivo": true,
+    "ofertaBadgeTexto": "OFERTA",
+    "rippleBotaoTexto": "💬 Fazer pedido no WhatsApp",
+    "checkoutBannerImg": null,
+    "checkoutBannerTexto": "🔥 Entrega rápida · Produto original · Pedido seguro",
+    "analytics": { "enabled": true }, "formasPagamento": [
+      { "id":"pix",  "label":"💠 Pix",              "ativo":true },
+      { "id":"link", "label":"🔗 Link de pagamento", "ativo":true },
+      { "id":"din",  "label":"💵 Dinheiro",          "ativo":true }
+    ]
+  },
+  "marcas": [
+    {
+      "nome": "IGNITE",
+      "corFita": "#2A2A30",
+      "corTexto": "#FFFFFF",
+      "corGradA": "#E3132B",
+      "corGradB": "#FF8C2B",
+      "corFundo": "#1A1A22",
+      "descricao": "Pods descartáveis premium com sabores exclusivos",
+      "ativo": true,
+      "modelos": [
+        { "nome":"IGNITE V500", "desc":"500 puffs · 20mg nicotina", "preco":39.9, "de":49.9, "img":null, "emoji":"💨" },
+        { "nome":"IGNITE V400 Mix", "desc":"400 puffs · Frutas mistas", "preco":34.9, "de":null, "img":null, "emoji":"🍓" },
+        { "nome":"IGNITE V600 Ice", "desc":"600 puffs · Refrescante", "preco":44.9, "de":null, "img":null, "emoji":"❄️" },
+        { "nome":"IGNITE Pro Max", "desc":"800 puffs · Sabor intenso", "preco":52.9, "de":59.9, "img":null, "emoji":"⚡" }
+      ]
+    }
+  ],
+  "produtos": [
+    { "cat":"Essências", "emoji":"🍉", "nome":"Essência 50g", "desc":"Doce e refrescante, fumaça densa", "preco":14.9, "de":null, "destaque":true, "img":null, "ativo":true, "estoque":true, "sabores":["Melancia Ice","Uva","Menta","Pêssego"] },
+    { "cat":"Essências", "emoji":"🍇", "nome":"Essência 50g — Uva", "desc":"O clássico que nunca falha", "preco":14.9, "de":19.9, "destaque":true, "img":null, "ativo":true, "estoque":true, "sabores":[] },
+    { "cat":"Essências", "emoji":"🌿", "nome":"Essência 50g — Menta", "desc":"Refrescância intensa", "preco":12.9, "de":null, "destaque":false, "img":null, "ativo":true, "estoque":true, "sabores":[] },
+    { "cat":"Essências", "emoji":"🍑", "nome":"Essência 50g — Pêssego", "desc":"Sabor suave e adocicado", "preco":14.9, "de":null, "destaque":false, "img":null, "ativo":true, "estoque":true, "sabores":[] },
+    { "cat":"Carvão", "emoji":"🔥", "nome":"Carvão de coco 1kg", "desc":"Hexagonal, brasa duradoura", "preco":24.9, "de":29.9, "destaque":true, "img":null, "ativo":true, "estoque":true, "sabores":[] },
+    { "cat":"Carvão", "emoji":"🧊", "nome":"Carvão de coco 250g", "desc":"Ideal pra sessão rápida", "preco":9.9, "de":null, "destaque":false, "img":null, "ativo":true, "estoque":true, "sabores":[] },
+    { "cat":"Sedas & Filtros", "emoji":"📜", "nome":"Seda king size (un)", "desc":"Papel fino, queima lenta", "preco":5, "de":null, "destaque":false, "img":null, "ativo":true, "estoque":true, "sabores":[] },
+    { "cat":"Sedas & Filtros", "emoji":"🌀", "nome":"Piteira de vidro", "desc":"Reutilizável, bocal confortável", "preco":15, "de":null, "destaque":true, "img":null, "ativo":true, "estoque":true, "sabores":[] },
+    { "cat":"Sedas & Filtros", "emoji":"🧻", "nome":"Filtro carvão ativado (pct)", "desc":"Fumada mais suave", "preco":19.9, "de":null, "destaque":false, "img":null, "ativo":true, "estoque":true, "sabores":[] },
+    { "cat":"Acessórios", "emoji":"⚡", "nome":"Isqueiro maçarico", "desc":"Chama forte, recarregável", "preco":29.9, "de":39.9, "destaque":true, "img":null, "ativo":true, "estoque":true, "sabores":[] },
+    { "cat":"Acessórios", "emoji":"🫖", "nome":"Rosh de cerâmica", "desc":"Alta durabilidade", "preco":39.9, "de":null, "destaque":false, "img":null, "ativo":true, "estoque":true, "sabores":[] },
+    { "cat":"Acessórios", "emoji":"🧲", "nome":"Alumínio premium (rolo)", "desc":"Espessura ideal pra narguilé", "preco":12, "de":null, "destaque":false, "img":null, "ativo":true, "estoque":true, "sabores":[] },
+    { "cat":"Acessórios", "emoji":"🧰", "nome":"Kit abafador + pinça", "desc":"Combo essencial da sessão", "preco":34.9, "de":44.9, "destaque":true, "img":null, "ativo":true, "estoque":true, "sabores":[] }
+  ]
+}
+</script>
+
+<!-- ═══════ VERIFICAÇÃO +18 ═══════ -->
+<div id="ageGate">
+  <div class="gate">
+    <div class="glogo" id="gateLogo"></div>
+    <h2 id="gateTitulo"></h2>
+    <p id="gateTexto"></p>
+    <div class="row">
+      <button class="no" onclick="location.href='https://www.google.com'">Sair</button>
+      <button class="yes" onclick="App.passGate()">Sou maior de 18</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ TOPBAR / HEADER / NAV ═══════ -->
+<div class="topbar" aria-hidden="true"><div class="track" id="topTrack"></div></div>
+<div class="typewriter-bar" id="typeBar" style="display:none"><span id="typeEl">&nbsp;</span></div>
+
+<header class="site">
+  <div class="container">
+    <a class="logo" href="#" onclick="App.goHome(event)" id="headLogo"></a>
+    <div class="search">
+      <input id="searchInput" type="search" oninput="App.search(this.value)" aria-label="Buscar produtos">
+      <button aria-label="Buscar" onclick="document.getElementById('searchInput').focus()">🔍</button>
+    </div>
+    <span class="badge-online" id="badgeOnline" style="display:none"><span class="dot"></span><span id="badgeOnlineTxt"></span></span>
+    <button class="cart-btn" onclick="App.openDrawer()" aria-label="Abrir carrinho">🛒<span class="bubble hide" id="cartBubble">0</span></button>
+  </div>
+</header>
+
+<nav class="catnav"><div class="container" id="catNav"></div></nav>
+
+<main>
+  <div class="container hero" id="heroWrap">
+    <div class="slider"><div class="slides" id="slides"></div><div class="dots" id="dots"></div></div>
+  </div>
+
+  <div class="container"><div class="perks" id="perks"></div></div>
+
+  <section class="container section" id="catShowcase">
+    <h2 class="section-title" id="tituloCategorias"></h2>
+    <div class="catgrid" id="catGrid"></div>
+  </section>
+
+  <div id="marcaSections"></div>
+
+  <div class="container" id="productSections"></div>
+
+  <div class="container">
+    <div class="strip">
+      <h3 id="stripTitulo"></h3>
+      <p id="stripTexto"></p>
+      <a id="stripWa" href="#" target="_blank" rel="noopener"></a>
+    </div>
+  </div>
+</main>
+
+<!-- ═══════ FOOTER ═══════ -->
+<footer>
+  <div class="container">
+    <div class="cols">
+      <div>
+        <div class="footer-logo" id="footLogo"></div>
+        <ul style="margin-top:12px" id="footCol1"></ul>
+      </div>
+      <div>
+        <h4>Atendimento</h4>
+        <ul id="footHours"></ul>
+      </div>
+      <div>
+        <h4>Departamentos</h4>
+        <ul id="footCats"></ul>
+      </div>
+      <div>
+        <h4>Pagamento</h4>
+        <ul id="footPay"></ul>
+      </div>
+    </div>
+  </div>
+  <div class="foot-18">
+    <div class="container">
+      <b id="avisoTitulo"></b><br>
+      <span id="avisoLegal"></span><br>
+      <a href="#" class="adm-link" onclick="Admin.askLogin(event)">Área do lojista</a>
+    </div>
+  </div>
+</footer>
+
+<button class="wa-float ripple-host" id="waFloatBtn" onclick="App.openWaChat()" aria-label="Falar no WhatsApp">💬</button>
+
+<!-- ═══════ DRAWER DO CARRINHO ═══════ -->
+<div class="overlay" id="overlay" onclick="App.closeDrawer()"></div>
+<aside class="drawer" id="drawer" aria-label="Carrinho de compras">
+  <div class="dh"><b>🛒 Seu carrinho</b><button onclick="App.closeDrawer()" aria-label="Fechar">✕</button></div>
+  <div class="dlist" id="drawerList"></div>
+  <div class="dfoot">
+    <div class="sub"><span>Subtotal</span><b id="drawerSub">R$ 0,00</b></div>
+    <button class="go" id="drawerGo" onclick="App.openCheckout()">Finalizar pedido</button>
+  </div>
+</aside>
+
+<!-- ═══════ CHECKOUT ═══════ -->
+<div id="checkout">
+  <div class="co">
+    <div class="co-top">
+      <button onclick="App.closeCheckout()" aria-label="Voltar">←</button>
+      <h2>Finalizar pedido</h2>
+    </div>
+    <div class="co-banner" id="coBanner"><span id="coBannerTxt"></span></div>
+    <div class="box"><h3><span class="n">1</span> Itens do pedido</h3><div id="coItems"></div></div>
+    <div class="box">
+      <h3><span class="n">2</span> Entrega</h3>
+
+      <div class="pills" id="modePills">
+        <button class="pill sel" data-mode="local"   onclick="App.setMode('local')">🛵 ABC / SP</button>
+        <button class="pill"    data-mode="nacional" onclick="App.setMode('nacional')">📦 Envio nacional</button>
+        <button class="pill"    data-mode="retirada" onclick="App.setMode('retirada')">🏪 Retirar</button>
+      </div>
+
+      <!-- LOCAL: CEP → busca automática -->
+      <div id="addrLocal">
+        <!-- CEP com busca automática -->
+        <label for="cepInput">CEP</label>
+        <div style="display:flex;gap:8px">
+          <input id="cepInput" class="field" inputmode="numeric" maxlength="9"
+                 placeholder="00000-000" oninput="App.maskCep(this)" style="flex:1">
+          <button onclick="App.buscaCep()" id="cepBtn"
+                  style="flex-shrink:0;padding:0 18px;border:none;border-radius:10px;background:var(--red);color:#fff;font-weight:700;font-size:.85rem">
+            Buscar
+          </button>
+        </div>
+        <div id="cepStatus" style="font-size:.78rem;margin-top:6px;min-height:18px;color:var(--muted)"></div>
+
+        <!-- Campos de endereço — aparecem após busca do CEP (editáveis) -->
+        <div id="addrAuto" style="display:none">
+          <label for="rua">Rua / Logradouro</label>
+          <input id="rua" class="field" placeholder="Rua, Av., Travessa..." oninput="App.render()">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 10px">
+            <div>
+              <label for="numero">Número</label>
+              <input id="numero" class="field" placeholder="Nº" oninput="App.render()">
+            </div>
+            <div>
+              <label for="bairroInput">Bairro</label>
+              <input id="bairroInput" class="field" placeholder="Bairro" oninput="App.render()">
+            </div>
+          </div>
+          <label for="comp">Complemento (opcional)</label>
+          <input id="comp" class="field" placeholder="Apto, bloco, referência...">
+
+          <!-- Dados pessoais integrados -->
+          <div class="dados-grid" style="margin-top:4px">
+            <div>
+              <label for="nomeLocal">Nome completo</label>
+              <input id="nomeLocal" class="field" placeholder="Seu nome" oninput="App.render()">
+            </div>
+            <div>
+              <label for="telefone">Telefone / WhatsApp</label>
+              <input id="telefone" class="field" inputmode="tel" placeholder="(11) 9xxxx-xxxx" oninput="App.render()">
+            </div>
+          </div>
+
+          <!-- Card de frete estimado -->
+          <div id="freteCard" style="margin-top:12px;border-radius:10px;padding:12px 14px;background:#FDE8EA;display:flex;align-items:center;gap:10px">
+            <span style="font-size:1.4rem">🛵</span>
+            <div>
+              <div style="font-size:.78rem;color:var(--muted)">Frete estimado · <b id="freteNomeCidade"></b></div>
+              <div style="font-family:'Archivo',sans-serif;font-weight:900;font-size:1.2rem;color:var(--red)" id="freteValor">—</div>
+            </div>
+          </div>
+          <p class="note" style="margin-top:7px">⚡ Frete calculado pela distância. Confirmamos o valor exato pelo WhatsApp antes de finalizar. Você pode editar os campos acima se precisar corrigir algo.</p>
+        </div>
+      </div>
+
+      <!-- NACIONAL: Correios / transportadora -->
+      <div id="addrNacional" class="hidden">
+        <div style="background:#EEF6FF;border:1px solid #B8D6F6;border-radius:10px;padding:12px 14px;margin-top:10px">
+          <div style="font-weight:700;font-size:.9rem;margin-bottom:4px">📦 Envio para todo o Brasil</div>
+          <div style="font-size:.82rem;color:var(--muted);line-height:1.5">Enviamos pelos Correios (PAC / SEDEX) ou transportadora. O valor do frete é calculado pelo WhatsApp após você montar o pedido.</div>
+        </div>
+        <label for="cepNac" style="margin-top:12px">CEP de destino</label>
+        <div style="display:flex;gap:8px">
+          <input id="cepNac" class="field" inputmode="numeric" maxlength="9"
+                 placeholder="00000-000" oninput="App.maskCep(this)" style="flex:1">
+          <button onclick="App.buscaCepNac()"
+                  style="flex-shrink:0;padding:0 18px;border:none;border-radius:10px;background:var(--ink);color:#fff;font-weight:700;font-size:.85rem">
+            Buscar
+          </button>
+        </div>
+        <div id="cepNacStatus" style="font-size:.78rem;margin-top:7px;min-height:18px;color:var(--muted)"></div>
+        <div id="nacAddrAuto" style="display:none">
+          <label for="nacRua">Rua / Logradouro</label>
+          <input id="nacRua" class="field" placeholder="Rua, Av., Travessa..." oninput="App.render()">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 10px">
+            <div>
+              <label for="nacNum">Número</label>
+              <input id="nacNum" class="field" placeholder="Nº" oninput="App.render()">
+            </div>
+            <div>
+              <label for="nacBairro">Bairro</label>
+              <input id="nacBairro" class="field" placeholder="Bairro" oninput="App.render()">
+            </div>
+          </div>
+          <label for="nacComp">Complemento (opcional)</label>
+          <input id="nacComp" class="field" placeholder="Apto, bloco...">
+          <div class="dados-grid" style="margin-top:4px">
+            <div>
+              <label for="nomeNac">Nome completo</label>
+              <input id="nomeNac" class="field" placeholder="Seu nome" oninput="App.render()">
+            </div>
+            <div>
+              <label for="telNac">Telefone / WhatsApp</label>
+              <input id="telNac" class="field" inputmode="tel" placeholder="(11) 9xxxx-xxxx" oninput="App.render()">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RETIRADA -->
+      <div id="addrRetirada" class="hidden">
+        <div style="background:#F0FFF4;border:1px solid #A7E3BE;border-radius:10px;padding:12px 14px;margin-top:10px">
+          <div style="font-weight:700;font-size:.9rem;margin-bottom:4px">🏪 Retirada combinada</div>
+          <div style="font-size:.82rem;color:var(--muted);line-height:1.5">Combinamos local e horário de retirada pelo WhatsApp após o pedido.</div>
+        </div>
+        <div class="dados-grid" style="margin-top:10px">
+          <div>
+            <label for="nomeRet">Nome completo</label>
+            <input id="nomeRet" class="field" placeholder="Seu nome" oninput="App.render()">
+          </div>
+          <div>
+            <label for="telRet">Telefone / WhatsApp</label>
+            <input id="telRet" class="field" inputmode="tel" placeholder="(11) 9xxxx-xxxx" oninput="App.render()">
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="box">
+      <h3><span class="n">3</span> Pagamento</h3>
+      <div class="pay-grid" id="payGrid"></div>
+    </div>
+
+    <div class="box tt">
+      <div class="row"><span>Subtotal</span><span id="tSub">R$ 0,00</span></div>
+      <div class="row" id="tFreteRow"><span>Frete estimado</span><span id="tFrete">—</span></div>
+      <div class="row big"><span>Total</span><span id="tTotal">R$ 0,00</span></div>
+    </div>
+    <button id="btnSend" class="ripple-host" onclick="App.sendOrder()"><span id="btnSendTxt">💬 Enviar pedido no WhatsApp</span></button>
+  </div>
+</div>
+
+<!-- ═══════ EDITOR DE IMAGEM ═══════ -->
+<div id="imgEditor">
+  <div class="ied-head">
+    <h3>✂️ Editor de imagem</h3>
+    <div style="display:flex;gap:6px">
+      <button onclick="ImgEd.cancel()">✕ Cancelar</button>
+      <button class="ied-save" onclick="ImgEd.save()">✓ Salvar foto</button>
+    </div>
+  </div>
+  <div class="ied-canvas-wrap" id="iedWrap">
+    <canvas id="iedCanvas"></canvas>
+    <div class="ied-overlay" id="iedCropBox" style="display:none"></div>
+  </div>
+  <div class="ied-controls">
+    <div class="ied-tabs">
+      <button class="ied-tab on" onclick="ImgEd.tab('ajuste',this)">🎨 Ajuste</button>
+      <button class="ied-tab" onclick="ImgEd.tab('cortar',this)">✂️ Cortar</button>
+      <button class="ied-tab" onclick="ImgEd.tab('fundo',this)">🪄 Fundo</button>
+    </div>
+    <div class="ied-panel on" id="panel-ajuste">
+      <div class="ied-row"><label>Brilho</label><input type="range" min="-100" max="100" value="0" id="rBrilho" oninput="ImgEd.apply()"><span id="vBrilho">0</span></div>
+      <div class="ied-row"><label>Contraste</label><input type="range" min="-100" max="100" value="0" id="rContraste" oninput="ImgEd.apply()"><span id="vContraste">0</span></div>
+      <div class="ied-row"><label>Saturação</label><input type="range" min="-100" max="100" value="0" id="rSat" oninput="ImgEd.apply()"><span id="vSat">0</span></div>
+      <div class="ied-row"><label>Nitidez</label><input type="range" min="0" max="5" value="0" step="0.5" id="rNit" oninput="ImgEd.apply()"><span id="vNit">0</span></div>
+      <div class="ied-btns" style="margin-top:10px">
+        <button onclick="ImgEd.rot(-90)">↺ -90°</button>
+        <button onclick="ImgEd.rot(90)">↻ +90°</button>
+        <button onclick="ImgEd.flipH()">↔ Espelhar</button>
+        <button onclick="ImgEd.resetAdj()">↺ Resetar</button>
+      </div>
+    </div>
+    <div class="ied-panel" id="panel-cortar">
+      <p class="ied-crop-hint">Arraste na imagem para selecionar a área de corte. Clique em "Cortar seleção" para aplicar.</p>
+      <div class="ied-btns" style="margin-top:8px">
+        <button onclick="ImgEd.crop()">✂️ Cortar seleção</button>
+        <button onclick="ImgEd.cropSquare()">⬛ Quadrado central</button>
+        <button onclick="ImgEd.cancelCrop()">✕ Cancelar seleção</button>
+      </div>
+    </div>
+    <div class="ied-panel" id="panel-fundo">
+      <div class="ied-btns">
+        <button onclick="ImgEd.removeBg()">🪄 Remover fundo automático</button>
+        <button onclick="ImgEd.whiteBg()">⬜ Fundo branco</button>
+        <button onclick="ImgEd.transpBg()">⬛ Fundo transparente</button>
+      </div>
+      <div class="ied-row" style="margin-top:10px">
+        <label>Tolerância</label>
+        <input type="range" min="10" max="100" value="42" id="rTol" oninput="document.getElementById('vTol').textContent=this.value">
+        <span id="vTol">42</span>
+      </div>
+      <p class="ied-crop-hint">Tolerância alta remove mais do fundo; tolerância baixa preserva mais detalhes nas bordas do produto.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ ADMIN: LOGIN ═══════ -->
+<div id="admLogin">
+  <div class="adm-login-box">
+    <h2>🔐 Área do lojista</h2>
+    <p>Digite a senha de administrador para editar a loja. A senha padrão é <b>admin123</b> — troque na aba "Loja" depois de entrar.</p>
+    <div class="adm-err" id="admErr">Senha incorreta. Tenta de novo.</div>
+    <input type="password" class="field" id="admPass" placeholder="Senha" onkeydown="if(event.key==='Enter')Admin.tryLogin()">
+    <button class="go" onclick="Admin.tryLogin()" style="margin-top:10px">Entrar</button>
+    <button class="cancel" onclick="Admin.closeLogin()">Cancelar</button>
+  </div>
+</div>
+
+<!-- ═══════ ADMIN: BARRA + PAINEL ═══════ -->
+<div id="admBar">
+  <b>🛠 Modo lojista</b>
+  <span class="spacer"></span>
+  <button class="open" onclick="Admin.open()">Abrir painel</button>
+  <button class="exit" onclick="Admin.logout()">Sair</button>
+</div>
+
+<div id="admin">
+  <div class="adm-head">
+    <b>Painel do lojista</b>
+    <span class="spacer"></span>
+    <button onclick="Admin.close()">✕ Ver loja</button>
+  </div>
+  <div class="adm-tabs" id="admTabs"></div>
+  <div class="adm-body"><div class="adm-wrap" id="admBody"></div></div>
+</div>
+
+<div id="toast" role="status"></div>
+<input type="file" id="fileInput" class="file-hide" accept="image/*">
+
+<script>
+"use strict";
+
+/* ════════════════════════════════════════════════════════════
+   DADOS — carregados do bloco JSON (e do rascunho local, se houver)
+   ════════════════════════════════════════════════════════════ */
+const DATA_TAG = document.getElementById("STORE_DATA");
+let DATA = JSON.parse(DATA_TAG.textContent);
+try {
+  const draft = localStorage.getItem("sc_draft");
+  if (draft) DATA = JSON.parse(draft);
+} catch (e) { /* sem localStorage (pré-visualização) — usa os dados publicados */ }
+
+function saveDraft(){ try { localStorage.setItem("sc_draft", JSON.stringify(DATA)); } catch(e){} }
+function clearDraft(){ try { localStorage.removeItem("sc_draft"); } catch(e){} }
+
+/* Paletas disponíveis para os banners de categoria */
+const CORES = [
+  ["azul","Azul"], ["verde","Verde"], ["vermelho","Vermelho suave"], ["amarelo","Amarelo"],
+  ["roxo","Roxo"], ["rosa","Rosa"], ["escuro","Preto"], ["fogo","Vermelho fogo"]
+];
+
+/* ════════════════════════════════════════════════════════════
+   LOJA (App)
+   ════════════════════════════════════════════════════════════ */
+const App = (() => {
+
+  const state = { cart:{}, mode:"entrega", pay:"Pix", query:"", slide:0, timer:null };
+  const fmt = v => "R$ " + Number(v).toFixed(2).replace(".", ",");
+  const $ = id => document.getElementById(id);
+  const waUrl = msg => `https://wa.me/${DATA.whatsapp}?text=${encodeURIComponent(msg)}`;
+  const cssId = s => s.normalize("NFD").replace(/[^\w]/g,"").toLowerCase();
+  const escAttr = s => String(s).replace(/'/g,"\\'");
+
+  /* mantém a lista de categorias em dia com os produtos */
+  function syncCats(){
+    const usados = [...new Set(DATA.produtos.map(p => p.cat))];
+    DATA.categorias = DATA.categorias.filter(c => usados.includes(c.nome));
+    usados.forEach(n => {
+      if(!DATA.categorias.find(c => c.nome === n))
+        DATA.categorias.push({ nome:n, cor:"fogo", img:null });
+    });
+  }
+  const cats = () => { syncCats(); return DATA.categorias.map(c => c.nome); };
+
+  /* ---------- monta tudo que depende dos dados ---------- */
+  function build(){
+    const T = DATA.textos;
+    const logo = `${DATA.marca.p1}<span>${DATA.marca.p2}</span>`;
+
+    // marca / gate
+    $("gateLogo").innerHTML = logo;
+    $("headLogo").innerHTML = `${logo}<small>${DATA.marca.slogan.replace(/ /g,"&nbsp;")}</small>`;
+    $("footLogo").innerHTML = logo;
+    $("gateTitulo").textContent = T.gateTitulo;
+    $("gateTexto").textContent = T.gateTexto;
+    $("searchInput").placeholder = T.buscaPlaceholder;
+
+    // topbar (duplicada para o letreiro girar)
+    const msgs = T.topbar.map(m => `<span>${m}</span>`).join("");
+    $("topTrack").innerHTML = msgs + msgs;
+
+    // nav
+    $("catNav").innerHTML =
+      `<button class="navlink active" data-cat="__home" onclick="App.goCat('__home')">Início</button>` +
+      cats().map(c => `<button class="navlink" data-cat="${c}" onclick="App.goCat('${escAttr(c)}')">${c}</button>`).join("");
+
+    // banners rotativos
+    $("slides").innerHTML = DATA.banners.map(b => {
+      const bg = b.img ? `style="background-image:linear-gradient(120deg,rgba(20,20,22,.82),rgba(122,10,23,.6)),url('${b.img}')"` : "";
+      const go = (b.destino && cats().includes(b.destino))
+        ? `App.goCat('${escAttr(b.destino)}')` : `App.openWaChat()`;
+      return `<div class="slide ${b.img ? "" : b.estilo}" ${bg}>
+        <span class="tag">${b.tag||""}</span>
+        <div class="h">${b.titulo||""}</div>
+        <p>${b.texto||""}</p>
+        <button class="cta" onclick="${go}">${b.botao||"Ver mais"} →</button>
+        ${b.img ? "" : `<span class="bgicon">${b.icone||"🔥"}</span>`}
+      </div>`;
+    }).join("");
+    $("dots").innerHTML = DATA.banners.map((_,i) =>
+      `<button aria-label="Banner ${i+1}" onclick="App.goSlide(${i})"></button>`).join("");
+    state.slide = 0;
+    startSlider();
+
+    // benefícios
+    $("perks").innerHTML = T.perks.map(([ic,t,s]) =>
+      `<div class="perk"><div class="ic">${ic}</div><div><b>${t}</b><small>${s}</small></div></div>`).join("");
+
+    // banners de categoria
+    $("tituloCategorias").textContent = T.tituloCategorias;
+    $("catGrid").innerHTML = DATA.categorias.map(c => {
+      const list = DATA.produtos.filter(p => p.cat === c.nome);
+      if(!list.length) return "";
+      const menor = Math.min(...list.map(p => p.preco));
+      const visual = c.img
+        ? `<img class="cimg" src="${c.img}" alt=""><span class="cfade"></span>`
+        : `<span class="cemoji">${list[0].emoji||"🛍"}</span>`;
+      return `<button class="catbanner cg-${c.cor||"fogo"}" onclick="App.goCat('${escAttr(c.nome)}')">
+        ${visual}
+        <div class="cinfo"><b>${c.nome}</b><small>a partir de ${fmt(menor)} →</small></div>
+      </button>`;
+    }).join("");
+
+    // strip + footer
+    const chat = waUrl(DATA.waSaudacao);
+    $("stripTitulo").textContent = T.stripTitulo;
+    $("stripTexto").textContent = T.stripTexto;
+    $("stripWa").textContent = T.stripBotao;
+    $("stripWa").href = chat;
+    $("footCol1").innerHTML = `<li>${T.rodapeDescricao}</li>` +
+      T.rodapeLinhas.map((l,i) => `<li ${i===0?'style="margin-top:10px"':""}>${l}</li>`).join("");
+    $("footHours").innerHTML =
+      `<li><a href="${chat}" target="_blank" rel="noopener">💬 WhatsApp</a></li>` +
+      T.horarios.map(h => `<li>${h}</li>`).join("");
+    $("footPay").innerHTML = T.pagamentos.map(p => `<li>${p}</li>`).join("");
+    $("footCats").innerHTML = cats().map(c =>
+      `<li><a href="#" onclick="App.goCat('${escAttr(c)}');return false">${c}</a></li>`).join("");
+    $("avisoTitulo").textContent = T.avisoTitulo;
+    $("avisoLegal").textContent = T.avisoLegal;
+
+    // ── marcas ──
+    buildMarcas();
+
+    // ── pagamento ──
+    if(typeof buildPayGrid === "function") buildPayGrid();
+
+    // ── efeitos visuais ──
+    const T2 = DATA.textos;
+    // typewriter
+    const tBar = $("typeBar");
+    if(T2.typewriterAtivo && T2.typewriterFrases && T2.typewriterFrases.length){
+      tBar.style.display = "block";
+      startTypewriter(T2.typewriterFrases);
+    } else { tBar.style.display = "none"; }
+    // badge online
+    const bOnline = $("badgeOnline");
+    if(T2.badgeOnlineAtivo){
+      bOnline.style.display = "inline-flex";
+      $("badgeOnlineTxt").textContent = T2.badgeOnlineTexto || "Online agora";
+    } else { bOnline.style.display = "none"; }
+    // texto do btnSend
+    const bst = $("btnSendTxt");
+    if(bst) bst.textContent = T2.rippleBotaoTexto || "💬 Enviar pedido no WhatsApp";
+    // ripple em todos os .ripple-host
+    document.querySelectorAll(".ripple-host").forEach(btn => {
+      btn.removeEventListener("click", rippleHandler);
+      btn.addEventListener("click", rippleHandler);
+    });
+
+    render();
+  }
+
+  /* ---------- typewriter ---------- */
+  let twTimer = null;
+  function startTypewriter(frases){
+    if(twTimer){ clearTimeout(twTimer); twTimer = null; }
+    const el = $("typeEl");
+    if(!el || !frases.length) return;
+    let mi = 0, ci = 0, apagando = false;
+    function tick(){
+      const msg = frases[mi];
+      if(!apagando){
+        ci++;
+        el.textContent = msg.slice(0, ci);
+        if(ci === msg.length){ apagando = true; twTimer = setTimeout(tick, 1800); }
+        else twTimer = setTimeout(tick, 80);
+      } else {
+        ci--;
+        el.textContent = msg.slice(0, ci);
+        if(ci === 0){ apagando = false; mi = (mi+1) % frases.length; twTimer = setTimeout(tick, 300); }
+        else twTimer = setTimeout(tick, 40);
+      }
+    }
+    tick();
+  }
+
+  /* ---------- ripple ---------- */
+  function rippleHandler(e){
+    const btn = e.currentTarget;
+    const wave = document.createElement("span");
+    wave.className = "ripple-wave";
+    const size = Math.max(btn.offsetWidth, btn.offsetHeight) * 2;
+    const r = btn.getBoundingClientRect();
+    wave.style.cssText = `width:${size}px;height:${size}px;left:${e.clientX-r.left-size/2}px;top:${e.clientY-r.top-size/2}px`;
+    btn.appendChild(wave);
+    setTimeout(() => wave.remove(), 700);
+  }
+
+  /* ---------- vitrine de marcas ---------- */
+  const marcaState = {};
+
+  function buildMarcas(){
+    const wrap = $("marcaSections");
+    if(!wrap) return;
+    const marcas = (DATA.marcas || []).filter(m => m.ativo && m.modelos && m.modelos.length);
+    if(!marcas.length){ wrap.innerHTML = ""; return; }
+
+    wrap.innerHTML = marcas.map((m, mi) => {
+      const trackId  = `mt-${mi}`;
+      const fundo    = m.corFundo  || "#1A1A22";
+      const gradA    = m.corGradA  || "#E3132B";
+      const gradB    = m.corGradB  || "#FF8C2B";
+      const fita     = m.corFita   || "#2A2A30";
+
+      const items = m.modelos.map((mod, idx) => {
+        const thumb = mod.img
+          ? `<img src="${mod.img}" alt="${mod.nome}">`
+          : `<span>${mod.emoji || "💨"}</span>`;
+        return `<div class="mcard" style="--mf-cor:${fita}">
+          <div class="mfita"></div>
+          <div class="mpic">
+            ${thumb}
+            ${mod.de ? `<span class="mbadge">OFERTA</span>` : ""}
+          </div>
+          <div class="mbody">
+            <span class="mbrand">${m.nome}</span>
+            <span class="mname">${mod.nome}</span>
+            <span class="mdesc">${mod.desc || ""}</span>
+            ${mod.de ? `<span class="mold">de R$ ${mod.de.toFixed(2).replace(".",",")}</span>` : ""}
+            <span class="mpreco">R$ ${mod.preco.toFixed(2).replace(".",",")}</span>
+            <button class="mbuy ripple-host" onclick="App.addMarca(${mi},${idx})">Adicionar ao carrinho</button>
+          </div>
+        </div>`;
+      }).join("");
+
+      return `<div class="container marca-section" id="sec-marca-${mi}">
+        <!-- card externo com cor de fundo -->
+        <div class="marca-outer" style="background:${fundo}">
+          <div class="marca-inner">
+            <div class="marca-header">
+              <div class="marca-titulo-wrap">
+                <span class="marca-logo-txt" style="--mg-a:${gradA};--mg-b:${gradB}">${m.nome}</span>
+                <div class="marca-linha" style="--mg-a:${gradA};--mg-b:${gradB}"></div>
+              </div>
+            </div>
+            ${m.descricao ? `<p style="font-size:.8rem;color:rgba(255,255,255,.5);margin-bottom:12px;margin-top:-6px">${m.descricao}</p>` : ""}
+          </div>
+
+          <!-- carrossel com setas flutuantes e fade -->
+          <div class="marca-carousel" style="padding:0 22px">
+            <div class="marca-fade-l" style="--mf-fade:${fundo}"></div>
+            <div class="marca-fade-r" style="--mf-fade:${fundo}"></div>
+            <button class="marca-btn-l" id="btn-l-${mi}" onclick="App.slideM(${mi},-1)" aria-label="Anterior">←</button>
+            <button class="marca-btn-r" id="btn-r-${mi}" onclick="App.slideM(${mi},1)"  aria-label="Próximo">→</button>
+            <div class="marca-track-wrap">
+              <div class="marca-track" id="${trackId}">${items}</div>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    }).join("");
+
+    // inicializa estado de cada carrossel
+    marcas.forEach((m, mi) => {
+      marcaState[mi] = 0;
+      updateSlide(mi);
+      document.querySelectorAll(`#sec-marca-${mi} .ripple-host`).forEach(btn => {
+        btn.addEventListener("click", rippleHandler);
+      });
+    });
+  }
+
+  function slideM(mi, dir){
+    const marcas = (DATA.marcas || []).filter(m => m.ativo && m.modelos && m.modelos.length);
+    if(!marcas[mi]) return;
+    const count = marcas[mi].modelos.length;
+    const cardW = 214; // 200px + 14px gap
+    const wrap = document.querySelector(`#sec-marca-${mi} .marca-track-wrap`);
+    const visible = wrap ? Math.floor(wrap.offsetWidth / cardW) : 2;
+    const max = Math.max(0, count - visible);
+    marcaState[mi] = Math.max(0, Math.min((marcaState[mi] || 0) + dir, max));
+    updateSlide(mi);
+  }
+
+  function updateSlide(mi){
+    const track = $(`mt-${mi}`);
+    if(!track) return;
+    const pos = marcaState[mi] || 0;
+    track.style.transform = `translateX(-${pos * 214}px)`;
+    const btnL = $(`btn-l-${mi}`);
+    const btnR = $(`btn-r-${mi}`);
+    if(btnL) btnL.disabled = pos === 0;
+    const marcas = (DATA.marcas || []).filter(m => m.ativo && m.modelos && m.modelos.length);
+    if(btnR && marcas[mi]){
+      const wrap = document.querySelector(`#sec-marca-${mi} .marca-track-wrap`);
+      const visible = wrap ? Math.floor(wrap.offsetWidth / 214) : 2;
+      btnR.disabled = pos >= Math.max(0, marcas[mi].modelos.length - visible);
+    }
+  }
+
+  /* ---------- slider ---------- */
+  function startSlider(){
+    stopSlider();
+    if(DATA.banners.length > 1)
+      state.timer = setInterval(() => goSlide((state.slide+1) % DATA.banners.length, true), 5200);
+  }
+  function stopSlider(){ if(state.timer) clearInterval(state.timer); }
+  function goSlide(i, auto){
+    state.slide = i;
+    $("slides").style.transform = `translateX(-${i*100}%)`;
+    [...$("dots").children].forEach((d,k) => d.classList.toggle("on", k===i));
+    if(!auto) startSlider();
+  }
+
+  /* ---------- navegação / busca ---------- */
+  function goCat(cat){
+    document.querySelectorAll(".navlink").forEach(n =>
+      n.classList.toggle("active", n.dataset.cat === cat));
+    if(cat === "__home"){ window.scrollTo({top:0,behavior:"smooth"}); return; }
+    const el = $("sec-" + cssId(cat));
+    if(el) window.scrollTo({top: el.getBoundingClientRect().top + window.scrollY - 118, behavior:"smooth"});
+  }
+  function goHome(e){ e.preventDefault(); goCat("__home"); }
+  function search(q){ state.query = q.trim().toLowerCase(); renderProducts(); }
+
+  /* ---------- produtos ---------- */
+  function pic(p){ return p.img ? `<img src="${p.img}" alt="${p.nome}">` : (p.emoji || "🛍"); }
+  function productCard(p,i){
+    const q = state.cart[i] || 0;
+    const control = q === 0
+      ? `<button class="buy" onclick="App.add(${i})">Adicionar ao carrinho</button>`
+      : `<div class="qty"><button onclick="App.chg(${i},-1)" aria-label="Diminuir">−</button><span>${q}</span><button onclick="App.chg(${i},1)" aria-label="Aumentar">+</button></div>`;
+    return `<article class="pcard">
+      ${p.de ? `<span class="flag oferta-badge" id="ofb-${i}">${DATA.textos.ofertaBadgeTexto||'OFERTA'}</span>` : ""}
+      <div class="pic">${pic(p)}</div>
+      <div class="body">
+        <span class="cat-tag">${(p.cat||"").toUpperCase()}</span>
+        <span class="name">${p.nome}</span>
+        <span class="desc">${p.desc||""}</span>
+        ${p.de ? `<span class="old">de ${fmt(p.de)}</span>` : ""}
+        <span class="price">${fmt(p.preco)}</span>
+        ${control}
+      </div></article>`;
+  }
+  function renderProducts(){
+    const q = state.query;
+    const match = p => !q || (p.nome+" "+(p.desc||"")+" "+p.cat).toLowerCase().includes(q);
+    let html = "";
+    if(q){
+      const found = DATA.produtos.map((p,i)=>({p,i})).filter(({p})=>match(p));
+      html = `<section class="section"><h2 class="section-title">Resultados para "${q}"</h2>
+        ${found.length
+          ? `<div class="pgrid">${found.map(({p,i})=>productCard(p,i)).join("")}</div>`
+          : `<p class="empty-msg">Nenhum produto encontrado. Tenta outra palavra ou chama a gente no WhatsApp 😉</p>`}
+      </section>`;
+      $("catShowcase").classList.add("hidden");
+      $("heroWrap").classList.add("hidden");
+    } else {
+      $("catShowcase").classList.remove("hidden");
+      $("heroWrap").classList.remove("hidden");
+      const dest = DATA.produtos.map((p,i)=>({p,i})).filter(({p})=>p.destaque);
+      if(dest.length)
+        html += `<section class="section"><h2 class="section-title">${DATA.textos.tituloDestaques}</h2><div class="pgrid">${dest.map(({p,i})=>productCard(p,i)).join("")}</div></section>`;
+      for(const c of cats()){
+        const list = DATA.produtos.map((p,i)=>({p,i})).filter(({p})=>p.cat===c);
+        html += `<section class="section" id="sec-${cssId(c)}"><h2 class="section-title">${c}</h2><div class="pgrid">${list.map(({p,i})=>productCard(p,i)).join("")}</div></section>`;
+      }
+    }
+    $("productSections").innerHTML = html;
+  }
+
+  /* ---------- carrinho ---------- */
+  function add(i){
+    state.cart[i]=1;
+    // tracking de cliques para o dashboard
+    try {
+      const clicks = JSON.parse(localStorage.getItem("sc_clicks")||"{}");
+      const nome = DATA.produtos[i]?.nome || "produto";
+      clicks[nome] = (clicks[nome]||0)+1;
+      localStorage.setItem("sc_clicks", JSON.stringify(clicks));
+    } catch(e){}
+    toast("Adicionado ao carrinho ✓"); render();
+  }
+
+  // adicionar modelo de marca ao carrinho como produto avulso
+  function addMarca(mi, idx){
+    const marcas = (DATA.marcas||[]).filter(m=>m.ativo&&m.modelos&&m.modelos.length);
+    const mod = marcas[mi]?.modelos[idx];
+    if(!mod) return;
+    // converte modelo em produto temporário (adiciona ao fim de DATA.produtos se não existir)
+    const key = `marca_${mi}_${idx}`;
+    let pi = DATA.produtos.findIndex(p=>p._marcaKey===key);
+    if(pi === -1){
+      DATA.produtos.push({
+        cat: marcas[mi].nome, emoji: mod.emoji||"💨", nome: mod.nome,
+        desc: mod.desc||"", preco: mod.preco, de: mod.de||null,
+        destaque: false, img: mod.img||null, _marcaKey: key
+      });
+      pi = DATA.produtos.length - 1;
+    }
+    state.cart[pi] = (state.cart[pi]||0) + 1;
+    toast("Adicionado ao carrinho ✓");
+    render();
+    // atualizar botão do card de marca
+    const btn = document.querySelector(`#sec-marca-${mi} .marca-track .mcard:nth-child(${idx+1}) .mbuy`);
+    if(btn){ btn.textContent = `${state.cart[pi]}× no carrinho`; btn.style.background = "var(--ink)"; }
+  }
+  function chg(i,d){
+    state.cart[i]=(state.cart[i]||0)+d;
+    if(state.cart[i]<=0) delete state.cart[i];
+    render();
+  }
+  function clearCart(){ state.cart = {}; }
+  function totals(){
+    const ids = Object.keys(state.cart);
+    return { ids,
+      count: ids.reduce((s,i)=>s+state.cart[i],0),
+      sub: ids.reduce((s,i)=>s+state.cart[i]*DATA.produtos[i].preco,0) };
+  }
+  function openDrawer(){ $("overlay").classList.add("show"); $("drawer").classList.add("show"); }
+  function closeDrawer(){ $("overlay").classList.remove("show"); $("drawer").classList.remove("show"); }
+
+  /* ---------- busca de CEP — 3 APIs com fallback manual ---------- */
+  // Base Smoke Club (SBC-Anchieta) — só distância, endereço não aparece no site
+  const BASE = { lat: -23.6640, lon: -46.5530 };
+
+  function maskCep(el){
+    let v = el.value.replace(/\D/g,"").slice(0,8);
+    if(v.length > 5) v = v.slice(0,5)+"-"+v.slice(5);
+    el.value = v;
+    App.render();
+  }
+
+  // Normaliza a resposta de qualquer API para o mesmo formato
+  function normalizaCep(raw, fonte){
+    if(fonte === "viacep"){
+      if(raw.erro) throw new Error("not found");
+      return { cep: raw.cep, logradouro: raw.logradouro||"", bairro: raw.bairro||"", localidade: raw.localidade||"", uf: raw.uf||"" };
+    }
+    if(fonte === "brasilapi"){
+      return { cep: raw.cep, logradouro: raw.street||"", bairro: raw.neighborhood||"", localidade: raw.city||"", uf: raw.state||"" };
+    }
+    if(fonte === "opencep"){
+      if(raw.erro) throw new Error("not found");
+      return { cep: raw.cep, logradouro: raw.logradouro||"", bairro: raw.bairro||"", localidade: raw.localidade||"", uf: raw.uf||"" };
+    }
+  }
+
+  async function tryFetch(url){
+    const r = await fetch(url, {signal: AbortSignal.timeout(5000)});
+    if(!r.ok) throw new Error("http "+r.status);
+    return r.json();
+  }
+
+  async function consultaCep(cep){
+    // tenta as 3 APIs em sequência; se todas falharem, retorna null (modo manual)
+    const tentativas = [
+      () => tryFetch(`https://viacep.com.br/ws/${cep}/json/`).then(d => normalizaCep(d,"viacep")),
+      () => tryFetch(`https://brasilapi.com.br/api/cep/v2/${cep}`).then(d => normalizaCep(d,"brasilapi")),
+      () => tryFetch(`https://opencep.com/v1/${cep}`).then(d => normalizaCep(d,"opencep"))
+    ];
+    for(const fn of tentativas){
+      try { return await fn(); } catch(e){ /* tenta próxima */ }
+    }
+    return null; // todas falharam → modo manual
+  }
+
+  // Haversine
+  function haversine(lat1,lon1,lat2,lon2){
+    const R=6371, dLat=(lat2-lat1)*Math.PI/180, dLon=(lon2-lon1)*Math.PI/180;
+    const a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+    return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+  }
+
+  // Geocodifica via Nominatim para calcular frete
+  async function geoFromCep(d){
+    const q = encodeURIComponent(`${d.logradouro} ${d.bairro} ${d.localidade} ${d.uf} Brasil`.trim());
+    const r = await tryFetch(`https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1`);
+    if(!r.length) throw new Error("geo");
+    return { lat: parseFloat(r[0].lat), lon: parseFloat(r[0].lon) };
+  }
+
+  function aplicaEndereco(d, campos){
+    // d = objeto normalizado de CEP | null
+    // campos = { rua, numero, bairro, cepEl, status, wrap, frete? }
+    campos.rua.value = d ? d.logradouro : "";
+    campos.bairro.value = d ? d.bairro : "";
+    campos.numero.value = "";
+    campos.numero.focus();
+    if(campos.status){
+      campos.status.innerHTML = d
+        ? '<span style="color:#238636">✓ Endereço encontrado! Confira e preencha o número.</span>'
+        : '<span style="color:#B97A00">⚠️ CEP não encontrado automaticamente — preencha os campos abaixo manualmente.</span>';
+    }
+    campos.wrap.style.display = "block";
+    App.render();
+  }
+
+  async function buscaCep(){
+    const raw = $("cepInput").value.replace(/\D/g,"");
+    // cepStatus removido
+    $("cepStatus").innerHTML = '<span style="color:var(--muted)">🔍 Buscando endereço...</span>';
+    // addrAuto removido
+    $("cepBtn").disabled = true;
+
+    const d = await consultaCep(raw);
+    // guarda no state (mesmo que null, pra modo manual funcionar)
+    state.cepData = d || { cep: raw, logradouro:"", bairro:"", localidade:"", uf:"" };
+
+    aplicaEndereco(d, {
+      rua: $("rua"), numero: $("numero"), bairro: $("bairroInput"),
+      status: $("cepStatus"), wrap: $("addrAuto")
+    });
+
+    // frete: tenta geolocalizar; se não der, "a combinar"
+    $("freteNomeCidade").textContent = d ? d.localidade : "seu endereço";
+    if(d && d.localidade){
+      try {
+        const geo = await geoFromCep(d);
+        const km = haversine(BASE.lat, BASE.lon, geo.lat, geo.lon) * 1.35;
+        const val = Math.max(DATA.frete.minimo, km * DATA.frete.porKm);
+        $("freteValor").textContent = `R$ ${val.toFixed(2).replace(".",",")} (estimado)`;
+        state.freteCalc = val;
+      } catch(e){
+        $("freteValor").textContent = "a confirmar pelo WhatsApp";
+        state.freteCalc = "combinar";
+      }
+    } else {
+      $("freteValor").textContent = "a confirmar pelo WhatsApp";
+      state.freteCalc = "combinar";
+    }
+
+    $("cepBtn").disabled = false;
+  }
+
+  async function buscaCepNac(){
+    const raw = $("cepNac").value.replace(/\D/g,"");
+    // cepNacStatus removido
+    $("cepNacStatus").innerHTML = '<span style="color:var(--muted)">🔍 Buscando...</span>';
+    // nacAddrAuto removido
+
+    const d = await consultaCep(raw);
+    state.cepNacData = d || { cep: raw, logradouro:"", bairro:"", localidade:"", uf:"" };
+
+    aplicaEndereco(d, {
+      rua: $("nacRua"), numero: $("nacNum"), bairro: $("nacBairro"),
+      status: $("cepNacStatus"), wrap: $("nacAddrAuto")
+    });
+  }
+
+  /* ---------- frete ---------- */
+  function frete(){
+    if(state.mode === "retirada") return 0;
+    return "combinar";
+  }
+
+
+
+
+  /* ---------- checkout ---------- */
+  function openCheckout(){
+    if(totals().count === 0){ toast("Seu carrinho está vazio"); return; }
+    closeDrawer();
+    $("checkout").classList.add("show");
+    document.body.style.overflow = "hidden";
+    // reseta estado de entrega ao abrir
+    state.mode = "local";
+    // cepData/freteCalc removidos
+    // cepData/freteCalc removidos
+    // cepData/freteCalc removidos
+    $("cepInput").value = "";
+    // cepStatus removido
+    // addrAuto removido
+    $("rua").value = ""; $("numero").value = ""; $("bairroInput").value = ""; $("comp").value = "";
+    // cepNac removido
+    // cepNacStatus removido
+    // nacAddrAuto removido
+    // reset já feito na linha abaixo
+    ["nomeCliente","telefone","rua","numero","bairroInput","cepInput","comp","nacRua","nacNum","nacBairro","nacCep","nacComp"].forEach(id=>{const el=$(id);if(el)el.value="";});
+    buildPayGrid();
+    document.querySelectorAll("#modePills .pill").forEach(p=>p.classList.toggle("sel",p.dataset.mode==="local"));
+    $("addrLocal").classList.remove("hidden");
+    $("addrNacional").classList.add("hidden");
+    $("addrRetirada").classList.add("hidden");
+    render();
+  }
+  function closeCheckout(){ $("checkout").classList.remove("show"); document.body.style.overflow=""; }
+  function setMode(m){
+    state.mode = m;
+    document.querySelectorAll("#modePills .pill").forEach(p=>p.classList.toggle("sel",p.dataset.mode===m));
+    $("addrLocal").classList.toggle("hidden", m!=="local");
+    $("addrNacional").classList.toggle("hidden", m!=="nacional");
+    $("addrRetirada").classList.toggle("hidden", m!=="retirada");
+    render();
+  }
+  /* ---------- formas de pagamento ---------- */
+  const PAY_ICONS = { pix:"💠", link:"🔗", din:"💵" };
+
+  function buildPayGrid(){
+    const grid = $("payGrid");
+    if(!grid) return;
+    const formas = (DATA.textos.formasPagamento || []).filter(f => f.ativo);
+    if(!formas.length){
+      grid.innerHTML = `<div style="color:var(--muted);font-size:.82rem;padding:8px 0">Nenhuma forma ativa. Configure no painel → Textos.</div>`;
+      return;
+    }
+    // seleciona a primeira forma ativa se a atual não estiver ativa
+    if(!formas.find(f=>f.id===state.pay)) state.pay = formas[0].id;
+    grid.innerHTML = formas.map(f => {
+      const icon = PAY_ICONS[f.id] || "💳";
+      const label = f.label.replace(/^[^\s]+\s/, "");
+      return `<div class="pay-opt ${state.pay===f.id?"sel":""}" onclick="App.setPay('${f.id}')">`
+        + `<span class="pay-icon">${icon}</span><span>${label}</span></div>`;
+    }).join("");
+  }
+
+  function setPay(p){
+    state.pay = p;
+    buildPayGrid();
+  }
+
+  /* ---------- render ---------- */
+  function render(){
+    renderProducts();
+    const {ids,count,sub} = totals();
+    const bubble = $("cartBubble");
+    bubble.textContent = count;
+    bubble.classList.toggle("hide", count===0);
+
+    $("drawerList").innerHTML = ids.length
+      ? ids.map(i => {
+          const p = DATA.produtos[i];
+          return `<div class="ditem">
+            <div class="dpic">${pic(p)}</div>
+            <div class="din"><b>${p.nome}</b><span>${fmt(p.preco*state.cart[i])}</span></div>
+            <div class="dqty"><button onclick="App.chg(${i},-1)">−</button><i>${state.cart[i]}</i><button onclick="App.chg(${i},1)">+</button></div>
+          </div>`;}).join("")
+      : `<div class="dempty">Seu carrinho está vazio.<br>Explora os produtos e adiciona por aqui 😉</div>`;
+    $("drawerSub").textContent = fmt(sub);
+    $("drawerGo").disabled = count===0;
+
+    $("coItems").innerHTML = ids.length ? ids.map(i => {
+      const p = DATA.produtos[i]; const thumb = p.img ? `<img src="${p.img}" alt="">` : (p.emoji||"🛍");
+      return `<div class="ci2"><div class="co-item-pic">${thumb}</div><div class="ci2-info"><div class="ci2-nome">${p.nome}</div><div class="ci2-sub">${state.cart[i]}x · ${p.cat}</div></div><div class="ci2-preco">${fmt(state.cart[i]*p.preco)}</div></div>`;
+    }).join("") : `<div class="ci2" style="justify-content:center;color:var(--muted);font-size:.85rem;padding:12px 0">Carrinho vazio.</div>`;
+    const f = frete();
+    const row = $("tFreteRow");
+    let total = sub;
+    if(state.mode === "retirada"){
+      row.style.display = "none";
+    } else if(state.mode === "nacional"){
+      row.style.display = "flex";
+      $("tFrete").textContent = "calcular no WhatsApp";
+    } else {
+      row.style.display = "flex";
+      if(f === null) $("tFrete").textContent = "informe o CEP acima";
+      else if(f === "combinar") $("tFrete").textContent = "a combinar";
+      else { $("tFrete").textContent = fmt(f)+" (est.)"; total += f; }
+    }
+    $("tSub").textContent = fmt(sub);
+    $("tTotal").textContent = fmt(total) +
+      ((f==="combinar"||state.mode==="nacional") ? " + frete" : "");
+
+    const gv = id => { const el = document.getElementById(id); return el ? el.value.trim() : ""; };
+    const nomeV = gv("nomeCliente"), telV = gv("telefone");
+    const formasAtivas = (DATA.textos.formasPagamento||[]).filter(f=>f.ativo);
+    const payOk = formasAtivas.length === 0 || formasAtivas.some(f=>f.id===state.pay);
+    let addrOk = false;
+    if(state.mode === "retirada") addrOk = true;
+    else if(state.mode === "nacional") addrOk = gv("nacRua") !== "" && gv("nacNum") !== "";
+    else addrOk = gv("rua") !== "" && gv("numero") !== "";
+    const ok = count>0 && nomeV && telV && payOk && addrOk;
+    $("btnSend").disabled = !ok;
+  }
+
+
+
+
+
+
+
+
+  /* ---------- envio ---------- */
+  function sendOrder(){
+    const {ids,sub} = totals();
+    const gvS = id => { const el=document.getElementById(id); return el?el.value.trim():""; };
+    const nomeCliente = gvS("nomeCliente");
+    const telCliente  = gvS("telefone");
+    const formaLabel  = (DATA.textos.formasPagamento||[]).find(f=>f.id===state.pay)?.label || state.pay;
+    const sep = "━━━━━━━━━━━━━━";
+
+    // ── itens ──
+    let itens = "";
+    ids.forEach(i => {
+      const p = DATA.produtos[i];
+      const sabor = state.saboresSel?.[i] ? ` · ${state.saboresSel[i]}` : "";
+      itens += `▪ ${state.cart[i]}x ${p.nome}${sabor} — ${fmt(state.cart[i]*p.preco)}\n`;
+    });
+
+    let msg = `🔴 *NOVO PEDIDO — ${DATA.loja}*\n\n`;
+    msg += `📦 *ITENS DO PEDIDO*\n${itens}`;
+    msg += `${sep}\n`;
+    msg += `🛒 *Subtotal:* ${fmt(sub)}\n`;
+
+    // ── entrega ──
+    if(state.mode === "retirada"){
+      msg += `🚚 *Entrega:* Retirada / a combinar\n`;
+      msg += `💰 *TOTAL:* ${fmt(sub)}\n`;
+      msg += `${sep}\n`;
+      msg += `🏪 *Retirada* combinada pelo WhatsApp\n`;
+    } else if(state.mode === "nacional"){
+      const nacRua    = gvS("nacRua");
+      const nacNum    = gvS("nacNum");
+      const nacBairro = gvS("nacBairro");
+      const nacCep    = gvS("nacCep");
+      const nacComp   = gvS("nacComp");
+      msg += `🚚 *Frete:* a calcular (Correios/SEDEX)\n`;
+      msg += `💰 *TOTAL:* ${fmt(sub)} + frete\n`;
+      msg += `${sep}\n`;
+      msg += `📦 *ENDEREÇO DE ENVIO*\n`;
+      msg += `${nacRua}, ${nacNum}${nacComp?" — "+nacComp:""}\n`;
+      msg += `${nacBairro} — CEP ${nacCep}\n`;
+    } else {
+      const rua    = gvS("rua");
+      const numero = gvS("numero");
+      const bairro = gvS("bairroInput");
+      const cep    = gvS("cepInput");
+      const comp   = gvS("comp");
+      msg += `🚚 *Frete:* a combinar pelo WhatsApp\n`;
+      msg += `💰 *TOTAL:* ${fmt(sub)} + frete\n`;
+      msg += `${sep}\n`;
+      msg += `📍 *ENDEREÇO DE ENTREGA*\n`;
+      msg += `${rua}, ${numero}${comp?" — "+comp:""}\n`;
+      msg += `${bairro} — CEP ${cep}\n`;
+    }
+
+    msg += `${sep}\n`;
+    msg += `🙋 *Cliente:* ${nomeCliente}\n`;
+    msg += `📱 *Telefone:* ${telCliente}\n`;
+    msg += `💳 *Pagamento:* ${formaLabel}\n`;
+    msg += `🌐 *Pedido realizado pelo site.*`;
+
+    window.open(waUrl(msg), "_blank");
+    try {
+      const o = parseInt(localStorage.getItem("sc_orders")||"0")+1;
+      localStorage.setItem("sc_orders", String(o));
+    } catch(e){}
+  }
+
+  /* ---------- utilidades ---------- */
+  let toastTimer = null;
+  function toast(t){
+    const el = $("toast");
+    el.textContent = t;
+    el.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(()=>el.classList.remove("show"), 2400);
+  }
+  function openWaChat(){ window.open(waUrl(DATA.waSaudacao), "_blank"); }
+  function passGate(){ const g = $("ageGate"); if(g) g.remove(); }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    build();
+    // conta visitas por sessão (não conta recarregamentos)
+    try {
+      if(!sessionStorage.getItem("sc_sess")){
+        sessionStorage.setItem("sc_sess","1");
+        const v = parseInt(localStorage.getItem("sc_visits")||"0")+1;
+        localStorage.setItem("sc_visits", String(v));
+      }
+    } catch(e){}
+  });
+  return { passGate, goHome, goCat, goSlide, search, add, chg, addMarca, slideM, clearCart,
+           openDrawer, closeDrawer, openCheckout, closeCheckout,
+           setMode, setPay, render, sendOrder, openWaChat, build, toast,
+           maskCep, buscaCep, buscaCepNac,
+           get cats(){ return cats(); } };
+})();
+
+/* ════════════════════════════════════════════════════════════
+   EDITOR DE IMAGEM (ImgEd)
+   ════════════════════════════════════════════════════════════ */
+const ImgEd = (() => {
+  let _cb = null;          // callback após salvar
+  let _srcImg = null;      // imagem original
+  let _working = null;     // canvas de trabalho
+  let _rotation = 0;
+  let _flipped = false;
+  let _cropSel = null;     // {x,y,w,h} em coordenadas do canvas
+  let _dragging = false;
+  let _dragStart = {x:0,y:0};
+  let _activeTab = "ajuste";
+  const $ = id => document.getElementById(id);
+  const cv  = () => $("iedCanvas");
+  const ctx = () => cv().getContext("2d");
+
+  /* ── abrir editor ── */
+  function open(cb, srcUrl){
+    _cb = cb;
+    _rotation = 0;
+    _flipped = false;
+    _cropSel = null;
+    _activeTab = "ajuste";
+    resetSliders();
+    $("imgEditor").classList.add("show");
+    document.body.style.overflow = "hidden";
+    const img = new Image();
+    img.onload = () => {
+      _srcImg = img;
+      _working = null;
+      render();
+    };
+    img.src = srcUrl;
+  }
+
+  function cancel(){
+    $("imgEditor").classList.remove("show");
+    document.body.style.overflow = "";
+    hideCropBox();
+  }
+
+  function save(){
+    const c = getResult();
+    if(!c){ cancel(); return; }
+    _cb(c.toDataURL("image/png"));
+    cancel();
+  }
+
+  /* ── render: aplica rotação + flip + ajustes sobre _srcImg ── */
+  function render(){
+    if(!_srcImg) return;
+    const c = cv();
+    const wrap = $("iedWrap");
+    // calcular dimensões com rotação
+    const sw = _srcImg.naturalWidth, sh = _srcImg.naturalHeight;
+    const rotated = (_rotation % 180 !== 0);
+    let dw = rotated ? sh : sw;
+    let dh = rotated ? sw : sh;
+    // escalar para caber no container
+    const maxW = wrap.clientWidth  || 600;
+    const maxH = Math.max(220, (window.innerHeight||600) - 260);
+    const scale = Math.min(1, maxW/dw, maxH/dh);
+    c.width  = Math.round(dw * scale);
+    c.height = Math.round(dh * scale);
+    const cx = ctx();
+    cx.save();
+    cx.translate(c.width/2, c.height/2);
+    if(_flipped) cx.scale(-1,1);
+    cx.rotate(_rotation * Math.PI/180);
+    cx.drawImage(_srcImg, -sw*scale/2, -sh*scale/2, sw*scale, sh*scale);
+    cx.restore();
+    applyFilters(cx, c.width, c.height);
+  }
+
+  function applyFilters(cx, w, h){
+    const brilho  = parseInt($("rBrilho")?.value||0);
+    const contraste= parseInt($("rContraste")?.value||0);
+    const sat     = parseInt($("rSat")?.value||0);
+    const nit     = parseFloat($("rNit")?.value||0);
+    if(brilho===0 && contraste===0 && sat===0 && nit===0) return;
+    const id = cx.getImageData(0,0,w,h);
+    const d  = id.data;
+    const cF = 1 + contraste/100;
+    const bF = brilho * 2.55;
+    const sF = 1 + sat/100;
+    for(let i=0;i<d.length;i+=4){
+      let r=d[i],g=d[i+1],b=d[i+2];
+      // brilho
+      r+=bF; g+=bF; b+=bF;
+      // contraste
+      r=(r-128)*cF+128; g=(g-128)*cF+128; b=(b-128)*cF+128;
+      // saturação (via HSL simplificado)
+      const avg=(r+g+b)/3;
+      r=avg+(r-avg)*sF; g=avg+(g-avg)*sF; b=avg+(b-avg)*sF;
+      d[i]  =Math.max(0,Math.min(255,r));
+      d[i+1]=Math.max(0,Math.min(255,g));
+      d[i+2]=Math.max(0,Math.min(255,b));
+    }
+    cx.putImageData(id,0,0);
+  }
+
+  function apply(){
+    const ids = ["rBrilho","rContraste","rSat","rNit"];
+    const lbs = ["vBrilho","vContraste","vSat","vNit"];
+    ids.forEach((id,k)=>{ const el=$(id); if(el&&$(lbs[k])) $(lbs[k]).textContent=el.value; });
+    render();
+    if(_cropSel) drawCropBox();
+  }
+
+  function resetSliders(){
+    ["rBrilho","rContraste","rSat","rNit"].forEach(id=>{ const el=$(id); if(el) el.value=0; });
+    ["vBrilho","vContraste","vSat","vNit"].forEach(id=>{ const el=$(id); if(el) el.textContent=0; });
+  }
+
+  function resetAdj(){ resetSliders(); render(); }
+
+  /* ── rotação e flip ── */
+  function rot(deg){
+    _rotation = (_rotation + deg + 360) % 360;
+    render(); if(_cropSel) drawCropBox();
+  }
+  function flipH(){ _flipped = !_flipped; render(); if(_cropSel) drawCropBox(); }
+
+  /* ── abas ── */
+  function tab(name, btn){
+    _activeTab = name;
+    document.querySelectorAll(".ied-tab").forEach(b=>b.classList.remove("on"));
+    document.querySelectorAll(".ied-panel").forEach(p=>p.classList.remove("on"));
+    if(btn) btn.classList.add("on");
+    const panel = $("panel-"+name);
+    if(panel) panel.classList.add("on");
+    if(name !== "cortar"){ hideCropBox(); _cropSel=null; }
+  }
+
+  /* ── corte ── */
+  function hideCropBox(){ const b=$("iedCropBox"); if(b) b.style.display="none"; }
+  function drawCropBox(){
+    if(!_cropSel) return;
+    const b=$("iedCropBox"); if(!b) return;
+    b.style.display="block";
+    b.style.left   = _cropSel.x+"px";
+    b.style.top    = _cropSel.y+"px";
+    b.style.width  = _cropSel.w+"px";
+    b.style.height = _cropSel.h+"px";
+  }
+
+  function getCanvasPos(e){
+    const r = cv().getBoundingClientRect();
+    const touch = e.touches?.[0] || e;
+    return { x: touch.clientX - r.left, y: touch.clientY - r.top };
+  }
+
+  // eventos de arrastar para seleção de corte
+  function onDown(e){
+    if(_activeTab !== "cortar") return;
+    e.preventDefault();
+    _dragging = true;
+    _dragStart = getCanvasPos(e);
+    _cropSel = {x:_dragStart.x, y:_dragStart.y, w:0, h:0};
+    drawCropBox();
+  }
+  function onMove(e){
+    if(!_dragging) return;
+    e.preventDefault();
+    const p = getCanvasPos(e);
+    const x = Math.min(_dragStart.x, p.x);
+    const y = Math.min(_dragStart.y, p.y);
+    _cropSel = { x, y, w: Math.abs(p.x-_dragStart.x), h: Math.abs(p.y-_dragStart.y) };
+    drawCropBox();
+  }
+  function onUp(e){
+    _dragging = false;
+    if(_cropSel && (_cropSel.w<5 || _cropSel.h<5)) { _cropSel=null; hideCropBox(); }
+  }
+
+  function getResult(){
+    // cria canvas final no tamanho real
+    const c = cv();
+    const sw = _srcImg.naturalWidth, sh = _srcImg.naturalHeight;
+    const rotated = (_rotation % 180 !== 0);
+    let dw = rotated ? sh : sw;
+    let dh = rotated ? sw : sh;
+    const out = document.createElement("canvas");
+    out.width = dw; out.height = dh;
+    const ox = out.getContext("2d");
+    ox.save();
+    ox.translate(dw/2, dh/2);
+    if(_flipped) ox.scale(-1,1);
+    ox.rotate(_rotation*Math.PI/180);
+    ox.drawImage(_srcImg, -sw/2, -sh/2);
+    ox.restore();
+    // aplicar filtros em tamanho real
+    const brilho   = parseInt($("rBrilho")?.value||0);
+    const contraste= parseInt($("rContraste")?.value||0);
+    const sat      = parseInt($("rSat")?.value||0);
+    const nit      = parseFloat($("rNit")?.value||0);
+    if(brilho||contraste||sat||nit) applyFilters(ox, dw, dh);
+    // aplicar corte (se houver)
+    if(_cropSel && _cropSel.w>4 && _cropSel.h>4){
+      const scaleX = dw / c.width;
+      const scaleY = dh / c.height;
+      const cx2 = document.createElement("canvas");
+      cx2.width  = Math.round(_cropSel.w * scaleX);
+      cx2.height = Math.round(_cropSel.h * scaleY);
+      cx2.getContext("2d").drawImage(out,
+        Math.round(_cropSel.x*scaleX), Math.round(_cropSel.y*scaleY),
+        cx2.width, cx2.height, 0, 0, cx2.width, cx2.height);
+      return cx2;
+    }
+    return out;
+  }
+
+  function crop(){
+    if(!_cropSel || _cropSel.w<5 || _cropSel.h<5){ App.toast("Selecione uma área primeiro"); return; }
+    const c2 = getResult();
+    // atualiza a imagem de trabalho com o recorte
+    const img2 = new Image();
+    img2.onload = () => {
+      _srcImg = img2;
+      _rotation = 0; _flipped = false;
+      _cropSel = null; hideCropBox();
+      resetSliders();
+      render();
+      App.toast("✂️ Corte aplicado!");
+    };
+    img2.src = c2.toDataURL("image/png");
+  }
+
+  function cropSquare(){
+    const c = cv();
+    const s = Math.min(c.width, c.height);
+    _cropSel = { x:(c.width-s)/2, y:(c.height-s)/2, w:s, h:s };
+    drawCropBox();
+    App.toast("Quadrado selecionado — clique em Cortar");
+  }
+
+  function cancelCrop(){ _cropSel=null; hideCropBox(); }
+
+  /* ── fundo ── */
+  function removeBg(){
+    const c = getResult();
+    const tol = parseInt($("rTol")?.value||42);
+    const rem = removeBackgroundCanvas(c, tol);
+    const img2 = new Image();
+    img2.onload = () => { _srcImg=img2; _rotation=0; _flipped=false; _cropSel=null; hideCropBox(); resetSliders(); render(); App.toast("🪄 Fundo removido!"); };
+    img2.src = rem.toDataURL("image/png");
+  }
+
+  function removeBackgroundCanvas(srcC, tol){
+    const w=srcC.width, h=srcC.height;
+    const cx=srcC.getContext("2d");
+    const src=cx.getImageData(0,0,w,h); const d=src.data;
+    const margin=Math.max(1,Math.round(Math.min(w,h)*0.04));
+    const border=[];
+    for(let x=0;x<w;x++)for(let y=0;y<margin;y++){const o=(y*w+x)*4;border.push([d[o],d[o+1],d[o+2]]);}
+    for(let x=0;x<w;x++)for(let y=h-margin;y<h;y++){const o=(y*w+x)*4;border.push([d[o],d[o+1],d[o+2]]);}
+    for(let y=0;y<h;y++)for(let x=0;x<margin;x++){const o=(y*w+x)*4;border.push([d[o],d[o+1],d[o+2]]);}
+    for(let y=0;y<h;y++)for(let x=w-margin;x<w;x++){const o=(y*w+x)*4;border.push([d[o],d[o+1],d[o+2]]);}
+    const n=border.length;
+    const br=Math.round(border.reduce((s,c)=>s+c[0],0)/n);
+    const bg=Math.round(border.reduce((s,c)=>s+c[1],0)/n);
+    const bb=Math.round(border.reduce((s,c)=>s+c[2],0)/n);
+    const out=cx.createImageData(w,h); const od=out.data;
+    for(let i=0;i<d.length;i+=4){
+      const dr=Math.abs(d[i]-br),dg=Math.abs(d[i+1]-bg),db=Math.abs(d[i+2]-bb);
+      const dist=Math.sqrt(dr*dr+dg*dg+db*db);
+      od[i]=d[i];od[i+1]=d[i+1];od[i+2]=d[i+2];
+      od[i+3]=dist<tol?Math.round(Math.min(1,(dist/tol)*2.5)*255):255;
+    }
+    const cv2=document.createElement("canvas"); cv2.width=w; cv2.height=h;
+    cv2.getContext("2d").putImageData(out,0,0);
+    return cv2;
+  }
+
+  function whiteBg(){
+    const c=getResult(); const w=c.width,h=c.height;
+    const cv2=document.createElement("canvas"); cv2.width=w; cv2.height=h;
+    const cx2=cv2.getContext("2d");
+    cx2.fillStyle="#ffffff"; cx2.fillRect(0,0,w,h);
+    cx2.drawImage(c,0,0);
+    const img2=new Image();
+    img2.onload=()=>{_srcImg=img2;_rotation=0;_flipped=false;_cropSel=null;hideCropBox();resetSliders();render();App.toast("⬜ Fundo branco aplicado!");};
+    img2.src=cv2.toDataURL("image/jpeg",0.9);
+  }
+
+  function transpBg(){
+    const c=getResult(); const w=c.width,h=c.height;
+    const tol=parseInt($("rTol")?.value||42);
+    const rem=removeBackgroundCanvas(c,tol);
+    whiteBg(); // aplica branco depois do remoção
+    const img2=new Image();
+    img2.onload=()=>{_srcImg=img2;_rotation=0;_flipped=false;_cropSel=null;hideCropBox();resetSliders();render();App.toast("Fundo transparente!");};
+    img2.src=rem.toDataURL("image/png");
+  }
+
+  /* ── init eventos ── */
+  document.addEventListener("DOMContentLoaded",()=>{
+    const c=document.getElementById("iedCanvas");
+    if(!c) return;
+    c.addEventListener("mousedown",onDown);
+    c.addEventListener("mousemove",onMove);
+    c.addEventListener("mouseup",onUp);
+    c.addEventListener("touchstart",onDown,{passive:false});
+    c.addEventListener("touchmove",onMove,{passive:false});
+    c.addEventListener("touchend",onUp);
+  });
+
+  return { open, cancel, save, apply, resetAdj, rot, flipH, tab, crop, cropSquare, cancelCrop, removeBg, whiteBg, transpBg };
+})();
+
+/* ════════════════════════════════════════════════════════════
+   PAINEL ADMINISTRATIVO (Admin)
+   ════════════════════════════════════════════════════════════ */
+const Admin = (() => {
+
+  const $ = id => document.getElementById(id);
+  let logged = false;
+  let tab = "produtos";
+
+  const TABS = [
+    ["dashboard","📊 Dashboard"],
+    ["produtos","📦 Produtos"],
+    ["marcas","🏷️ Marcas"],
+    ["categorias","🏷 Categorias"],
+    ["banners","🖼 Banners"],
+    ["textos","✏️ Textos"],
+    ["frete","🛵 Frete"],
+    ["loja","🏪 Loja"],
+    ["publicar","🚀 Publicar"]
+  ];
+
+  /* ---------- login ---------- */
+  function askLogin(e){ if(e) e.preventDefault(); $("admLogin").classList.add("show"); setTimeout(()=>$("admPass").focus(),50); }
+  function closeLogin(){ $("admLogin").classList.remove("show"); $("admErr").style.display="none"; $("admPass").value=""; }
+  function tryLogin(){
+    let hash = "";
+    try { hash = btoa(unescape(encodeURIComponent($("admPass").value))); } catch(e){}
+    if(hash === DATA.senha){
+      logged = true;
+      closeLogin();
+      $("admBar").classList.add("show");
+      App.toast("Modo lojista ativado 🛠");
+      open();
+    } else {
+      $("admErr").style.display = "block";
+    }
+  }
+  function logout(){
+    logged = false;
+    $("admBar").classList.remove("show");
+    close();
+    App.toast("Saiu do modo lojista");
+  }
+
+  /* ---------- painel ---------- */
+  function open(){
+    if(!logged) return askLogin();
+    tab = "dashboard";
+    $("admin").classList.add("show");
+    document.body.style.overflow = "hidden";
+    drawTabs();
+    draw();
+  }
+  function close(){
+    $("admin").classList.remove("show");
+    document.body.style.overflow = "";
+    App.clearCart();
+    App.build();               // aplica as edições na loja ao vivo
+  }
+  function drawTabs(){
+    $("admTabs").innerHTML = TABS.map(([id,label]) =>
+      `<button class="adm-tab ${tab===id?'active':''}" onclick="Admin.go('${id}')">${label}</button>`).join("");
+  }
+  function go(t){ tab = t; drawTabs(); draw(); $("admin").querySelector(".adm-body").scrollTop = 0; }
+  function commit(){ saveDraft(); }
+
+  const esc = s => String(s ?? "").replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;");
+  const num = v => { const n = parseFloat(String(v).replace(",", ".")); return isNaN(n) ? null : n; };
+
+  function draw(){
+    if(tab === "dashboard") drawDashboard();
+    else if(tab === "produtos") drawProdutos();
+    else if(tab === "marcas") drawMarcas();
+    else if(tab === "categorias") drawCategorias();
+    else if(tab === "banners") drawBanners();
+    else if(tab === "textos") drawTextos();
+    else if(tab === "frete") drawFrete();
+    else if(tab === "loja") drawLoja();
+    else drawPublicar();
+  }
+
+  /* ══════════ ABA PRODUTOS ══════════ */
+  /* ──────── DASHBOARD ──────── */
+  function drawDashboard(){
+    // analytics simulado com localStorage (real em hospedagem)
+    const visits = parseInt(localStorage.getItem("sc_visits")||"0");
+    const clicks = JSON.parse(localStorage.getItem("sc_clicks")||"{}");
+    const orders = parseInt(localStorage.getItem("sc_orders")||"0");
+    const prods  = DATA.produtos.filter(p=>p.ativo!==false);
+    const ativos = prods.length;
+    const ofertas = prods.filter(p=>p.de).length;
+    const semEstoque = prods.filter(p=>p.estoque===false).length;
+
+    const topClick = Object.entries(clicks).sort((a,b)=>b[1]-a[1]).slice(0,6);
+    const maxC = topClick[0]?.[1] || 1;
+
+    $("admBody").innerHTML = `
+      <div style="margin-bottom:14px">
+        <div style="font-size:.72rem;font-weight:700;color:var(--muted);letter-spacing:.06em;margin-bottom:8px">VISÃO GERAL</div>
+        <div class="dash-grid">
+          <div class="dash-kpi"><div class="dk-val">${visits}</div><div class="dk-lbl">ACESSOS HOJE</div><div class="dk-sub">↑ acumulado local</div></div>
+          <div class="dash-kpi"><div class="dk-val">${orders}</div><div class="dk-lbl">PEDIDOS VIA WPP</div><div class="dk-sub">desde ${new Date().toLocaleDateString("pt-BR",{month:"short",year:"numeric"})}</div></div>
+          <div class="dash-kpi"><div class="dk-val">${ativos}</div><div class="dk-lbl">PRODUTOS ATIVOS</div><div class="dk-sub">${ofertas} em oferta</div></div>
+          <div class="dash-kpi"><div class="dk-val" style="color:${semEstoque>0?'var(--red)':'#1a7a40'}">${semEstoque}</div><div class="dk-lbl">SEM ESTOQUE</div><div class="dk-sub">${semEstoque>0?"⚠️ revisar":"✓ tudo ok"}</div></div>
+        </div>
+      </div>
+      ${topClick.length ? `
+      <div class="dash-bar">
+        <h5>🔥 PRODUTOS MAIS CLICADOS</h5>
+        ${topClick.map(([nome,val])=>`
+          <div class="dash-row">
+            <div class="dr-lbl">${nome}</div>
+            <div class="dr-bar"><div class="dr-fill" style="width:${Math.round(val/maxC*100)}%"></div></div>
+            <div class="dr-val">${val}</div>
+          </div>`).join("")}
+      </div>` : `<div class="adm-note">📊 Os dados de cliques aparecem aqui conforme os clientes navegam pelo site hospedado. Acesse o catálogo pelo link público para começar a registrar.</div>`}
+      <div class="dash-bar">
+        <h5>📦 STATUS DO CATÁLOGO</h5>
+        ${DATA.produtos.slice(0,8).map(p=>`
+          <div class="dash-row">
+            <div class="dr-lbl">${p.nome}</div>
+            <div style="display:flex;gap:4px;flex-shrink:0">
+              <span class="pc-badge ${p.ativo===false?'off':'on'}">${p.ativo===false?'off':'on'}</span>
+              ${p.estoque===false?'<span class="pc-badge sem">sem est.</span>':''}
+              ${p.de?'<span class="pc-badge" style="background:#eef3ff;color:#185fa5">oferta</span>':''}
+            </div>
+            <div class="dr-val" style="color:var(--red)">R$ ${Number(p.preco).toFixed(2).replace(".",",")}</div>
+          </div>`).join("")}
+        ${DATA.produtos.length>8?`<div style="font-size:.75rem;color:var(--muted);text-align:center;padding:6px 0">+${DATA.produtos.length-8} produtos</div>`:""}
+      </div>
+      <div class="adm-note" style="background:#e6f9ee;border-color:#a7dfc2;color:#1a5c30">
+        💡 <b>Dica:</b> Para dados de acesso em tempo real, hospede o site no Netlify e conecte ao Google Analytics ou Plausible — gratuito e leva 5 minutos.
+      </div>`;
+  }
+
+  /* ──────── PRODUTOS COMPACTO ──────── */
+  function drawProdutos(){
+    const catList = App.cats;
+    const dl = `<datalist id="catsDl">${catList.map(c=>`<option value="${esc(c)}">`).join("")}</datalist>`;
+    const busca = (admProdBusca||"").toLowerCase();
+    const lista = busca
+      ? DATA.produtos.map((p,i)=>({p,i})).filter(({p})=>(p.nome+p.cat).toLowerCase().includes(busca))
+      : DATA.produtos.map((p,i)=>({p,i}));
+
+    $("admBody").innerHTML = dl + `
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <input class="field" style="flex:1" placeholder="🔍 Buscar produto..." value="${esc(admProdBusca)}"
+          oninput="Admin.setProdBusca(this.value)">
+        <button class="abtn red" onclick="Admin.addProduto()">＋ Produto</button>
+      </div>` +
+      lista.map(({p,i}) => prodCard(p,i)).join("") +
+      (lista.length===0?`<div style="text-align:center;color:var(--muted);padding:24px">Nenhum produto encontrado</div>`:"");
+  }
+
+  let admProdBusca = "";
+  function setProdBusca(v){ admProdBusca=v; draw(); }
+
+  function prodCard(p, i){
+    const isColl = !admProdOpen.has(i);
+    const statusBadge = p.ativo===false
+      ? `<span class="pc-badge off">inativo</span>`
+      : p.estoque===false
+        ? `<span class="pc-badge sem">sem estoque</span>`
+        : `<span class="pc-badge on">ativo</span>`;
+    const ofertaBadge = p.de ? `<span class="pc-badge" style="background:#eef3ff;color:#185fa5">oferta</span>` : "";
+    const destaqueB = p.destaque ? `<span class="pc-badge" style="background:#fff0d4;color:#8a5a00">destaque</span>` : "";
+    const saboresHtml = (() => {
+      const sab = p.sabores || [];
+      return sab.map((s,si) =>
+        `<span class="sabor-tag">${esc(s)}<button onclick="Admin.rmSabor(${i},${si})" title="Remover">×</button></span>`
+      ).join("") +
+      `<button class="sabor-add" onclick="Admin.showSaborInput(${i})">＋ Sabor</button>
+       <input class="sabor-input" id="sab-inp-${i}" placeholder="Ex: Melancia Ice" style="display:none"
+         onkeydown="if(event.key==='Enter')Admin.addSabor(${i},this)" onblur="this.style.display='none'">`;
+    })();
+
+    return `<div class="pc" id="pc-${i}">
+      <div class="pc-head" onclick="Admin.toggleProd(${i})">
+        <div class="img-wrap">
+          <div class="pc-thumb">${p.img?`<img src="${p.img}" alt="">`:p.emoji||"🛍"}</div>
+          ${p.img?`<div class="img-ov" onclick="event.stopPropagation()">
+            <button class="ov-edit" onclick="Admin.editFoto(${i})" title="Editar">✏️</button>
+            <button class="ov-del"  onclick="Admin.rmFoto(${i})"   title="Remover">✕</button>
+          </div>`:""}
+        </div>
+        <div class="pc-info">
+          <div class="pc-name">${esc(p.nome)}</div>
+          <div class="pc-meta">${statusBadge}${ofertaBadge}${destaqueB}<span>${esc(p.cat)}</span></div>
+        </div>
+        <div class="pc-price">R$ ${Number(p.preco).toFixed(2).replace(".",",")}</div>
+        <div class="pc-actions" onclick="event.stopPropagation()">
+          <label class="tog" title="${p.ativo===false?'Ativar':'Desativar'}">
+            <input type="checkbox" ${p.ativo!==false?"checked":""} onchange="Admin.setP(${i},'ativo',this.checked);Admin.draw()">
+            <span class="tog-sl"></span>
+          </label>
+          <button style="background:#FDE8EA;color:var(--red)" onclick="Admin.rmProduto(${i})" title="Excluir">🗑</button>
+        </div>
+      </div>
+      <div class="pc-body${isColl?'':' open'}" id="pcb-${i}">
+        <div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:12px">
+          <div class="pv" style="cursor:pointer" onclick="Admin.pickFoto(${i})" title="Trocar foto">
+            ${p.img?`<img src="${p.img}" alt="">`:p.emoji||"🛍"}
+          </div>
+          <div style="flex:1">
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <button class="abtn soft" onclick="Admin.pickFoto(${i})">📷 Foto</button>
+              ${p.img?`<button class="abtn danger" onclick="Admin.rmFoto(${i})">✕ Remover</button>`:""}
+              <input class="field" style="width:74px" maxlength="4" value="${esc(p.emoji||'')}" placeholder="😀" onchange="Admin.setP(${i},'emoji',this.value)">
+            </div>
+            <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
+              <button class="abtn soft" onclick="Admin.moveP(${i},-1)" ${i===0?"disabled":""}>↑</button>
+              <button class="abtn soft" onclick="Admin.moveP(${i},1)" ${i===DATA.produtos.length-1?"disabled":""}>↓</button>
+              <label class="chk" style="margin:0"><input type="checkbox" ${p.destaque?"checked":""} onchange="Admin.setP(${i},'destaque',this.checked)"> Destaque</label>
+              <label class="chk" style="margin:0"><input type="checkbox" ${p.estoque!==false?"checked":""} onchange="Admin.setP(${i},'estoque',this.checked)"> Em estoque</label>
+            </div>
+          </div>
+        </div>
+        <div class="adm-grid">
+          <div><label>Nome</label><input class="field" value="${esc(p.nome)}" onchange="Admin.setP(${i},'nome',this.value)"></div>
+          <div><label>Categoria</label><input class="field" list="catsDl" value="${esc(p.cat)}" onchange="Admin.setP(${i},'cat',this.value)"></div>
+          <div><label>Preço (R$)</label><input class="field" inputmode="decimal" value="${p.preco}" onchange="Admin.setP(${i},'preco',this.value,true)"></div>
+          <div><label>Preço "de" — promoção</label><input class="field" inputmode="decimal" value="${p.de??''}" placeholder="vazio = sem promoção" onchange="Admin.setP(${i},'de',this.value,true)"></div>
+        </div>
+        <label>Descrição</label>
+        <input class="field" value="${esc(p.desc||'')}" onchange="Admin.setP(${i},'desc',this.value)">
+        <label style="margin-top:12px">Sabores disponíveis</label>
+        <div style="margin-top:6px;line-height:2.2">${saboresHtml}</div>
+      </div>
+    </div>`;
+  }
+
+  const admProdOpen = new Set();
+  function toggleProd(i){ admProdOpen.has(i)?admProdOpen.delete(i):admProdOpen.add(i); draw(); }
+
+  function addSabor(i, input){
+    const v = input.value.trim();
+    if(!v) return;
+    if(!DATA.produtos[i].sabores) DATA.produtos[i].sabores = [];
+    DATA.produtos[i].sabores.push(v);
+    commit(); draw();
+  }
+  function rmSabor(i, si){
+    DATA.produtos[i].sabores.splice(si,1); commit(); draw();
+  }
+  function showSaborInput(i){
+    const el = document.getElementById(`sab-inp-${i}`);
+    if(!el) return;
+    el.style.display = "inline-block";
+    el.value = "";
+    el.focus();
+  }
+
+  function setP(i, campo, valor, isNum){
+    if(isNum){
+      const n = num(valor);
+      DATA.produtos[i][campo] = (campo === "preco") ? (n ?? 0) : n;
+    } else {
+      DATA.produtos[i][campo] = typeof valor === "boolean" ? valor : valor.trim();
+    }
+    commit();
+  }
+  function addProduto(){
+    DATA.produtos.unshift({ cat: App.cats[0] || "Geral", emoji:"🛍", nome:"Novo produto",
+      desc:"", preco:0, de:null, destaque:false, img:null, ativo:true, estoque:true, sabores:[] });
+    admProdOpen.add(0);
+    commit(); draw();
+  }
+  function rmProduto(i){
+    if(!confirm(`Excluir "${DATA.produtos[i].nome}"?`)) return;
+    DATA.produtos.splice(i,1);
+    commit(); draw();
+  }
+  function moveP(i,d){
+    const j = i + d;
+    if(j < 0 || j >= DATA.produtos.length) return;
+    [DATA.produtos[i], DATA.produtos[j]] = [DATA.produtos[j], DATA.produtos[i]];
+    commit(); draw();
+  }
+
+  /* ---------- fotos (redimensionadas para não pesar o site) ---------- */
+  /* ---------- remoção de fundo por cor dominante (borda) ---------- */
+  function removeBackground(srcCanvas){
+    const w = srcCanvas.width, h = srcCanvas.height;
+    const ctx = srcCanvas.getContext("2d");
+    const src = ctx.getImageData(0, 0, w, h);
+    const d   = src.data;
+
+    // coleta cor de fundo nas 4 bordas (amostra de 5% de cada)
+    const border = [];
+    const margin = Math.max(1, Math.round(Math.min(w,h)*0.04));
+    for(let x=0;x<w;x++) for(let y=0;y<margin;y++){
+      const off=(y*w+x)*4; border.push([d[off],d[off+1],d[off+2]]);
+    }
+    for(let x=0;x<w;x++) for(let y=h-margin;y<h;y++){
+      const off=(y*w+x)*4; border.push([d[off],d[off+1],d[off+2]]);
+    }
+    for(let y=0;y<h;y++) for(let x=0;x<margin;x++){
+      const off=(y*w+x)*4; border.push([d[off],d[off+1],d[off+2]]);
+    }
+    for(let y=0;y<h;y++) for(let x=w-margin;x<w;x++){
+      const off=(y*w+x)*4; border.push([d[off],d[off+1],d[off+2]]);
+    }
+
+    // média da cor de fundo
+    const n  = border.length;
+    const br = Math.round(border.reduce((s,c)=>s+c[0],0)/n);
+    const bg = Math.round(border.reduce((s,c)=>s+c[1],0)/n);
+    const bb = Math.round(border.reduce((s,c)=>s+c[2],0)/n);
+
+    // cria imagem com transparência
+    const out = ctx.createImageData(w, h);
+    const od  = out.data;
+    const tol = 42; // tolerância de cor (0-255)
+
+    for(let i=0;i<d.length;i+=4){
+      const dr=Math.abs(d[i]-br), dg=Math.abs(d[i+1]-bg), db=Math.abs(d[i+2]-bb);
+      const dist = Math.sqrt(dr*dr+dg*dg+db*db);
+      od[i]   = d[i];
+      od[i+1] = d[i+1];
+      od[i+2] = d[i+2];
+      if(dist < tol){
+        // fade suave nas bordas de cor de fundo
+        od[i+3] = Math.round(Math.min(1,(dist/tol)*2.5)*255);
+      } else {
+        od[i+3] = 255;
+      }
+    }
+
+    const cv2 = document.createElement("canvas");
+    cv2.width = w; cv2.height = h;
+    cv2.getContext("2d").putImageData(out, 0, 0);
+    return cv2;
+  }
+
+  /* ---------- upload de foto com ou sem remoção de fundo ---------- */
+  function pickImage(cb, maxW, removerFundo){
+    const input = $("fileInput");
+    input.accept = "image/*";
+    input.onchange = () => {
+      const file = input.files[0];
+      input.value = "";
+      if(!file) return;
+
+      // mostra loading no toast
+      App.toast("⏳ Processando imagem...");
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+          const scale = Math.min(1, (maxW||640) / img.width);
+          const cv = document.createElement("canvas");
+          cv.width  = Math.round(img.width  * scale);
+          cv.height = Math.round(img.height * scale);
+          cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height);
+
+          if(removerFundo){
+            try {
+              const sem = removeBackground(cv);
+              cb(sem.toDataURL("image/png")); // PNG para preservar transparência
+              App.toast("✅ Fundo removido com sucesso!");
+            } catch(e){
+              // fallback: salva sem remover fundo
+              cb(cv.toDataURL("image/jpeg", 0.82));
+              App.toast("📷 Foto salva (sem remoção de fundo)");
+            }
+          } else {
+            cb(cv.toDataURL("image/jpeg", 0.82));
+            App.toast("📷 Foto salva!");
+          }
+        };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    };
+    input.click();
+  }
+
+  /* ---------- pickFoto: upload → editor → salvar ---------- */
+  function pickFoto(i){
+    pickImage(url => {
+      // abre editor com a foto carregada
+      ImgEd.open(result => {
+        DATA.produtos[i].img = result;
+        commit(); draw();
+        App.toast("✅ Foto salva!");
+      }, url);
+    }, 1200, false);
+  }
+  function editFoto(i){
+    if(!DATA.produtos[i].img){ pickFoto(i); return; }
+    ImgEd.open(result => {
+      DATA.produtos[i].img = result;
+      commit(); draw();
+      App.toast("✅ Foto atualizada!");
+    }, DATA.produtos[i].img);
+  }
+  function rmFoto(i){ DATA.produtos[i].img = null; commit(); draw(); }
+
+  /* ---------- modal: remover fundo ou não ---------- */
+  function showBgModal(cb, maxW){
+    // cria modal de escolha
+    const overlay = document.createElement("div");
+    overlay.style.cssText = "position:fixed;inset:0;z-index:2000;background:rgba(14,14,16,.7);display:flex;align-items:center;justify-content:center;padding:20px";
+    overlay.innerHTML = `
+      <div style="background:#fff;border-radius:16px;padding:24px 22px;max-width:340px;width:100%;box-shadow:0 20px 50px rgba(0,0,0,.25);text-align:center">
+        <div style="font-size:1.8rem;margin-bottom:10px">🖼</div>
+        <div style="font-family:'Archivo',sans-serif;font-weight:900;font-size:1rem;margin-bottom:6px">Adicionar foto</div>
+        <p style="font-size:.82rem;color:#6E6E78;line-height:1.55;margin-bottom:18px">Deseja remover o fundo da imagem automaticamente? Funciona melhor em fotos com fundo branco, cinza ou sólido.</p>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <button id="bgYes" style="padding:13px;border:none;border-radius:10px;background:#E3132B;color:#fff;font-weight:800;font-size:.9rem;cursor:pointer">
+            ✨ Sim — remover fundo
+          </button>
+          <button id="bgNo" style="padding:13px;border:none;border-radius:10px;background:#F1F1F4;color:#141416;font-weight:700;font-size:.88rem;cursor:pointer">
+            📷 Não — manter fundo
+          </button>
+          <button id="bgCancel" style="padding:10px;border:none;background:none;color:#6E6E78;font-size:.82rem;cursor:pointer">Cancelar</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+
+    const close = () => document.body.removeChild(overlay);
+
+    overlay.querySelector("#bgYes").onclick = () => {
+      close();
+      pickImage(cb, maxW, true);
+    };
+    overlay.querySelector("#bgNo").onclick = () => {
+      close();
+      pickImage(cb, maxW, false);
+    };
+    overlay.querySelector("#bgCancel").onclick = close;
+    overlay.addEventListener("click", e => { if(e.target===overlay) close(); });
+  }
+
+  /* ══════════ ABA MARCAS ══════════ */
+  /* ══════════ ABA MARCAS COMPACTA ══════════ */
+  const admMarcaOpen = new Set();
+  const admModeloOpen = new Set();
+
+  function drawMarcas(){
+    const marcas = DATA.marcas || [];
+    $("admBody").innerHTML =
+      `<div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">
+        <div style="font-size:.8rem;color:var(--muted);flex:1">${marcas.length} marca(s) · ${marcas.reduce((s,m)=>s+(m.modelos||[]).length,0)} modelo(s)</div>
+        <button class="abtn red" onclick="Admin.addMarca()">＋ Marca</button>
+      </div>` +
+      marcas.map((m,mi) => {
+        const isOpen = admMarcaOpen.has(mi);
+        return `<div class="mc ${isOpen?'open':''}" id="mc-${mi}">
+          <div class="mc-head" onclick="Admin.toggleMarca(${mi})">
+            <div class="mc-dot" style="background:${m.corGradA||'#E3132B'}"></div>
+            <div style="width:10px;height:10px;border-radius:2px;flex-shrink:0;background:${m.corFundo||'#1A1A22'}"></div>
+            <div class="mc-nome">${esc(m.nome)}</div>
+            <div class="mc-count">${(m.modelos||[]).length} modelos</div>
+            <div style="display:flex;gap:6px;margin-right:4px" onclick="event.stopPropagation()">
+              <label class="tog" title="Ativa/desativa no site">
+                <input type="checkbox" ${m.ativo?"checked":""} onchange="Admin.setMarcaField(${mi},'ativo',this.checked)">
+                <span class="tog-sl"></span>
+              </label>
+              <button style="width:28px;height:28px;border:none;border-radius:7px;background:#FDE8EA;color:var(--red);cursor:pointer"
+                onclick="Admin.rmMarca(${mi})">🗑</button>
+            </div>
+            <div class="mc-chevron">›</div>
+          </div>
+          <div class="mc-body">
+            <!-- info básica -->
+            <div class="adm-grid" style="margin-bottom:10px">
+              <div><label>Nome</label><input class="field" value="${esc(m.nome)}" onchange="Admin.setMarcaField(${mi},'nome',this.value)"></div>
+              <div><label>Descrição</label><input class="field" value="${esc(m.descricao||'')}" onchange="Admin.setMarcaField(${mi},'descricao',this.value)"></div>
+            </div>
+            <!-- cores compactas -->
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px;background:#F8F8FA;padding:10px;border-radius:10px">
+              <span style="font-size:.72rem;font-weight:700;color:var(--muted)">CORES</span>
+              <div style="display:flex;align-items:center;gap:4px">
+                <input type="color" class="cpick" value="${m.corFundo||'#1A1A22'}" title="Fundo" onchange="Admin.setMarcaField(${mi},'corFundo',this.value)">
+                <span style="font-size:.65rem;color:var(--muted)">Fundo</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:4px">
+                <input type="color" class="cpick" value="${m.corFita||'#2A2A30'}" title="Fita" onchange="Admin.setMarcaField(${mi},'corFita',this.value)">
+                <span style="font-size:.65rem;color:var(--muted)">Fita</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:4px">
+                <input type="color" class="cpick" value="${m.corGradA||'#E3132B'}" title="Degradê início" onchange="Admin.setMarcaField(${mi},'corGradA',this.value)">
+                <span style="font-size:.65rem;color:var(--muted)">Grad. A</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:4px">
+                <input type="color" class="cpick" value="${m.corGradB||'#FF8C2B'}" title="Degradê fim" onchange="Admin.setMarcaField(${mi},'corGradB',this.value)">
+                <span style="font-size:.65rem;color:var(--muted)">Grad. B</span>
+              </div>
+              <div style="flex:1;min-width:80px;height:22px;border-radius:6px;background:linear-gradient(90deg,${m.corGradA||'#E3132B'},${m.corGradB||'#FF8C2B'})"></div>
+            </div>
+            <!-- modelos -->
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+              <span style="font-size:.78rem;font-weight:700">📦 Modelos</span>
+              <button class="abtn red" style="padding:6px 12px;font-size:.75rem" onclick="Admin.addModelo(${mi})">＋ Modelo</button>
+            </div>
+            ${(m.modelos||[]).map((mod,idx) => {
+              const mKey = `${mi}-${idx}`;
+              const mOpen = admModeloOpen.has(mKey);
+              const sabHtml = (mod.sabores||[]).map((s,si)=>
+                `<span class="sabor-tag">${esc(s)}<button onclick="Admin.rmSaborModelo(${mi},${idx},${si})">×</button></span>`
+              ).join("") +
+              `<button class="sabor-add" onclick="Admin.showSaborInputModelo(${mi},${idx})">＋ Sabor</button>
+               <input class="sabor-input" id="sab-m-${mi}-${idx}" placeholder="Ex: Grape Ice" style="display:none"
+                 onkeydown="if(event.key==='Enter')Admin.addSaborModelo(${mi},${idx},this)" onblur="this.style.display='none'">`;
+              return `<div class="modelo-row" style="flex-wrap:wrap">
+                <div class="img-wrap">
+                <div class="mr-thumb" onclick="Admin.pickFotoModelo(${mi},${idx})" style="cursor:pointer" title="Trocar foto">
+                  ${mod.img?`<img src="${mod.img}" alt="">`:mod.emoji||"💨"}
+                </div>
+                ${mod.img?`<div class="img-ov" onclick="event.stopPropagation()">
+                  <button class="ov-edit" onclick="Admin.editFotoModelo(${mi},${idx})" title="Editar">✏️</button>
+                  <button class="ov-del"  onclick="Admin.rmFotoModelo(${mi},${idx})"   title="Remover">✕</button>
+                </div>`:""}
+              </div>
+                <div class="mr-info">
+                  <div class="mr-name">${esc(mod.nome)}</div>
+                  <div class="mr-sub">${esc(mod.desc||'')} ${mod.de?'· <s>R$'+Number(mod.de).toFixed(2).replace(".",",")+'</s>':''}</div>
+                </div>
+                <div class="mr-price">R$ ${Number(mod.preco).toFixed(2).replace(".",",")}</div>
+                <div class="mr-acts">
+                  <button style="background:#F1F1F4" onclick="Admin.toggleModelo(${mi},${idx})" title="Editar">✏️</button>
+                  <button style="background:#F1F1F4" onclick="Admin.moveModelo(${mi},${idx},-1)" ${idx===0?"disabled":""}>↑</button>
+                  <button style="background:#F1F1F4" onclick="Admin.moveModelo(${mi},${idx},1)" ${idx===(m.modelos.length-1)?"disabled":""}>↓</button>
+                  <button style="background:#FDE8EA;color:var(--red)" onclick="Admin.rmModelo(${mi},${idx})">🗑</button>
+                </div>
+                <div class="modelo-expand${mOpen?' open':''}" style="width:100%">
+                  <div class="adm-grid">
+                    <div><label>Nome do modelo</label><input class="field" value="${esc(mod.nome)}" onchange="Admin.setModeloField(${mi},${idx},'nome',this.value)"></div>
+                    <div><label>Descrição</label><input class="field" value="${esc(mod.desc||'')}" onchange="Admin.setModeloField(${mi},${idx},'desc',this.value)"></div>
+                    <div><label>Preço (R$)</label><input class="field" inputmode="decimal" value="${mod.preco}" onchange="Admin.setModeloField(${mi},${idx},'preco',this.value,true)"></div>
+                    <div><label>Preço "de" (promoção)</label><input class="field" inputmode="decimal" value="${mod.de??''}" placeholder="vazio = sem oferta" onchange="Admin.setModeloField(${mi},${idx},'de',this.value,true)"></div>
+                  </div>
+                  <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+                    <button class="abtn soft" onclick="Admin.pickFotoModelo(${mi},${idx})">📷 Foto</button>
+                    ${mod.img?`<button class="abtn danger" onclick="Admin.rmFotoModelo(${mi},${idx})">✕ Remover</button>`:''}
+                    <input class="field" style="width:72px" maxlength="4" value="${esc(mod.emoji||'')}" placeholder="😀" onchange="Admin.setModeloField(${mi},${idx},'emoji',this.value)">
+                    <label class="chk" style="margin:0"><input type="checkbox" ${mod.ativo!==false?"checked":""} onchange="Admin.setModeloField(${mi},${idx},'ativo',this.checked)"> Ativo</label>
+                  </div>
+                  <label style="margin-top:10px">Sabores</label>
+                  <div style="margin-top:6px;line-height:2.2">${sabHtml}</div>
+                </div>
+              </div>`;
+            }).join("")}
+          </div>
+        </div>`;
+      }).join("");
+  }
+
+  function toggleMarca(mi){ admMarcaOpen.has(mi)?admMarcaOpen.delete(mi):admMarcaOpen.add(mi); draw(); }
+  function toggleModelo(mi,idx){ const k=`${mi}-${idx}`; admModeloOpen.has(k)?admModeloOpen.delete(k):admModeloOpen.add(k); draw(); }
+
+  function setMarcaField(mi, campo, valor){
+    if(!DATA.marcas || !DATA.marcas[mi]) return;
+    DATA.marcas[mi][campo] = typeof valor==="boolean"?valor:(typeof valor==="number"?valor:valor.trim());
+    commit(); draw();
+  }
+  function addMarca(){
+    if(!DATA.marcas) DATA.marcas = [];
+    const mi = DATA.marcas.length;
+    DATA.marcas.push({ nome:"NOVA MARCA", corFita:"#2A2A30", corTexto:"#FFFFFF", corGradA:"#E3132B", corGradB:"#FF8C2B", corFundo:"#1A1A22", descricao:"", ativo:true, modelos:[] });
+    admMarcaOpen.add(mi);
+    commit(); draw();
+  }
+  function rmMarca(mi){
+    if(!confirm("Excluir esta marca?")) return;
+    DATA.marcas.splice(mi,1); commit(); draw();
+  }
+  function addModelo(mi){
+    if(!DATA.marcas[mi].modelos) DATA.marcas[mi].modelos = [];
+    const idx = DATA.marcas[mi].modelos.length;
+    DATA.marcas[mi].modelos.push({ nome:"Novo modelo", desc:"", preco:0, de:null, img:null, emoji:"💨", sabores:[], ativo:true });
+    admModeloOpen.add(`${mi}-${idx}`);
+    commit(); draw();
+  }
+  function rmModelo(mi, idx){ DATA.marcas[mi].modelos.splice(idx,1); commit(); draw(); }
+  function moveModelo(mi, idx, dir){
+    const j = idx+dir; const arr = DATA.marcas[mi].modelos;
+    if(j<0||j>=arr.length) return;
+    [arr[idx],arr[j]]=[arr[j],arr[idx]]; commit(); draw();
+  }
+  function setModeloField(mi, idx, campo, valor, isNum){
+    const mod = DATA.marcas[mi].modelos[idx];
+    if(isNum){ const n=parseFloat(String(valor).replace(",",".")); mod[campo]=isNaN(n)?null:n; }
+    else mod[campo] = typeof valor==="boolean"?valor:valor.trim();
+    commit();
+  }
+  function pickFotoModelo(mi, idx){
+    pickImage(url => {
+      ImgEd.open(result => {
+        DATA.marcas[mi].modelos[idx].img = result;
+        commit(); draw();
+        App.toast("✅ Foto salva!");
+      }, url);
+    }, 1200, false);
+  }
+  function editFotoModelo(mi, idx){
+    if(!DATA.marcas[mi].modelos[idx].img){ pickFotoModelo(mi,idx); return; }
+    ImgEd.open(result => {
+      DATA.marcas[mi].modelos[idx].img = result;
+      commit(); draw();
+      App.toast("✅ Foto atualizada!");
+    }, DATA.marcas[mi].modelos[idx].img);
+  }
+  function rmFotoModelo(mi, idx){ DATA.marcas[mi].modelos[idx].img=null; commit(); draw(); }
+  function addSaborModelo(mi, idx, input){
+    const v=input.value.trim(); if(!v) return;
+    if(!DATA.marcas[mi].modelos[idx].sabores) DATA.marcas[mi].modelos[idx].sabores=[];
+    DATA.marcas[mi].modelos[idx].sabores.push(v); commit(); draw();
+  }
+  function rmSaborModelo(mi, idx, si){ DATA.marcas[mi].modelos[idx].sabores.splice(si,1); commit(); draw(); }
+  function showSaborInputModelo(mi, idx){
+    const el=document.getElementById(`sab-m-${mi}-${idx}`);
+    if(!el) return; el.style.display="inline-block"; el.value=""; el.focus();
+  }
+
+  /* ══════════ ABA CATEGORIAS ══════════ */
+  function corSelect(i, atual){
+    return `<select class="field" onchange="Admin.setCat(${i},'cor',this.value)">` +
+      CORES.map(([v,l]) => `<option value="${v}" ${v===atual?"selected":""}>${l}</option>`).join("") +
+      `</select>`;
+  }
+  function drawCategorias(){
+    App.cats; // garante sincronização
+    $("admBody").innerHTML =
+      `<div class="adm-note">💡 Cada categoria vira um <b>banner grande</b> na home. Escolha a cor de fundo e, se quiser, uma <b>foto</b> (ela aparece no lado direito do banner). A ordem aqui é a ordem no site. Para criar uma categoria, use o campo "Categoria" de um produto na aba 📦 Produtos.</div>` +
+      DATA.categorias.map((c,i) => `
+      <div class="adm-card">
+        <div class="adm-row" style="margin-bottom:10px">
+          <div class="pv wide">${c.img ? `<img src="${c.img}" alt="">` : "🖼"}</div>
+          <span class="cor-preview cg-${c.cor}"></span>
+          <span style="flex:1"></span>
+          <button class="abtn soft" onclick="Admin.moveCat(${i},-1)" ${i===0?"disabled":""}>↑</button>
+          <button class="abtn soft" onclick="Admin.moveCat(${i},1)" ${i===DATA.categorias.length-1?"disabled":""}>↓</button>
+        </div>
+        <div class="adm-grid">
+          <div><label>Nome da categoria</label><input class="field" value="${esc(c.nome)}" onchange="Admin.renameCat(${i},this.value)"></div>
+          <div><label>Cor do banner</label>${corSelect(i, c.cor)}</div>
+        </div>
+        <div class="adm-actions">
+          <button class="abtn soft" onclick="Admin.fotoCat(${i})">📷 Foto do banner</button>
+          ${c.img ? `<button class="abtn danger" onclick="Admin.rmFotoCat(${i})">Remover foto</button>` : ""}
+        </div>
+        <p class="hint" style="margin-top:8px">${DATA.produtos.filter(p=>p.cat===c.nome).length} produto(s) nesta categoria. Renomear aqui atualiza todos eles.</p>
+      </div>`).join("");
+  }
+  function setCat(i, campo, valor){ DATA.categorias[i][campo] = valor; commit(); draw(); }
+  function renameCat(i, novo){
+    novo = novo.trim();
+    if(!novo) { draw(); return; }
+    const antigo = DATA.categorias[i].nome;
+    if(novo === antigo) return;
+    if(DATA.categorias.find((c,k) => k!==i && c.nome === novo)){
+      alert("Já existe uma categoria com esse nome.");
+      draw(); return;
+    }
+    DATA.categorias[i].nome = novo;
+    DATA.produtos.forEach(p => { if(p.cat === antigo) p.cat = novo; });
+    DATA.banners.forEach(b => { if(b.destino === antigo) b.destino = novo; });
+    commit(); draw();
+    App.toast(`Categoria renomeada ✓`);
+  }
+  function moveCat(i,d){
+    const j = i+d;
+    if(j<0 || j>=DATA.categorias.length) return;
+    [DATA.categorias[i],DATA.categorias[j]] = [DATA.categorias[j],DATA.categorias[i]];
+    commit(); draw();
+  }
+  function fotoCat(i){ pickImage(url => { DATA.categorias[i].img = url; commit(); draw(); App.toast("Foto do banner adicionada 📷"); }, 900); }
+  function rmFotoCat(i){ DATA.categorias[i].img = null; commit(); draw(); }
+
+  /* ══════════ ABA BANNERS ══════════ */
+  function drawBanners(){
+    const catOpts = c => `<option value="">— Falar no WhatsApp —</option>` +
+      App.cats.map(x=>`<option value="${esc(x)}" ${x===c?"selected":""}>${x}</option>`).join("");
+    $("admBody").innerHTML =
+      `<div class="adm-note">💡 Estes são os banners <b>rotativos do topo</b> do site (propaganda, promoções, avisos). Os banners de categoria são editados na aba 🏷 Categorias.</div>` +
+      `<button class="adm-add" onclick="Admin.addBanner()">＋ Adicionar banner</button>` +
+      DATA.banners.map((b,i) => `
+      <div class="adm-card">
+        <h4>Banner ${i+1}
+          <span style="flex:1"></span>
+          <button class="abtn soft" onclick="Admin.moveB(${i},-1)" ${i===0?"disabled":""}>↑</button>
+          <button class="abtn soft" onclick="Admin.moveB(${i},1)" ${i===DATA.banners.length-1?"disabled":""}>↓</button>
+          <button class="abtn danger" onclick="Admin.rmBanner(${i})">🗑</button>
+        </h4>
+        <div class="adm-grid">
+          <div><label>Etiqueta (texto pequeno)</label><input class="field" value="${esc(b.tag)}" onchange="Admin.setB(${i},'tag',this.value)"></div>
+          <div><label>Botão</label><input class="field" value="${esc(b.botao)}" onchange="Admin.setB(${i},'botao',this.value)"></div>
+        </div>
+        <label>Título</label><input class="field" value="${esc(b.titulo)}" onchange="Admin.setB(${i},'titulo',this.value)">
+        <label>Texto</label><input class="field" value="${esc(b.texto)}" onchange="Admin.setB(${i},'texto',this.value)">
+        <div class="adm-grid">
+          <div><label>Botão leva para</label><select class="field" onchange="Admin.setB(${i},'destino',this.value||null)">${catOpts(b.destino)}</select></div>
+          <div><label>Cor de fundo</label><select class="field" onchange="Admin.setB(${i},'estilo',this.value)">
+            <option value="s1" ${b.estilo==="s1"?"selected":""}>Vermelho vivo</option>
+            <option value="s2" ${b.estilo==="s2"?"selected":""}>Preto</option>
+            <option value="s3" ${b.estilo==="s3"?"selected":""}>Vermelho escuro</option>
+          </select></div>
+        </div>
+        <div class="adm-row" style="margin-top:12px">
+          <input class="field" style="width:86px" maxlength="4" value="${esc(b.icone)}" placeholder="Ícone" onchange="Admin.setB(${i},'icone',this.value)">
+          <button class="abtn soft" onclick="Admin.fotoBanner(${i})">📷 Foto de fundo</button>
+          ${b.img ? `<button class="abtn danger" onclick="Admin.rmFotoBanner(${i})">Remover foto</button>` : ""}
+        </div>
+      </div>`).join("");
+  }
+  function setB(i,campo,valor){ DATA.banners[i][campo] = typeof valor==="string" ? valor.trim() : valor; commit(); }
+  function addBanner(){
+    DATA.banners.push({ estilo:"s1", tag:"NOVIDADE", titulo:"Novo banner", texto:"Edite este texto.", botao:"Ver mais", destino:null, icone:"🔥", img:null });
+    commit(); draw();
+  }
+  function rmBanner(i){
+    if(DATA.banners.length === 1){ alert("Deixa pelo menos 1 banner 😉"); return; }
+    if(!confirm("Excluir este banner?")) return;
+    DATA.banners.splice(i,1); commit(); draw();
+  }
+  function moveB(i,d){
+    const j = i+d;
+    if(j<0 || j>=DATA.banners.length) return;
+    [DATA.banners[i],DATA.banners[j]] = [DATA.banners[j],DATA.banners[i]];
+    commit(); draw();
+  }
+  function fotoBanner(i){ pickImage(url => { DATA.banners[i].img = url; commit(); draw(); App.toast("Foto do banner adicionada 📷"); }, 1200); }
+  function rmFotoBanner(i){ DATA.banners[i].img = null; commit(); draw(); }
+
+  /* ══════════ ABA TEXTOS ══════════ */
+  function listEditor(titulo, hint, lista, chave){
+    return `<div class="adm-card">
+      <h4>${titulo}</h4>
+      ${hint ? `<p class="hint">${hint}</p>` : ""}
+      ${lista.map((v,i) => `
+        <div class="list-item">
+          <input class="field" value="${esc(v)}" onchange="Admin.setLista('${chave}',${i},this.value)">
+          <button class="abtn danger" onclick="Admin.rmLista('${chave}',${i})">🗑</button>
+        </div>`).join("")}
+      <div class="adm-actions"><button class="abtn soft" onclick="Admin.addLista('${chave}')">＋ Adicionar linha</button></div>
+    </div>`;
+  }
+  function drawTextos(){
+    const T = DATA.textos;
+    $("admBody").innerHTML =
+      `<div class="adm-note">✏️ Aqui você muda <b>tudo que está escrito</b> no site. As mudanças aparecem quando você fecha o painel.</div>` +
+
+      `<div class="adm-card">
+        <h4>Marca (logo escrita)</h4>
+        <div class="adm-grid">
+          <div><label>Parte branca</label><input class="field" value="${esc(DATA.marca.p1)}" onchange="Admin.setMarca('p1',this.value)"></div>
+          <div><label>Parte vermelha</label><input class="field" value="${esc(DATA.marca.p2)}" onchange="Admin.setMarca('p2',this.value)"></div>
+        </div>
+        <label>Slogan (embaixo da logo)</label>
+        <input class="field" value="${esc(DATA.marca.slogan)}" onchange="Admin.setMarca('slogan',this.value)">
+      </div>` +
+
+      listEditor("Letreiro do topo (barra vermelha)", "Frases que giram na faixa vermelha acima do site.", T.topbar, "topbar") +
+
+      `<div class="adm-card">
+        <h4>Aviso +18 (tela de entrada)</h4>
+        <label>Título</label>
+        <input class="field" value="${esc(T.gateTitulo)}" onchange="Admin.setTexto('gateTitulo',this.value)">
+        <label>Texto</label>
+        <textarea class="field" rows="3" onchange="Admin.setTexto('gateTexto',this.value)">${esc(T.gateTexto)}</textarea>
+      </div>` +
+
+      `<div class="adm-card">
+        <h4>Vantagens (4 cartõezinhos abaixo do banner)</h4>
+        ${T.perks.map((p,i) => `
+          <div class="adm-row" style="margin-bottom:8px">
+            <input class="field" style="width:70px" maxlength="4" value="${esc(p[0])}" onchange="Admin.setPerk(${i},0,this.value)">
+            <input class="field" style="flex:1;min-width:120px" value="${esc(p[1])}" placeholder="Título" onchange="Admin.setPerk(${i},1,this.value)">
+            <input class="field" style="flex:2;min-width:160px" value="${esc(p[2])}" placeholder="Descrição" onchange="Admin.setPerk(${i},2,this.value)">
+          </div>`).join("")}
+      </div>` +
+
+      `<div class="adm-card">
+        <h4>Títulos de seção e busca</h4>
+        <div class="adm-grid">
+          <div><label>Título "Categorias"</label><input class="field" value="${esc(T.tituloCategorias)}" onchange="Admin.setTexto('tituloCategorias',this.value)"></div>
+          <div><label>Título "Destaques"</label><input class="field" value="${esc(T.tituloDestaques)}" onchange="Admin.setTexto('tituloDestaques',this.value)"></div>
+        </div>
+        <label>Texto da caixa de busca</label>
+        <input class="field" value="${esc(T.buscaPlaceholder)}" onchange="Admin.setTexto('buscaPlaceholder',this.value)">
+      </div>` +
+
+      `<div class="adm-card">
+        <h4>Faixa "fale conosco" (antes do rodapé)</h4>
+        <label>Título</label><input class="field" value="${esc(T.stripTitulo)}" onchange="Admin.setTexto('stripTitulo',this.value)">
+        <label>Texto</label><input class="field" value="${esc(T.stripTexto)}" onchange="Admin.setTexto('stripTexto',this.value)">
+        <label>Botão</label><input class="field" value="${esc(T.stripBotao)}" onchange="Admin.setTexto('stripBotao',this.value)">
+      </div>` +
+
+      `<div class="adm-card">
+        <h4>Rodapé — descrição da loja</h4>
+        <textarea class="field" rows="2" onchange="Admin.setTexto('rodapeDescricao',this.value)">${esc(T.rodapeDescricao)}</textarea>
+      </div>` +
+
+      listEditor("Rodapé — linhas extras", "Linhas abaixo da descrição (entrega, retirada...).", T.rodapeLinhas, "rodapeLinhas") +
+      listEditor("Rodapé — horários de atendimento", "", T.horarios, "horarios") +
+      listEditor("Rodapé — formas de pagamento", "", T.pagamentos, "pagamentos") +
+
+      `<div class="adm-card">
+        <h4>Aviso legal (barra final)</h4>
+        <label>Linha em destaque</label>
+        <input class="field" value="${esc(T.avisoTitulo)}" onchange="Admin.setTexto('avisoTitulo',this.value)">
+        <label>Texto</label>
+        <textarea class="field" rows="2" onchange="Admin.setTexto('avisoLegal',this.value)">${esc(T.avisoLegal)}</textarea>
+      </div>` +
+
+      `<div class="adm-card">
+        <h4>💳 Formas de pagamento no checkout</h4>
+        <p class="hint">Ative ou desative cada forma. O label é editável.</p>
+        ${(DATA.textos.formasPagamento||[]).map((f,i)=>`
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+            <label class="chk" style="margin:0;flex-shrink:0"><input type="checkbox" ${f.ativo?"checked":""} onchange="Admin.setPayForm(${i},'ativo',this.checked)"> </label>
+            <input class="field" value="${esc(f.label)}" onchange="Admin.setPayForm(${i},'label',this.value)" style="flex:1">
+          </div>`).join("")}
+      </div>` +
+
+      `<div class="adm-card">
+        <h4>🖼 Banner do checkout</h4>
+        <p class="hint">Aparece no topo da tela de finalizar pedido.</p>
+        <label>Texto do banner</label>
+        <input class="field" value="${esc(T.checkoutBannerTexto||'')}" onchange="Admin.setTexto('checkoutBannerTexto',this.value)">
+        <div class="adm-actions" style="margin-top:8px">
+          <button class="abtn soft" onclick="Admin.fotoCheckoutBanner()">📷 Foto de fundo</button>
+          ${T.checkoutBannerImg?`<button class="abtn danger" onclick="Admin.rmFotoCheckoutBanner()">Remover foto</button>`:""}
+        </div>
+      </div>` +
+
+      `<div class="adm-card" style="border-top:3px solid var(--red)">
+        <h4>✨ Efeitos visuais</h4>
+        <p class="hint">Ative ou desative cada efeito e edite os textos. As mudanças aparecem ao fechar o painel.</p>
+
+        <div style="border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:12px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <b style="font-size:.9rem">⌨️ Texto digitando (barra acima do site)</b>
+            <label class="chk" style="margin:0"><input type="checkbox" ${T.typewriterAtivo?"checked":""} onchange="Admin.setTexto('typewriterAtivo',this.checked)"> Ativo</label>
+          </div>
+          <p class="hint" style="margin-bottom:8px">Frases que aparecem sendo digitadas uma por uma. Adicione quantas quiser.</p>
+          ${(T.typewriterFrases||[]).map((v,i) => `
+            <div class="list-item">
+              <input class="field" value="${esc(v)}" onchange="Admin.setLista('typewriterFrases',${i},this.value)" placeholder="Frase...">
+              <button class="abtn danger" onclick="Admin.rmLista('typewriterFrases',${i})">🗑</button>
+            </div>`).join("")}
+          <div class="adm-actions"><button class="abtn soft" onclick="Admin.addLista('typewriterFrases')">＋ Adicionar frase</button></div>
+        </div>
+
+        <div style="border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:12px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <b style="font-size:.9rem">🟢 Badge "online" no header</b>
+            <label class="chk" style="margin:0"><input type="checkbox" ${T.badgeOnlineAtivo?"checked":""} onchange="Admin.setTexto('badgeOnlineAtivo',this.checked)"> Ativo</label>
+          </div>
+          <label>Texto do badge</label>
+          <input class="field" value="${esc(T.badgeOnlineTexto||'')}" onchange="Admin.setTexto('badgeOnlineTexto',this.value)" placeholder="Ex: Atendimento online agora">
+        </div>
+
+        <div style="border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:12px">
+          <b style="font-size:.9rem;display:block;margin-bottom:8px">🏷 Texto do selo de oferta nos produtos</b>
+          <input class="field" value="${esc(T.ofertaBadgeTexto||'OFERTA')}" onchange="Admin.setTexto('ofertaBadgeTexto',this.value)" placeholder="Ex: OFERTA, PROMO, -30%">
+        </div>
+
+        <div style="border:1px solid var(--line);border-radius:10px;padding:14px">
+          <b style="font-size:.9rem;display:block;margin-bottom:8px">💬 Texto do botão de envio do pedido</b>
+          <input class="field" value="${esc(T.rippleBotaoTexto||'')}" onchange="Admin.setTexto('rippleBotaoTexto',this.value)" placeholder="Ex: 💬 Fazer pedido no WhatsApp">
+        </div>
+      </div>`;
+  }
+  function setTexto(chave, valor){ DATA.textos[chave] = valor.trim(); commit(); }
+  function setMarca(campo, valor){ DATA.marca[campo] = valor.trim(); commit(); }
+  function setPerk(i, pos, valor){ DATA.textos.perks[i][pos] = valor.trim(); commit(); }
+  function setLista(chave, i, valor){ DATA.textos[chave][i] = valor.trim(); commit(); }
+  function addLista(chave){ DATA.textos[chave].push("Nova linha"); commit(); draw(); }
+  function rmLista(chave, i){ DATA.textos[chave].splice(i,1); commit(); draw(); }
+
+  /* ══════════ ABA FRETE & BAIRROS ══════════ */
+  function drawFrete(){
+    $("admBody").innerHTML = `
+      <div class="adm-card">
+        <h4>Fórmula do frete</h4>
+        <p class="hint">Frete = valor por km × distância do bairro (respeitando o mínimo). Calibrado pela Uber Flash.</p>
+        <div class="adm-grid">
+          <div><label>Valor por km (R$)</label><input class="field" inputmode="decimal" value="${DATA.frete.porKm}" onchange="Admin.setFrete('porKm',this.value)"></div>
+          <div><label>Frete mínimo (R$)</label><input class="field" inputmode="decimal" value="${DATA.frete.minimo}" onchange="Admin.setFrete('minimo',this.value)"></div>
+        </div>
+      </div>
+      <div class="adm-note">💡 A distância é em <b>km de rota</b> (caminho de moto), a partir da sua base. Deixe o campo km <b>vazio</b> para "frete a combinar". O endereço da loja não aparece em lugar nenhum do site.</div>
+      <button class="adm-add" onclick="Admin.addBairro()">＋ Adicionar bairro</button>` +
+      DATA.bairros.map((b,i) => `
+      <div class="adm-card">
+        <div class="adm-row">
+          <input class="field" style="flex:2;min-width:170px" value="${esc(b[0])}" onchange="Admin.setBairro(${i},0,this.value)">
+          <input class="field" style="width:110px" inputmode="decimal" placeholder="km" value="${b[1] ?? ""}" onchange="Admin.setBairro(${i},1,this.value)">
+          <button class="abtn danger" onclick="Admin.rmBairro(${i})">🗑</button>
+        </div>
+      </div>`).join("");
+  }
+  function setFrete(campo,valor){ const n = num(valor); if(n!==null) DATA.frete[campo]=n; commit(); }
+  function setBairro(i,pos,valor){
+    if(pos===0) DATA.bairros[i][0] = valor.trim();
+    else DATA.bairros[i][1] = valor.trim()==="" ? null : (num(valor) ?? null);
+    commit();
+  }
+  function addBairro(){ DATA.bairros.unshift(["Novo bairro", 5]); commit(); draw(); }
+  function rmBairro(i){
+    if(!confirm(`Excluir "${DATA.bairros[i][0]}"?`)) return;
+    DATA.bairros.splice(i,1); commit(); draw();
+  }
+
+  /* ══════════ ABA LOJA ══════════ */
+  function drawLoja(){
+    $("admBody").innerHTML = `
+      <div class="adm-card">
+        <h4>Dados da loja</h4>
+        <label>Nome da loja (aparece na mensagem do pedido)</label>
+        <input class="field" value="${esc(DATA.loja)}" onchange="Admin.setLoja('loja',this.value)">
+        <label>WhatsApp (só números, com DDI e DDD — ex: 5511995580546)</label>
+        <input class="field" inputmode="numeric" value="${esc(DATA.whatsapp)}" onchange="Admin.setLoja('whatsapp',this.value.replace(/\\D/g,''))">
+        <label>Mensagem de saudação (botão "falar com a gente")</label>
+        <input class="field" value="${esc(DATA.waSaudacao)}" onchange="Admin.setLoja('waSaudacao',this.value)">
+      </div>
+      <div class="adm-card">
+        <h4>Senha do painel</h4>
+        <p class="hint">⚠️ Como o site não tem servidor, essa senha é uma proteção básica — evita curiosos, mas não é segurança de banco. Nunca use uma senha que você usa em outros lugares.</p>
+        <label>Nova senha</label>
+        <input class="field" type="password" id="novaSenha" placeholder="Digite a nova senha">
+        <div class="adm-actions"><button class="abtn dark" onclick="Admin.trocarSenha()">Salvar nova senha</button></div>
+      </div>`;
+  }
+  function setPayForm(i, campo, valor){
+    if(!DATA.textos.formasPagamento) return;
+    DATA.textos.formasPagamento[i][campo] = typeof valor==="boolean"?valor:valor.trim();
+    commit();
+  }
+  function fotoCheckoutBanner(){
+    pickImage(url=>{ DATA.textos.checkoutBannerImg=url; commit(); draw(); App.toast("Foto do banner adicionada 📷"); }, 1200);
+  }
+  function rmFotoCheckoutBanner(){ DATA.textos.checkoutBannerImg=null; commit(); draw(); }
+  function setLoja(campo,valor){ DATA[campo] = valor.trim(); commit(); }
+  function trocarSenha(){
+    const v = $("novaSenha").value;
+    if(v.length < 4){ alert("Usa pelo menos 4 caracteres 😉"); return; }
+    DATA.senha = btoa(unescape(encodeURIComponent(v)));
+    commit();
+    $("novaSenha").value = "";
+    App.toast("Senha atualizada 🔐");
+  }
+
+  /* ══════════ ABA PUBLICAR ══════════ */
+  function drawPublicar(){
+    $("admBody").innerHTML = `
+      <div class="adm-note">📌 <b>Como funciona:</b> suas edições ficam salvas <b>neste navegador</b> (rascunho automático). Para os <b>clientes verem</b>, baixe o site atualizado e substitua o arquivo na hospedagem (no Netlify é só arrastar o arquivo novo).</div>
+      <div class="adm-card">
+        <h4>🚀 Publicar mudanças</h4>
+        <p class="hint">Gera o arquivo <b>smoke-club.html</b> com todas as suas edições (produtos, fotos, banners, categorias, textos, frete, senha).</p>
+        <div class="adm-actions">
+          <button class="abtn red big" onclick="Admin.exportSite()">⬇️ Baixar site atualizado</button>
+        </div>
+      </div>
+      <div class="adm-card">
+        <h4>💾 Backup dos dados</h4>
+        <p class="hint">Baixa só os dados num arquivo separado. Bom pra guardar de segurança ou restaurar depois.</p>
+        <div class="adm-actions">
+          <button class="abtn dark" onclick="Admin.exportJson()">⬇️ Baixar backup</button>
+          <button class="abtn soft" onclick="Admin.importJson()">⬆️ Restaurar backup</button>
+        </div>
+      </div>
+      <div class="adm-card">
+        <h4>🧹 Rascunho</h4>
+        <p class="hint">Descarta as edições feitas neste navegador e volta pra versão publicada do site.</p>
+        <div class="adm-actions">
+          <button class="abtn danger" onclick="Admin.descartar()">Descartar edições</button>
+        </div>
+      </div>`;
+  }
+
+  function dataJson(){
+    // troca "<" pela versão escapada para nenhum texto conseguir quebrar o HTML exportado
+    return JSON.stringify(DATA, null, 2).replace(/</g, "\\u003c");
+  }
+  function download(nome, conteudo, tipo){
+    const blob = new Blob([conteudo], {type: tipo});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = nome;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 400);
+  }
+  function exportSite(){
+    fetch(location.href, {cache:"no-store"})
+      .then(r => { if(!r.ok) throw 0; return r.text(); })
+      .then(html => {
+        const marca = 'id="STORE_DATA">';
+        const abre = html.indexOf(marca);
+        const fecha = html.indexOf("</" + "script>", abre);
+        if(abre === -1 || fecha === -1) throw 0;
+        const novo = html.slice(0, abre + marca.length) + "\n" + dataJson() + "\n" + html.slice(fecha);
+        download("smoke-club.html", novo, "text/html;charset=utf-8");
+        App.toast("Site atualizado baixado ⬇️");
+      })
+      .catch(() => {
+        alert("Não consegui gerar o site completo por aqui (isso acontece quando o arquivo está aberto direto do computador, fora da hospedagem).\n\nBaixa o BACKUP dos dados — com ele dá pra restaurar tudo quando o site estiver hospedado.");
+        exportJson();
+      });
+  }
+  function exportJson(){ download("smoke-club-dados.json", dataJson(), "application/json;charset=utf-8"); }
+  function importJson(){
+    const input = $("fileInput");
+    input.accept = "application/json,.json";
+    input.onchange = () => {
+      const file = input.files[0];
+      input.value = "";
+      input.accept = "image/*";
+      if(!file) return;
+      const r = new FileReader();
+      r.onload = () => {
+        try {
+          const d = JSON.parse(r.result);
+          if(!d.produtos || !d.bairros) throw 0;
+          DATA = d;
+          commit(); draw();
+          App.toast("Backup restaurado ✓");
+        } catch(e){ alert("Esse arquivo não parece um backup válido da loja."); }
+      };
+      r.readAsText(file);
+    };
+    input.click();
+  }
+  function descartar(){
+    if(!confirm("Descartar todas as edições feitas neste navegador?")) return;
+    clearDraft();
+    location.reload();
+  }
+
+  /* atalho: site.com/#admin abre o login */
+  document.addEventListener("DOMContentLoaded", () => {
+    if(location.hash === "#admin") askLogin();
+  });
+
+  return { askLogin, closeLogin, tryLogin, logout, open, close, go, draw,
+           setP, addProduto, rmProduto, moveP, pickFoto, editFoto, rmFoto, addSabor, rmSabor, showSaborInput, setProdBusca, toggleProd,
+           drawMarcas, addMarca, rmMarca, setMarcaField, addModelo, rmModelo, moveModelo, setModeloField, pickFotoModelo, editFotoModelo, rmFotoModelo, toggleMarca, toggleModelo, addSaborModelo, rmSaborModelo, showSaborInputModelo,
+           setCat, renameCat, moveCat, fotoCat, rmFotoCat,
+           setB, addBanner, rmBanner, moveB, fotoBanner, rmFotoBanner,
+           setTexto, setMarca, setPerk, setLista, addLista, rmLista,
+           setFrete, setBairro, addBairro, rmBairro,
+           setPayForm, fotoCheckoutBanner, rmFotoCheckoutBanner,
+           setLoja, trocarSenha,
+           exportSite, exportJson, importJson, descartar };
+})();
+</script>
+</body>
+</html>
