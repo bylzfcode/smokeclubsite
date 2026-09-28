@@ -318,7 +318,7 @@ const App = {
       ["painel","📊 Painel"], ["estoque","📦 Estoque"], ["venda","🛒 Nova venda"],
       ["clientes","👥 Clientes"], ["financeiro","💰 Financeiro"], ["whats","📋 Lista WhatsApp"],
     ];
-    if(isGerente) tabs.push(["catalogo","🏷️ Catálogo"]);
+    tabs.push(["catalogo", isGerente ? "🏷️ Catálogo" : "💲 Meus preços"]);
     $("tabsNav").innerHTML = tabs.map(([id,label]) =>
       `<button class="tabbtn" id="tab-${id}" onclick="App.goTab('${id}')">${label}</button>`).join("");
   },
@@ -678,16 +678,17 @@ const Views = {
 
   /* ---------- CATÁLOGO (gerente/dono) ---------- */
   catalogo(){
+    const isGerente = S.perfil.papel === "gerente" || S.perfil.papel === "dono";
     $("viewRoot").innerHTML = `
-      <div class="row" style="margin-bottom:12px">
+      ${isGerente ? `<div class="row" style="margin-bottom:12px">
         <button class="abtn red" onclick="Views.novaMarca()">+ Marca</button>
         <button class="abtn red" onclick="Views.novoItem('modelo')">+ Modelo de marca</button>
         <button class="abtn red" onclick="Views.novoItem('produto')">+ Produto avulso</button>
         <button class="abtn dark" onclick="Views.novaCategoria()">+ Categoria</button>
-      </div>
-      <div class="card"><h3>Marcas</h3>
+      </div>` : `<p style="color:var(--muted);font-size:.82rem;margin-bottom:12px">O catálogo (marcas/produtos) é compartilhado entre as 4 lojas e só quem é gerente/dono pode criar itens novos. Aqui você define o preço da sua loja para cada item.</p>`}
+      ${isGerente ? `<div class="card"><h3>Marcas</h3>
         ${S.marcas.map(m=>`<div class="list-row"><span style="flex:1"><b>${m.nome}</b> ${m.ativo?'':'<small style="color:var(--muted)">(inativa)</small>'}</span></div>`).join("") || `<div class="empty">Nenhuma marca cadastrada</div>`}
-      </div>
+      </div>` : ""}
       <div class="card"><h3>Itens do catálogo (compartilhado entre as 4 lojas)</h3>
         ${S.itens.map(item => {
           const marca = S.marcas.find(m=>m.id===item.marca_id);
@@ -697,9 +698,9 @@ const Views = {
             <span style="flex:1">${item.emoji||"📦"} <b>${item.nome}</b><br><small style="color:var(--muted)">${marca?marca.nome:cat?.nome||""}</small></span>
             <span>${precoRow ? fmt(precoRow.preco) : `<span style="color:var(--red)">sem preço</span>`}</span>
             <button class="abtn soft" onclick="Views.definirPreco('${item.id}')">Meu preço</button>
-            <button class="abtn soft" onclick="Views.addSaborItem('${item.id}')">+ Sabor</button>
+            ${isGerente ? `<button class="abtn soft" onclick="Views.addSaborItem('${item.id}')">+ Sabor</button>` : ""}
           </div>`;
-        }).join("") || `<div class="empty">Nenhum item cadastrado</div>`}
+        }).join("") || `<div class="empty">Nenhum item cadastrado ainda</div>`}
       </div>
     `;
   },
