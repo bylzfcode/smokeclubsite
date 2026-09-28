@@ -15,19 +15,31 @@ create table lojas (
   criado_em timestamptz not null default now()
 );
 
--- Perfil de cada usuário (funcionário) — vincula o login à loja dele
+-- Perfil de cada pessoa (funcionário). Uma pessoa pode ter acesso a várias
+-- lojas — ver tabela perfis_lojas logo abaixo.
 create table perfis (
   id uuid primary key references auth.users(id) on delete cascade,
-  loja_id uuid not null references lojas(id),
   nome text,
   papel text not null default 'operador' check (papel in ('operador','gerente','dono')),
   criado_em timestamptz not null default now()
 );
 
-create or replace function loja_atual() returns uuid
-language sql stable security definer set search_path = public as $tag_loja_atual$
-  select loja_id from perfis where id = auth.uid()
-$tag_loja_atual$;
+-- quais lojas cada pessoa pode acessar (muitos-para-muitos)
+create table perfis_lojas (
+  perfil_id uuid not null references perfis(id) on delete cascade,
+  loja_id uuid not null references lojas(id) on delete cascade,
+  primary key (perfil_id, loja_id)
+);
+
+create or replace function minhas_lojas() returns setof uuid
+language sql stable security definer set search_path = public as $tag_minhas_lojas$
+  select loja_id from perfis_lojas where perfil_id = auth.uid()
+$tag_minhas_lojas$;
+
+create or replace function tenho_acesso_a_loja(p_loja_id uuid) returns boolean
+language sql stable security definer set search_path = public as $tag_tenho_acesso$
+  select exists (select 1 from perfis_lojas where perfil_id = auth.uid() and loja_id = p_loja_id)
+$tag_tenho_acesso$;
 
 create or replace function eh_dono() returns boolean
 language sql stable security definer set search_path = public as $tag_eh_dono$
@@ -175,6 +187,7 @@ create table financeiro_lancamentos (
 -- itens, movimentação de estoque e lançamento financeiro — tudo em uma transação.
 -- Se QUALQUER item não tiver estoque suficiente, a função inteira falha e nada é gravado.
 create or replace function registrar_venda(
+  p_loja_id uuid,
   p_itens jsonb,
   p_cliente jsonb default null,
   p_forma_pagamento text default null,
@@ -182,7 +195,7 @@ create or replace function registrar_venda(
 ) returns uuid
 language plpgsql security definer set search_path = public as $tag_registrar_venda$
 declare
-  v_loja_id uuid := loja_atual();
+  v_loja_id uuid := p_loja_id;
   v_venda_id uuid;
   v_cliente_id uuid;
   v_subtotal numeric := 0;
@@ -192,8 +205,8 @@ declare
   v_qtd int;
   v_saldo int;
 begin
-  if v_loja_id is null then
-    raise exception 'Usuário sem loja associada';
+  if v_loja_id is null or not tenho_acesso_a_loja(v_loja_id) then
+    raise exception 'Você não tem permissão para vender por esta loja';
   end if;
 
   if p_cliente is not null and coalesce(p_cliente->>'telefone','') <> '' then
@@ -263,7 +276,6 @@ $tag_registrar_venda$;
 create or replace function cancelar_venda(p_venda_id uuid) returns void
 language plpgsql security definer set search_path = public as $tag_cancelar_venda$
 declare
-  v_loja_id uuid := loja_atual();
   v_venda vendas%rowtype;
   v_item venda_itens%rowtype;
   v_estoque_id uuid;
@@ -271,7 +283,7 @@ declare
 begin
   select * into v_venda from vendas where id = p_venda_id;
   if v_venda is null then raise exception 'Venda não encontrada'; end if;
-  if v_venda.loja_id <> v_loja_id and not eh_dono() then
+  if not tenho_acesso_a_loja(v_venda.loja_id) and not eh_dono() then
     raise exception 'Você não pode cancelar vendas de outra loja';
   end if;
   if v_venda.status = 'cancelada' then
@@ -299,11 +311,14 @@ end;
 $tag_cancelar_venda$;
 
 -- Entrada/ajuste manual de estoque (reposição de mercadoria, contagem, etc.)
-create or replace function ajustar_estoque(p_estoque_id uuid, p_quantidade int, p_observacao text default null)
+create or replace function ajustar_estoque(p_estoque_id uuid, p_quantidade int, p_loja_id uuid, p_observacao text default null)
 returns int language plpgsql security definer set search_path = public as $tag_ajustar_estoque$
 declare v_saldo int;
 begin
   if p_quantidade = 0 then raise exception 'Quantidade de ajuste não pode ser zero'; end if;
+  if not tenho_acesso_a_loja(p_loja_id) then
+    raise exception 'Você não tem permissão para ajustar estoque por esta loja';
+  end if;
 
   update estoque set quantidade = quantidade + p_quantidade, atualizado_em = now()
     where id = p_estoque_id and quantidade + p_quantidade >= 0
@@ -314,7 +329,7 @@ begin
   end if;
 
   insert into estoque_movimentos(estoque_id, loja_id, tipo, quantidade, saldo_resultante, observacao, criado_por)
-  values (p_estoque_id, loja_atual(), case when p_quantidade > 0 then 'entrada' else 'ajuste' end, p_quantidade, v_saldo, p_observacao, auth.uid());
+  values (p_estoque_id, p_loja_id, case when p_quantidade > 0 then 'entrada' else 'ajuste' end, p_quantidade, v_saldo, p_observacao, auth.uid());
 
   return v_saldo;
 end;
@@ -326,6 +341,7 @@ $tag_ajustar_estoque$;
 -- ============================================================
 alter table lojas enable row level security;
 alter table perfis enable row level security;
+alter table perfis_lojas enable row level security;
 alter table categorias enable row level security;
 alter table marcas enable row level security;
 alter table itens enable row level security;
@@ -340,6 +356,7 @@ alter table financeiro_lancamentos enable row level security;
 
 drop policy if exists "leitura autenticada" on lojas;
 drop policy if exists "leitura propria" on perfis;
+drop policy if exists "leitura propria" on perfis_lojas;
 drop policy if exists "leitura autenticada" on categorias;
 drop policy if exists "leitura autenticada" on marcas;
 drop policy if exists "leitura autenticada" on itens;
@@ -365,9 +382,10 @@ drop policy if exists "financeiro por loja" on financeiro_lancamentos;
 drop policy if exists "financeiro escrita propria" on financeiro_lancamentos;
 drop policy if exists "financeiro update propria" on financeiro_lancamentos;
 
--- todo usuário autenticado (funcionário de alguma das 4 lojas) enxerga o catálogo/estoque compartilhado
+-- todo usuário autenticado (funcionário de alguma das lojas) enxerga o catálogo/estoque compartilhado
 create policy "leitura autenticada" on lojas for select using (auth.role() = 'authenticated');
 create policy "leitura propria" on perfis for select using (id = auth.uid());
+create policy "leitura propria" on perfis_lojas for select using (perfil_id = auth.uid());
 create policy "leitura autenticada" on categorias for select using (auth.role() = 'authenticated');
 create policy "leitura autenticada" on marcas for select using (auth.role() = 'authenticated');
 create policy "leitura autenticada" on itens for select using (auth.role() = 'authenticated');
@@ -396,27 +414,27 @@ create policy "sem update direto" on estoque for update using (
   exists (select 1 from perfis where id = auth.uid() and papel in ('gerente','dono'))
 );
 
--- preços: cada loja só vê/edita o próprio preço; dono vê todos
-create policy "precos por loja" on precos_loja for select using (loja_id = loja_atual() or eh_dono());
-create policy "precos escrita propria" on precos_loja for insert with check (loja_id = loja_atual());
-create policy "precos update propria" on precos_loja for update using (loja_id = loja_atual());
-create policy "precos delete propria" on precos_loja for delete using (loja_id = loja_atual());
+-- preços: cada pessoa só vê/edita o preço das lojas que ela tem acesso; dono vê todas
+create policy "precos por loja" on precos_loja for select using (loja_id in (select minhas_lojas()) or eh_dono());
+create policy "precos escrita propria" on precos_loja for insert with check (loja_id in (select minhas_lojas()));
+create policy "precos update propria" on precos_loja for update using (loja_id in (select minhas_lojas()));
+create policy "precos delete propria" on precos_loja for delete using (loja_id in (select minhas_lojas()));
 
 -- clientes: histórico isolado por loja (dono enxerga tudo)
-create policy "clientes por loja" on clientes for select using (loja_id = loja_atual() or eh_dono());
-create policy "clientes escrita propria" on clientes for insert with check (loja_id = loja_atual());
-create policy "clientes update propria" on clientes for update using (loja_id = loja_atual());
+create policy "clientes por loja" on clientes for select using (loja_id in (select minhas_lojas()) or eh_dono());
+create policy "clientes escrita propria" on clientes for insert with check (loja_id in (select minhas_lojas()));
+create policy "clientes update propria" on clientes for update using (loja_id in (select minhas_lojas()));
 
 -- vendas: isoladas por loja (dono enxerga tudo) — inserção real só acontece via RPC, mas mantemos policy coerente
-create policy "vendas por loja" on vendas for select using (loja_id = loja_atual() or eh_dono());
+create policy "vendas por loja" on vendas for select using (loja_id in (select minhas_lojas()) or eh_dono());
 create policy "venda_itens por loja" on venda_itens for select using (
-  exists (select 1 from vendas v where v.id = venda_id and (v.loja_id = loja_atual() or eh_dono()))
+  exists (select 1 from vendas v where v.id = venda_id and (v.loja_id in (select minhas_lojas()) or eh_dono()))
 );
 
--- financeiro: isolado por loja (dono enxerga tudo); lançamentos manuais (despesas) qualquer operador da própria loja pode criar
-create policy "financeiro por loja" on financeiro_lancamentos for select using (loja_id = loja_atual() or eh_dono());
-create policy "financeiro escrita propria" on financeiro_lancamentos for insert with check (loja_id = loja_atual());
-create policy "financeiro update propria" on financeiro_lancamentos for update using (loja_id = loja_atual() or eh_dono());
+-- financeiro: isolado por loja (dono enxerga tudo); lançamentos manuais (despesas) qualquer pessoa da própria loja pode criar
+create policy "financeiro por loja" on financeiro_lancamentos for select using (loja_id in (select minhas_lojas()) or eh_dono());
+create policy "financeiro escrita propria" on financeiro_lancamentos for insert with check (loja_id in (select minhas_lojas()));
+create policy "financeiro update propria" on financeiro_lancamentos for update using (loja_id in (select minhas_lojas()) or eh_dono());
 
 -- ============================================================
 -- Realtime — estoque, vendas e financeiro atualizam ao vivo nas 4 lojas
@@ -436,11 +454,11 @@ end
 $tag_realtime_setup$;
 
 -- ============================================================
--- Seed inicial das 4 lojas (ajuste os nomes/whatsapp conforme necessário)
+-- Seed inicial das lojas (ajuste os nomes/whatsapp conforme necessário)
 -- ============================================================
 insert into lojas (nome, slug, whatsapp) values
-  ('Loja 1', 'loja-1', null),
-  ('Loja 2', 'loja-2', null),
-  ('Loja 3', 'loja-3', null),
-  ('Loja 4', 'loja-4', null)
+  ('Smoke Club', 'smoke-club', null),
+  ('Start BR01', 'start-br01', null),
+  ('EZ Store', 'ez-store', null),
+  ('Streaks Store', 'streaks-store', null)
 on conflict (slug) do nothing;
