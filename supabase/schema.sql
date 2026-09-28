@@ -25,14 +25,14 @@ create table perfis (
 );
 
 create or replace function loja_atual() returns uuid
-language sql stable security definer set search_path = public as $$
+language sql stable security definer set search_path = public as $tag_loja_atual$
   select loja_id from perfis where id = auth.uid()
-$$;
+$tag_loja_atual$;
 
 create or replace function eh_dono() returns boolean
-language sql stable security definer set search_path = public as $$
+language sql stable security definer set search_path = public as $tag_eh_dono$
   select coalesce((select papel = 'dono' from perfis where id = auth.uid()), false)
-$$;
+$tag_eh_dono$;
 
 -- ============ CATÁLOGO (compartilhado entre as 4 lojas) ============
 create table categorias (
@@ -180,7 +180,7 @@ create or replace function registrar_venda(
   p_forma_pagamento text default null,
   p_desconto numeric default 0
 ) returns uuid
-language plpgsql security definer set search_path = public as $$
+language plpgsql security definer set search_path = public as $tag_registrar_venda$
 declare
   v_loja_id uuid := loja_atual();
   v_venda_id uuid;
@@ -257,11 +257,11 @@ begin
 
   return v_venda_id;
 end;
-$$;
+$tag_registrar_venda$;
 
 -- Cancela uma venda já registrada: estorna o estoque e lança uma saída financeira de estorno.
 create or replace function cancelar_venda(p_venda_id uuid) returns void
-language plpgsql security definer set search_path = public as $$
+language plpgsql security definer set search_path = public as $tag_cancelar_venda$
 declare
   v_loja_id uuid := loja_atual();
   v_venda vendas%rowtype;
@@ -296,11 +296,11 @@ begin
   insert into financeiro_lancamentos (loja_id, tipo, categoria, descricao, valor, status, venda_id, criado_por)
   values (v_venda.loja_id, 'saida', 'estorno', 'Estorno da venda #' || substr(p_venda_id::text,1,8), v_venda.total, 'pago', p_venda_id, auth.uid());
 end;
-$$;
+$tag_cancelar_venda$;
 
 -- Entrada/ajuste manual de estoque (reposição de mercadoria, contagem, etc.)
 create or replace function ajustar_estoque(p_estoque_id uuid, p_quantidade int, p_observacao text default null)
-returns int language plpgsql security definer set search_path = public as $$
+returns int language plpgsql security definer set search_path = public as $tag_ajustar_estoque$
 declare v_saldo int;
 begin
   if p_quantidade = 0 then raise exception 'Quantidade de ajuste não pode ser zero'; end if;
@@ -318,7 +318,7 @@ begin
 
   return v_saldo;
 end;
-$$;
+$tag_ajustar_estoque$;
 
 -- ============================================================
 -- RLS
