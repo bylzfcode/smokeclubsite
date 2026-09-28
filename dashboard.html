@@ -491,7 +491,7 @@ const Views = {
         </div>
         <label>Desconto (R$)</label>
         <input class="field" id="vDesconto" type="number" min="0" step="0.01" value="0">
-        <button class="btn btn-red" style="margin-top:6px" onclick="Actions.finalizarVenda()" ${S.vendaCart.length?'':'disabled'}>✅ Finalizar venda</button>
+        <button class="btn btn-red" id="btnFinalizarVenda" style="margin-top:6px" onclick="Actions.finalizarVenda()" ${S.vendaCart.length?'':'disabled'}>✅ Finalizar venda</button>
       </div>
     `;
   },
@@ -753,6 +753,11 @@ const Actions = {
 
   async finalizarVenda(){
     if(!S.vendaCart.length) return;
+    if(S._enviandoVenda) return; // trava contra clique duplo (evita registrar a mesma venda 2x)
+    S._enviandoVenda = true;
+    const btn = $("btnFinalizarVenda");
+    if(btn){ btn.disabled = true; btn.textContent = "Enviando..."; }
+
     const desconto = Number($("vDesconto").value || 0);
     const nome = $("vClienteNome").value.trim();
     const tel = $("vClienteTel").value.trim();
@@ -760,15 +765,19 @@ const Actions = {
     const forma = pagBtn ? pagBtn.dataset.pag : "Pix";
     const cliente = (nome || tel) ? { nome: nome||"Cliente", telefone: tel||null } : null;
 
-    const { data, error } = await sb.rpc("registrar_venda", {
-      p_itens: S.vendaCart.map(c => ({ item_id:c.item_id, sabor_id:c.sabor_id, quantidade:c.quantidade, preco_unitario:c.preco_unitario, nome:c.nome })),
-      p_cliente: cliente, p_forma_pagamento: forma, p_desconto: desconto,
-    });
-    if(error){ toast("❌ Venda não registrada: " + error.message); return; }
-    toast("✅ Venda registrada! Estoque atualizado para todas as lojas.");
-    S.vendaCart = [];
-    await Promise.all([DB.carregarEstoque(), DB.carregarVendas(), DB.carregarClientes(), DB.carregarFinanceiro()]);
-    App.goTab("painel");
+    try {
+      const { data, error } = await sb.rpc("registrar_venda", {
+        p_itens: S.vendaCart.map(c => ({ item_id:c.item_id, sabor_id:c.sabor_id, quantidade:c.quantidade, preco_unitario:c.preco_unitario, nome:c.nome })),
+        p_cliente: cliente, p_forma_pagamento: forma, p_desconto: desconto,
+      });
+      if(error){ toast("❌ Venda não registrada: " + error.message); return; }
+      toast("✅ Venda registrada! Estoque atualizado para todas as lojas.");
+      S.vendaCart = [];
+      await Promise.all([DB.carregarEstoque(), DB.carregarVendas(), DB.carregarClientes(), DB.carregarFinanceiro()]);
+      App.goTab("painel");
+    } finally {
+      S._enviandoVenda = false;
+    }
   },
 
   async marcarPago(id){
