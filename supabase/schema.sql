@@ -321,7 +321,8 @@ end;
 $tag_ajustar_estoque$;
 
 -- ============================================================
--- RLS
+-- RLS (idempotente: pode ser rodado de novo sem erro caso uma
+-- execução anterior tenha parado no meio)
 -- ============================================================
 alter table lojas enable row level security;
 alter table perfis enable row level security;
@@ -336,6 +337,33 @@ alter table clientes enable row level security;
 alter table vendas enable row level security;
 alter table venda_itens enable row level security;
 alter table financeiro_lancamentos enable row level security;
+
+drop policy if exists "leitura autenticada" on lojas;
+drop policy if exists "leitura propria" on perfis;
+drop policy if exists "leitura autenticada" on categorias;
+drop policy if exists "leitura autenticada" on marcas;
+drop policy if exists "leitura autenticada" on itens;
+drop policy if exists "leitura autenticada" on sabores;
+drop policy if exists "leitura autenticada" on estoque;
+drop policy if exists "leitura autenticada" on estoque_movimentos;
+drop policy if exists "escrita gerente" on categorias;
+drop policy if exists "escrita gerente" on marcas;
+drop policy if exists "escrita gerente" on itens;
+drop policy if exists "escrita gerente" on sabores;
+drop policy if exists "sem escrita direta" on estoque;
+drop policy if exists "sem update direto" on estoque;
+drop policy if exists "precos por loja" on precos_loja;
+drop policy if exists "precos escrita propria" on precos_loja;
+drop policy if exists "precos update propria" on precos_loja;
+drop policy if exists "precos delete propria" on precos_loja;
+drop policy if exists "clientes por loja" on clientes;
+drop policy if exists "clientes escrita propria" on clientes;
+drop policy if exists "clientes update propria" on clientes;
+drop policy if exists "vendas por loja" on vendas;
+drop policy if exists "venda_itens por loja" on venda_itens;
+drop policy if exists "financeiro por loja" on financeiro_lancamentos;
+drop policy if exists "financeiro escrita propria" on financeiro_lancamentos;
+drop policy if exists "financeiro update propria" on financeiro_lancamentos;
 
 -- todo usuário autenticado (funcionário de alguma das 4 lojas) enxerga o catálogo/estoque compartilhado
 create policy "leitura autenticada" on lojas for select using (auth.role() = 'authenticated');
@@ -393,9 +421,19 @@ create policy "financeiro update propria" on financeiro_lancamentos for update u
 -- ============================================================
 -- Realtime — estoque, vendas e financeiro atualizam ao vivo nas 4 lojas
 -- ============================================================
-alter publication supabase_realtime add table estoque;
-alter publication supabase_realtime add table vendas;
-alter publication supabase_realtime add table financeiro_lancamentos;
+do $tag_realtime_setup$
+begin
+  if not exists (select 1 from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename='estoque') then
+    alter publication supabase_realtime add table estoque;
+  end if;
+  if not exists (select 1 from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename='vendas') then
+    alter publication supabase_realtime add table vendas;
+  end if;
+  if not exists (select 1 from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename='financeiro_lancamentos') then
+    alter publication supabase_realtime add table financeiro_lancamentos;
+  end if;
+end
+$tag_realtime_setup$;
 
 -- ============================================================
 -- Seed inicial das 4 lojas (ajuste os nomes/whatsapp conforme necessário)
@@ -404,4 +442,5 @@ insert into lojas (nome, slug, whatsapp) values
   ('Loja 1', 'loja-1', null),
   ('Loja 2', 'loja-2', null),
   ('Loja 3', 'loja-3', null),
-  ('Loja 4', 'loja-4', null);
+  ('Loja 4', 'loja-4', null)
+on conflict (slug) do nothing;
