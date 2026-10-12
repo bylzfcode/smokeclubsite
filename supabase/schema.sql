@@ -41,6 +41,13 @@ language sql stable security definer set search_path = public as $tag_tenho_aces
   select exists (select 1 from perfis_lojas where perfil_id = auth.uid() and loja_id = p_loja_id)
 $tag_tenho_acesso$;
 
+-- true só para quem foi liberado em pelo menos uma loja (impede que alguém de fora,
+-- que crie conta com a chave pública, enxergue catálogo/estoque)
+create or replace function eh_da_equipe() returns boolean
+language sql stable security definer set search_path = public as $tag_eh_da_equipe$
+  select exists (select 1 from perfis_lojas where perfil_id = auth.uid())
+$tag_eh_da_equipe$;
+
 create or replace function eh_dono() returns boolean
 language sql stable security definer set search_path = public as $tag_eh_dono$
   select coalesce((select papel = 'dono' from perfis where id = auth.uid()), false)
@@ -383,15 +390,15 @@ drop policy if exists "financeiro escrita propria" on financeiro_lancamentos;
 drop policy if exists "financeiro update propria" on financeiro_lancamentos;
 
 -- todo usuário autenticado (funcionário de alguma das lojas) enxerga o catálogo/estoque compartilhado
-create policy "leitura autenticada" on lojas for select using (auth.role() = 'authenticated');
+create policy "leitura autenticada" on lojas for select using (eh_da_equipe());
 create policy "leitura propria" on perfis for select using (id = auth.uid());
 create policy "leitura propria" on perfis_lojas for select using (perfil_id = auth.uid());
-create policy "leitura autenticada" on categorias for select using (auth.role() = 'authenticated');
-create policy "leitura autenticada" on marcas for select using (auth.role() = 'authenticated');
-create policy "leitura autenticada" on itens for select using (auth.role() = 'authenticated');
-create policy "leitura autenticada" on sabores for select using (auth.role() = 'authenticated');
-create policy "leitura autenticada" on estoque for select using (auth.role() = 'authenticated');
-create policy "leitura autenticada" on estoque_movimentos for select using (auth.role() = 'authenticated');
+create policy "leitura autenticada" on categorias for select using (eh_da_equipe());
+create policy "leitura autenticada" on marcas for select using (eh_da_equipe());
+create policy "leitura autenticada" on itens for select using (eh_da_equipe());
+create policy "leitura autenticada" on sabores for select using (eh_da_equipe());
+create policy "leitura autenticada" on estoque for select using (eh_da_equipe());
+create policy "leitura autenticada" on estoque_movimentos for select using (eh_da_equipe());
 
 -- catálogo/estoque só é escrito pelos RPCs (security definer) ou por gerente/dono
 create policy "escrita gerente" on categorias for all using (
@@ -462,3 +469,15 @@ insert into lojas (nome, slug, whatsapp) values
   ('EZ Store', 'ez-store', null),
   ('Streaks Store', 'streaks-store', null)
 on conflict (slug) do nothing;
+
+-- ============================================================
+-- Segurança extra: visitante sem login não pode chamar estas funções
+-- (quem está logado continua podendo; elas conferem a permissão por loja)
+-- ============================================================
+revoke execute on function public.registrar_venda(uuid, jsonb, jsonb, text, numeric) from public, anon;
+revoke execute on function public.cancelar_venda(uuid) from public, anon;
+revoke execute on function public.ajustar_estoque(uuid, integer, uuid, text) from public, anon;
+revoke execute on function public.minhas_lojas() from public, anon;
+revoke execute on function public.tenho_acesso_a_loja(uuid) from public, anon;
+revoke execute on function public.eh_da_equipe() from public, anon;
+revoke execute on function public.eh_dono() from public, anon;
