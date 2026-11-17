@@ -3,16 +3,16 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Smoke Club — Painel das Lojas</title>
+<title>Escritório — Painel Compartilhado</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <style>
 :root{
   --red:#E3132B; --red-dark:#A80D1F; --ink:#141416; --ink-2:#1E1E22;
-  --bg:#F4F4F6; --card:#FFFFFF; --line:#E4E4E9;
-  --text:#1B1B1F; --muted:#6E6E78; --green:#25D366; --amber:#B99A2B;
-  --radius:12px; --shadow:0 2px 10px rgba(20,20,22,.07); --shadow-lg:0 12px 34px rgba(20,20,22,.16);
+  --bg:#F4F4F6; --card:#FFFFFF; --line:#E4E4E9; --soft:#FAFAFB;
+  --text:#1B1B1F; --muted:#6E6E78; --green:#1FAF55; --green-bg:#E6F9EE; --amber-bg:#FFF1CE; --amber:#7A6215; --red-bg:#FDE8EA;
+  --radius:12px; --shadow:0 2px 10px rgba(20,20,22,.07); --shadow-lg:0 12px 34px rgba(20,20,22,.18);
 }
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased}
@@ -20,868 +20,866 @@ button{font-family:inherit;cursor:pointer}
 input,select,textarea{font-family:inherit}
 .hidden{display:none!important}
 h1,h2,h3{font-family:'Archivo',sans-serif;font-weight:800;letter-spacing:-.01em}
+button:disabled{opacity:.5;cursor:not-allowed}
 
-/* ---------- LOGIN ---------- */
-#loginScreen{position:fixed;inset:0;background:linear-gradient(135deg,var(--ink),#33161a 60%,var(--red-dark));display:flex;align-items:center;justify-content:center;padding:20px}
-.login-box{max-width:380px;width:100%;background:var(--card);border-radius:18px;padding:34px 30px;box-shadow:var(--shadow-lg)}
-.login-logo{font-size:1.5rem;font-weight:900;text-align:center;margin-bottom:4px}
-.login-logo span{color:var(--red)}
-.login-sub{text-align:center;color:var(--muted);font-size:.82rem;margin-bottom:24px}
-.field{width:100%;padding:13px 14px;border-radius:10px;border:1.5px solid var(--line);background:#FAFAFB;font-size:15px;color:var(--text);margin-bottom:12px}
+/* login / seletor */
+.fullscreen{position:fixed;inset:0;background:linear-gradient(135deg,var(--ink),#33161a 60%,var(--red-dark));display:flex;align-items:center;justify-content:center;padding:20px;overflow-y:auto}
+.login-box{max-width:390px;width:100%;background:var(--card);border-radius:18px;padding:34px 30px;box-shadow:var(--shadow-lg)}
+.login-logo{font-size:1.55rem;font-weight:900;text-align:center;margin-bottom:4px;font-family:'Archivo',sans-serif}
+.login-sub{text-align:center;color:var(--muted);font-size:.84rem;margin-bottom:22px}
+.login-foot{text-align:center;color:var(--muted);font-size:.68rem;margin-top:16px}
+.field{width:100%;padding:12px 14px;border-radius:10px;border:1.5px solid var(--line);background:var(--soft);font-size:15px;color:var(--text);margin-bottom:10px}
 .field:focus{outline:none;border-color:var(--red);background:#fff}
+textarea.field{resize:vertical;min-height:70px}
 .btn{border:none;border-radius:10px;padding:13px;font-weight:700;font-size:.92rem;width:100%}
 .btn-red{background:var(--red);color:#fff}
-.btn-red:hover{background:var(--red-dark)}
-.btn-red:disabled{opacity:.5;cursor:not-allowed}
-.login-err{color:var(--red);font-size:.82rem;margin-bottom:10px;display:none;text-align:center}
-
-/* ---------- SELETOR DE LOJA ---------- */
-#seletorLoja{position:fixed;inset:0;background:linear-gradient(135deg,var(--ink),#33161a 60%,var(--red-dark));display:none;align-items:center;justify-content:center;padding:20px}
-#seletorLoja.show{display:flex}
-.seletor-box{max-width:420px;width:100%;background:var(--card);border-radius:18px;padding:34px 30px;box-shadow:var(--shadow-lg)}
-.loja-card{width:100%;text-align:left;background:#FAFAFB;border:1.5px solid var(--line);border-radius:12px;padding:16px;margin-bottom:10px;font-weight:700;font-size:.95rem;display:flex;align-items:center;gap:12px}
-.loja-card:hover{border-color:var(--red);background:#FDE8EA}
+.btn-red:hover:not(:disabled){background:var(--red-dark)}
+.btn-soft{background:#F1F1F4;color:var(--text);border:1px solid var(--line)}
+.login-err{color:var(--red);font-size:.82rem;margin-bottom:10px;text-align:center;min-height:1em}
+.loja-card{width:100%;text-align:left;background:var(--soft);border:1.5px solid var(--line);border-radius:12px;padding:16px;margin-bottom:10px;font-weight:700;font-size:.95rem;display:flex;align-items:center;gap:12px}
+.loja-card:hover{border-color:var(--red);background:var(--red-bg)}
 .loja-card .ic{font-size:1.4rem}
 
-/* ---------- APP SHELL ---------- */
-#app{display:none;min-height:100vh;flex-direction:column}
+/* shell */
+#app{min-height:100vh;flex-direction:column;display:none}
 #app.show{display:flex}
-header.top{background:var(--ink);color:#fff;padding:12px 18px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;box-shadow:0 2px 12px rgba(0,0,0,.25);position:sticky;top:0;z-index:50}
-header.top .brand{font-weight:900;font-size:1.1rem}
-header.top .brand span{color:var(--red)}
-.loja-chip{background:var(--ink-2);border:1px solid #333338;border-radius:999px;padding:6px 13px;font-size:.78rem;font-weight:700;display:flex;align-items:center;gap:6px}
-.live-dot{width:8px;height:8px;border-radius:50%;background:var(--green);animation:pulse 1.8s ease infinite}
+header.top{background:var(--ink);color:#fff;padding:10px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;box-shadow:0 2px 12px rgba(0,0,0,.25);position:sticky;top:0;z-index:50}
+header.top .brand{font-weight:900;font-size:1.05rem;font-family:'Archivo',sans-serif}
+.loja-chip{background:var(--ink-2);border:1px solid #333338;border-radius:999px;padding:6px 13px;font-size:.78rem;font-weight:700;display:flex;align-items:center;gap:7px}
+.live-dot{width:8px;height:8px;border-radius:50%;background:#888}
+.live-dot.on{background:#25D366;animation:pulse 1.8s ease infinite}
+.live-dot.off{background:var(--red)}
 @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(37,211,102,.5)}70%{box-shadow:0 0 0 7px rgba(37,211,102,0)}100%{box-shadow:0 0 0 0 rgba(37,211,102,0)}}
 header.top .spacer{flex:1}
-header.top button{background:var(--ink-2);border:1px solid #333;color:#fff;border-radius:9px;padding:8px 13px;font-weight:700;font-size:.8rem}
-
-nav.tabs{background:var(--card);border-bottom:1px solid var(--line);display:flex;gap:2px;overflow-x:auto;padding:0 12px;scrollbar-width:none;position:sticky;top:52px;z-index:45}
+header.top button{background:var(--ink-2);border:1px solid #333;color:#fff;border-radius:9px;padding:8px 12px;font-weight:700;font-size:.78rem}
+nav.tabs{background:var(--card);border-bottom:1px solid var(--line);display:flex;gap:2px;overflow-x:auto;padding:0 10px;scrollbar-width:none;position:sticky;top:52px;z-index:45}
 nav.tabs::-webkit-scrollbar{display:none}
-.tabbtn{flex-shrink:0;background:none;border:none;padding:13px 14px 11px;font-size:.85rem;font-weight:700;color:var(--muted);border-bottom:2.5px solid transparent;white-space:nowrap}
+.tabbtn{flex-shrink:0;background:none;border:none;padding:13px 13px 11px;font-size:.84rem;font-weight:700;color:var(--muted);border-bottom:2.5px solid transparent;white-space:nowrap}
 .tabbtn.active{color:var(--red);border-bottom-color:var(--red)}
+main{flex:1;padding:16px 14px 70px}
+.wrap{max-width:980px;margin:0 auto}
+.page-h{display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+.page-h h2{font-size:1.15rem;flex:1}
 
-main{flex:1;padding:18px 16px 60px}
-.wrap{max-width:960px;margin:0 auto}
-
-/* ---------- KPIs ---------- */
-.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:18px}
-.kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow)}
-.kpi .v{font-family:'Archivo',sans-serif;font-weight:900;font-size:1.6rem;line-height:1}
-.kpi .l{font-size:.72rem;color:var(--muted);margin-top:4px;font-weight:600}
-.kpi.warn .v{color:var(--red)}
-
-.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin-bottom:12px;box-shadow:var(--shadow)}
+/* kpis & cards */
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 15px;box-shadow:var(--shadow)}
+.kpi .v{font-family:'Archivo',sans-serif;font-weight:900;font-size:1.45rem;line-height:1.1}
+.kpi .l{font-size:.72rem;color:var(--muted);margin-top:5px;font-weight:600}
+.kpi.warn .v{color:var(--red)}.kpi.good .v{color:var(--green)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:15px;margin-bottom:12px;box-shadow:var(--shadow)}
 .card h3{font-size:.95rem;margin-bottom:10px}
 .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.row>.grow{flex:1;min-width:120px}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}
-@media(max-width:520px){.grid2{grid-template-columns:1fr}}
-label{display:block;font-size:.75rem;font-weight:700;color:var(--muted);margin:8px 0 4px}
+@media(max-width:560px){.grid2{grid-template-columns:1fr}}
+label{display:block;font-size:.74rem;font-weight:700;color:var(--muted);margin:8px 0 4px}
+.two-col{display:grid;grid-template-columns:1.1fr .9fr;gap:12px;align-items:start}
+@media(max-width:800px){.two-col{grid-template-columns:1fr}}
 
-/* ---------- ESTOQUE ---------- */
-.stock-search{margin-bottom:12px}
-.grupo{margin-bottom:14px}
-.grupo-h{font-size:.8rem;font-weight:800;color:var(--muted);letter-spacing:.04em;margin:14px 0 6px;text-transform:uppercase}
+/* chart */
+.bars{display:flex;align-items:flex-end;gap:8px;height:130px;padding-top:8px}
+.bar{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;font-size:.66rem;color:var(--muted)}
+.bar i{display:block;width:100%;background:var(--red);border-radius:6px 6px 0 0;min-height:2px}
+.bar i.zero{background:var(--line)}
+.bar b{font-size:.66rem;color:var(--text);margin-bottom:3px}
+
+/* stock */
+.grupo-h{font-size:.76rem;font-weight:800;color:var(--muted);letter-spacing:.05em;margin:16px 0 6px;text-transform:uppercase}
 .item-row{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:9px 12px;margin-bottom:6px}
+.item-row.click{cursor:pointer}.item-row.click:hover{border-color:var(--red)}
 .item-row .ic{font-size:1.3rem;width:30px;text-align:center;flex-shrink:0}
 .item-row .in{flex:1;min-width:0}
-.item-row .in b{font-size:.85rem;display:block}
+.item-row .in b{font-size:.85rem;display:block;overflow-wrap:anywhere}
 .item-row .in small{color:var(--muted);font-size:.71rem}
-.qtd-badge{font-family:'Archivo',sans-serif;font-weight:900;font-size:1rem;padding:3px 10px;border-radius:8px;background:#EEEEF2;min-width:38px;text-align:center}
-.qtd-badge.baixo{background:#FFF1CE;color:#7A6215}
-.qtd-badge.zero{background:#FDE8EA;color:var(--red)}
-.adj-btns{display:flex;gap:3px}
-.adj-btns button{width:28px;height:28px;border:none;border-radius:7px;background:var(--ink);color:#fff;font-weight:800;font-size:.9rem}
-.adj-btns button.plus{background:var(--green)}
+.qtd-badge{font-family:'Archivo',sans-serif;font-weight:900;font-size:1rem;padding:3px 10px;border-radius:8px;background:#EEEEF2;min-width:40px;text-align:center}
+.qtd-badge.baixo{background:var(--amber-bg);color:var(--amber)}
+.qtd-badge.zero{background:var(--red-bg);color:var(--red)}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.chip{padding:7px 13px;border-radius:999px;border:1.5px solid var(--line);background:var(--soft);font-size:.78rem;font-weight:700;color:var(--muted)}
+.chip.sel{background:var(--ink);border-color:var(--ink);color:#fff}
 
-/* ---------- VENDA ---------- */
+/* sale */
 .cart-item{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)}
-.cart-item .ci-info{flex:1;font-size:.85rem}
+.cart-item .ci-info{flex:1;font-size:.85rem;min-width:0;overflow-wrap:anywhere}
 .cart-item .ci-info small{color:var(--muted);display:block;font-size:.72rem}
-.cart-item button.rm{background:none;border:none;color:var(--red);font-size:1.1rem}
-.sel-result{padding:9px 12px;border:1px solid var(--line);border-radius:9px;margin-bottom:5px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;font-size:.84rem}
-.sel-result:hover{border-color:var(--red);background:#FDE8EA}
+.qty{display:flex;align-items:center;gap:4px}
+.qty button{width:28px;height:28px;border:1px solid var(--line);background:#fff;border-radius:7px;font-weight:800}
+.qty span{min-width:24px;text-align:center;font-weight:800;font-size:.9rem}
+.sel-result{padding:9px 12px;border:1px solid var(--line);border-radius:9px;margin-bottom:5px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:.84rem;background:#fff}
+.sel-result:hover{border-color:var(--red);background:var(--red-bg)}
+.sel-result.off{opacity:.55;cursor:not-allowed}.sel-result.off:hover{border-color:var(--line);background:#fff}
 .sel-result small{color:var(--muted);display:block;font-size:.71rem}
-.pill{display:inline-block;padding:6px 13px;border-radius:999px;border:1.5px solid var(--line);background:#FAFAFB;font-size:.8rem;font-weight:600;color:var(--muted);margin:2px}
-.pill.sel{background:var(--red);border-color:var(--red);color:#fff}
 .tt-row{display:flex;justify-content:space-between;font-size:.88rem;padding:4px 0;color:var(--muted)}
-.tt-row.big{border-top:1px solid var(--line);margin-top:8px;padding-top:10px;font-weight:800;color:var(--text);font-size:1.05rem}
+.tt-row.big{border-top:1px solid var(--line);margin-top:8px;padding-top:10px;font-weight:800;color:var(--text);font-size:1.1rem}
 
-/* ---------- LISTAS / TABELAS ---------- */
+/* lists */
 .list-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);font-size:.85rem}
 .list-row:last-child{border-bottom:none}
-.tag{font-size:.68rem;font-weight:800;padding:3px 9px;border-radius:999px}
-.tag.entrada{background:#e6f9ee;color:#1a7a40}
-.tag.saida{background:#fde8ea;color:var(--red)}
-.tag.pendente{background:#FFF1CE;color:#7A6215}
-.tag.pago{background:#e6f9ee;color:#1a7a40}
-.tag.atrasado{background:#fde8ea;color:var(--red)}
+.list-row.click{cursor:pointer}.list-row.click:hover{background:var(--soft)}
+.list-row .grow{flex:1;min-width:0;overflow-wrap:anywhere}
+.list-row small{color:var(--muted);display:block;font-size:.72rem}
+.tag{font-size:.66rem;font-weight:800;padding:3px 9px;border-radius:999px;white-space:nowrap}
+.tag.entrada,.tag.pago,.tag.concluida{background:var(--green-bg);color:#1a7a40}
+.tag.saida,.tag.atrasado,.tag.cancelada{background:var(--red-bg);color:var(--red)}
+.tag.pendente{background:var(--amber-bg);color:var(--amber)}
+.tag.neutro{background:#EEEEF2;color:var(--muted)}
 .abtn{border:none;border-radius:8px;padding:9px 14px;font-weight:700;font-size:.8rem}
-.abtn.red{background:var(--red);color:#fff}
-.abtn.dark{background:var(--ink);color:#fff}
-.abtn.soft{background:#F1F1F4;color:var(--text);border:1px solid var(--line)}
-.abtn.green{background:var(--green);color:#fff}
-.empty{text-align:center;color:var(--muted);padding:30px 0;font-size:.88rem}
+.abtn.red{background:var(--red);color:#fff}.abtn.dark{background:var(--ink);color:#fff}
+.abtn.soft{background:#F1F1F4;color:var(--text);border:1px solid var(--line)}.abtn.green{background:var(--green);color:#fff}
+.abtn.sm{padding:6px 10px;font-size:.74rem}
+.empty{text-align:center;color:var(--muted);padding:28px 0;font-size:.88rem}
+.neg{color:var(--red)}.pos{color:var(--green)}
+#waPreview{white-space:pre-wrap;font-size:.83rem;line-height:1.6;background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:14px;max-height:440px;overflow-y:auto}
+.check{display:flex;align-items:center;gap:8px;font-size:.84rem;font-weight:600;margin:6px 0}
+.check input{width:18px;height:18px}
 
-/* ---------- WHATSAPP LIST ---------- */
-#waPreview{white-space:pre-wrap;font-family:'Inter',sans-serif;font-size:.83rem;line-height:1.6;background:#FAFAFB;border:1px solid var(--line);border-radius:10px;padding:14px;max-height:420px;overflow-y:auto}
-
-/* ---------- TOAST ---------- */
 #toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%) translateY(16px);z-index:600;background:var(--ink);color:#fff;font-size:.84rem;font-weight:600;padding:11px 20px;border-radius:999px;opacity:0;pointer-events:none;transition:all .25s;box-shadow:var(--shadow-lg);max-width:90vw;text-align:center}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
-
+#toast.err{background:var(--red)}
 .modal-ov{position:fixed;inset:0;background:rgba(14,14,16,.55);z-index:200;display:none;align-items:center;justify-content:center;padding:16px}
 .modal-ov.show{display:flex}
-.modal-box{background:var(--card);border-radius:16px;padding:22px;max-width:420px;width:100%;max-height:88vh;overflow-y:auto;box-shadow:var(--shadow-lg)}
-.modal-box h3{margin-bottom:14px}
-.modal-close-row{display:flex;gap:8px;margin-top:14px}
-.modal-close-row button{flex:1}
+.modal-box{background:var(--card);border-radius:16px;padding:22px;max-width:460px;width:100%;max-height:88vh;overflow-y:auto;box-shadow:var(--shadow-lg)}
+.modal-box h3{margin-bottom:12px}
+.modal-actions{display:flex;gap:8px;margin-top:14px}.modal-actions button{flex:1}
+.banner{background:var(--amber-bg);color:var(--amber);border-radius:10px;padding:9px 12px;font-size:.8rem;font-weight:600;margin-bottom:12px}
 </style>
 </head>
 <body>
 
-<!-- ═══════ LOGIN ═══════ -->
-<div id="loginScreen">
-  <div class="login-box">
+<div id="loginScreen" class="fullscreen">
+  <form class="login-box" id="loginForm" autocomplete="on">
     <div class="login-logo">Escritório</div>
     <div class="login-sub">Painel Compartilhado</div>
-    <div class="login-err" id="loginErr"></div>
-    <input class="field" id="loginUsuario" type="text" placeholder="User" autocomplete="username">
+    <div class="login-err" id="loginErr" role="alert"></div>
+    <input class="field" id="loginUsuario" type="text" placeholder="User" autocomplete="username" autocapitalize="none" spellcheck="false">
     <input class="field" id="loginSenha" type="password" placeholder="Senha" autocomplete="current-password">
-    <button class="btn btn-red" id="btnLogin" onclick="Auth.login()">Entrar</button>
-  </div>
+    <button class="btn btn-red" id="btnLogin" type="submit">Entrar</button>
+    <div class="login-foot" id="loginFoot"></div>
+  </form>
 </div>
 
-<!-- ═══════ SELETOR DE LOJA ═══════ -->
-<div id="seletorLoja">
-  <div class="seletor-box">
-    <div class="login-logo" style="font-size:1.15rem">Escolha a loja</div>
+<div id="seletorLoja" class="fullscreen hidden">
+  <div class="login-box">
+    <div class="login-logo" style="font-size:1.2rem">Escolha a loja</div>
     <div class="login-sub" id="seletorSub">—</div>
     <div id="seletorCards"></div>
+    <button class="btn btn-soft" data-a="logout" style="margin-top:6px">Sair</button>
   </div>
 </div>
 
-<!-- ═══════ APP ═══════ -->
 <div id="app">
   <header class="top">
     <div class="brand">Escritório</div>
-    <span class="loja-chip"><span class="live-dot" id="liveDot"></span><span id="lojaNomeChip">—</span></span>
-    <button id="btnTrocarLoja" class="hidden" onclick="App.trocarLoja()">🔄 Trocar loja</button>
+    <span class="loja-chip"><span class="live-dot" id="liveDot" title="Tempo real"></span><span id="lojaNomeChip">—</span></span>
+    <button id="btnTrocarLoja" class="hidden" data-a="trocarLoja">🔄 Trocar loja</button>
     <div class="spacer"></div>
-    <button onclick="Auth.logout()">Sair</button>
+    <button data-a="logout">Sair</button>
   </header>
-
   <nav class="tabs" id="tabsNav"></nav>
-
   <main><div class="wrap" id="viewRoot"></div></main>
 </div>
 
 <div id="toast"></div>
-
 <div class="modal-ov" id="modalOv"><div class="modal-box" id="modalBox"></div></div>
 
 <script>
 "use strict";
-
-/* ════════════════════════════════════════════════════════════
-   CONFIGURAÇÃO — cole aqui os dados do seu projeto Supabase
-   (Project Settings → API). Veja README-DASHBOARD.md.
-   ════════════════════════════════════════════════════════════ */
 const SUPABASE_URL = "https://viqgnzppazhcvthaknzi.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpcWduenBwYXpoY3Z0aGFrbnppIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyNTYwMjMsImV4cCI6MjEwMDgzMjAyM30.NyGmfSLNAdq0CqjSx1kq6kK_L2iSSV5RtzgwgI0_ncc";
+const TZ = "America/Sao_Paulo";
+const FORMAS = ["Pix","Cartão","Débito","Crédito","Dinheiro","Outro"];
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-/* ════════════════════════════════════════════════════════════
-   HELPERS
-   ════════════════════════════════════════════════════════════ */
+/* ───────── helpers ───────── */
 const $ = id => document.getElementById(id);
-const fmt = v => "R$ " + Number(v||0).toFixed(2).replace(".", ",");
-const fmtDate = s => new Date(s).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});
-let toastTimer = null;
-function toast(msg){
-  const t = $("toast"); t.textContent = msg; t.classList.add("show");
-  clearTimeout(toastTimer); toastTimer = setTimeout(()=>t.classList.remove("show"), 3200);
-}
-function closeModal(){ $("modalOv").classList.remove("show"); $("modalBox").innerHTML=""; }
-function openModal(html){ $("modalBox").innerHTML = html; $("modalOv").classList.add("show"); }
+const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const num = v => { const n = Number(String(v ?? "").replace(",", ".")); return Number.isFinite(n) ? n : NaN; };
+const fmt = v => "R$ " + Number(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmtDT = s => s ? new Date(s).toLocaleString("pt-BR", { timeZone: TZ, day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—";
+const fmtD = s => { if (!s) return "—"; const [y, m, d] = String(s).slice(0, 10).split("-"); return `${d}/${m}/${y}`; };
+const hojeISO = () => new Date().toLocaleDateString("en-CA", { timeZone: TZ });
+const addDias = (iso, n) => { const d = new Date(iso + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+const norm = s => String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === "x" ? r : (r & 3 | 8)).toString(16); }));
+const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
 
-/* ════════════════════════════════════════════════════════════
-   ESTADO GLOBAL (cache local, hidratado do Supabase)
-   ════════════════════════════════════════════════════════════ */
+let toastTimer;
+function toast(msg, erro) {
+  const t = $("toast"); t.textContent = msg; t.className = "show" + (erro ? " err" : "");
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), erro ? 5000 : 3000);
+}
+function openModal(html) { $("modalBox").innerHTML = html; $("modalOv").classList.add("show"); const f = $("modalBox").querySelector("input,select,textarea"); if (f) f.focus(); }
+function closeModal() { $("modalOv").classList.remove("show"); $("modalBox").innerHTML = ""; }
+const modalOpen = () => $("modalOv").classList.contains("show");
+
+/* roda ação com botão travado; SEMPRE destrava no fim (inclusive em erro) */
+async function busy(btn, fn) {
+  if (btn) { if (btn.dataset.busy) return; btn.dataset.busy = "1"; btn.disabled = true; }
+  try { return await fn(); }
+  catch (e) { toast(msgErro(e), true); }
+  finally { if (btn && btn.isConnected) { btn.disabled = false; delete btn.dataset.busy; } }
+}
+function msgErro(e) {
+  const m = (e && e.message) || String(e);
+  if (/Failed to fetch|NetworkError|Load failed/i.test(m)) return "Sem conexão com o servidor. Verifique a internet e tente de novo.";
+  return m;
+}
+async function rpc(nome, args) {
+  const { data, error } = await sb.rpc(nome, args);
+  if (error) throw new Error(error.message || "Erro no servidor");
+  return data;
+}
+function ok(res) { if (res.error) throw new Error(res.error.message); return res.data; }
+
+/* ───────── estado ───────── */
 const S = {
-  perfil: null,        // { id, nome, papel }
-  minhasLojas: [],     // lojas que essa pessoa pode acessar
-  loja: null,          // { id, nome, whatsapp } — loja ativa no momento
-  marcas: [], categorias: [], itens: [], sabores: [],
-  estoque: [],          // { id, item_id, sabor_id, quantidade, estoque_minimo }
-  precos: [],           // precos_loja da loja atual
-  clientes: [],
-  vendasRecentes: [],
-  financeiro: [],
-  vendaCart: [],        // carrinho da tela "Nova Venda"
-  tab: "painel",
-  channel: null,
+  perfil: null, minhasLojas: [], loja: null,
+  marcas: [], categorias: [], itens: [], sabores: [], estoque: [], precos: [], clientes: [],
+  cart: [], chave: null, chaveSig: "",
+  tab: "painel", channel: null, realtime: "off",
+  f: { estBusca: "", estFiltro: "todos", vendaBusca: "", vendasPeriodo: "hoje", finStatus: "todos", finPeriodo: "mes", cliBusca: "",
+       waPreco: true, waQtd: true, waSabores: true },
 };
+const isGerente = () => S.perfil && (S.perfil.papel === "gerente" || S.perfil.papel === "dono");
+const itemById = id => S.itens.find(i => i.id === id);
+const saborById = id => S.sabores.find(s => s.id === id);
+const saboresDe = itemId => S.sabores.filter(s => s.item_id === itemId);
+const precoRow = itemId => S.precos.find(p => p.item_id === itemId);
+const precoAtivo = itemId => { const p = precoRow(itemId); return p && p.ativo ? Number(p.preco) : null; };
+const nomeLinha = (it, sab) => sab ? `${it.nome} — ${sab.nome}` : it.nome;
+const marcaNome = it => it.tipo === "modelo" ? (S.marcas.find(m => m.id === it.marca_id) || {}).nome : (S.categorias.find(c => c.id === it.categoria_id) || {}).nome;
 
-function estoqueDe(itemId, saborId){
-  return S.estoque.find(e => e.item_id === itemId && (e.sabor_id||null) === (saborId||null));
-}
-function precoDe(itemId){
-  return S.precos.find(p => p.item_id === itemId);
-}
-function itemNome(item, sabor){
-  return sabor ? `${item.nome} — ${sabor.nome}` : item.nome;
-}
-
-/* ════════════════════════════════════════════════════════════
-   AUTENTICAÇÃO
-   ════════════════════════════════════════════════════════════ */
-const Auth = {
-  async login(){
-    const usuario = $("loginUsuario").value.trim().toLowerCase();
-    const senha = $("loginSenha").value;
-    const err = $("loginErr");
-    err.style.display = "none";
-    if(!usuario || !senha){ err.textContent = "Preencha usuário e senha."; err.style.display="block"; return; }
-    $("btnLogin").disabled = true; $("btnLogin").textContent = "Entrando...";
-    const email = usuario + "@painel.local";
-    const { error } = await sb.auth.signInWithPassword({ email, password: senha });
-    $("btnLogin").disabled = false; $("btnLogin").textContent = "Entrar";
-    if(error){ err.textContent = "Usuário ou senha inválidos."; err.style.display="block"; return; }
-    await App.boot();
-  },
-  async logout(){
-    if(S.channel) sb.removeChannel(S.channel);
-    await sb.auth.signOut();
-    location.reload();
+/* linhas de estoque "vendáveis" já unidas com item/sabor */
+function linhasEstoque() {
+  const out = [];
+  for (const e of S.estoque) {
+    const item = itemById(e.item_id); if (!item) continue;
+    const temSab = saboresDe(item.id).length > 0;
+    if (!e.sabor_id && temSab) continue;           // linha base some quando o item tem sabores
+    const sabor = e.sabor_id ? saborById(e.sabor_id) : null;
+    if (e.sabor_id && !sabor) continue;
+    out.push({ e, item, sabor, nome: nomeLinha(item, sabor), grupo: marcaNome(item) || "Outros" });
   }
-};
+  return out.sort((a, b) => a.grupo.localeCompare(b.grupo) || a.nome.localeCompare(b.nome));
+}
+const nivel = e => e.quantidade <= 0 ? "zero" : (e.quantidade <= e.estoque_minimo ? "baixo" : "ok");
 
-/* ════════════════════════════════════════════════════════════
-   CARGA DE DADOS
-   ════════════════════════════════════════════════════════════ */
+/* ───────── carga de dados ───────── */
 const DB = {
-  async carregarPerfil(){
+  async perfil() {
     const { data: { user } } = await sb.auth.getUser();
-    if(!user) return null;
-    const { data: perfil, error } = await sb.from("perfis").select("*").eq("id", user.id).single();
-    if(error || !perfil) return null;
-    S.perfil = perfil;
-    const { data: acessos } = await sb.from("perfis_lojas").select("lojas(*)").eq("perfil_id", user.id);
-    S.minhasLojas = (acessos || []).map(a => a.lojas).filter(Boolean);
-    return perfil;
+    if (!user) return false;
+    const p = ok(await sb.from("perfis").select("*").eq("id", user.id).maybeSingle());
+    if (!p) return false;
+    S.perfil = p;
+    const ac = ok(await sb.from("perfis_lojas").select("lojas(*)").eq("perfil_id", user.id));
+    S.minhasLojas = (ac || []).map(a => a.lojas).filter(l => l && l.ativo !== false).sort((a, b) => a.nome.localeCompare(b.nome));
+    return true;
   },
-  async carregarCatalogo(){
+  async catalogo() {
     const [m, c, i, s] = await Promise.all([
-      sb.from("marcas").select("*").order("ordem"),
-      sb.from("categorias").select("*").order("ordem"),
-      sb.from("itens").select("*").order("ordem"),
-      sb.from("sabores").select("*").order("ordem"),
-    ]);
-    S.marcas = m.data || []; S.categorias = c.data || []; S.itens = i.data || []; S.sabores = s.data || [];
+      sb.from("marcas").select("*").order("ordem").order("nome"), sb.from("categorias").select("*").order("ordem").order("nome"),
+      sb.from("itens").select("*").order("ordem").order("nome"), sb.from("sabores").select("*").order("ordem").order("nome")]);
+    S.marcas = ok(m) || []; S.categorias = ok(c) || []; S.itens = ok(i) || []; S.sabores = ok(s) || [];
   },
-  async carregarEstoque(){
-    const { data } = await sb.from("estoque").select("*");
-    S.estoque = data || [];
-  },
-  async carregarPrecos(){
-    const { data } = await sb.from("precos_loja").select("*").eq("loja_id", S.loja.id);
-    S.precos = data || [];
-  },
-  async carregarClientes(){
-    const { data } = await sb.from("clientes").select("*").eq("loja_id", S.loja.id).order("nome");
-    S.clientes = data || [];
-  },
-  async carregarVendas(){
-    const { data } = await sb.from("vendas").select("*, clientes(nome), lojas(nome)").eq("loja_id", S.loja.id).order("criado_em", { ascending:false }).limit(60);
-    S.vendasRecentes = data || [];
-  },
-  async carregarFinanceiro(){
-    const { data } = await sb.from("financeiro_lancamentos").select("*, lojas(nome)").eq("loja_id", S.loja.id).order("criado_em", { ascending:false }).limit(120);
-    S.financeiro = data || [];
-  },
-  async recarregarTudo(){
-    await Promise.all([
-      DB.carregarCatalogo(), DB.carregarEstoque(), DB.carregarPrecos(),
-      DB.carregarClientes(), DB.carregarVendas(), DB.carregarFinanceiro(),
-    ]);
-  }
+  async estoque() { S.estoque = ok(await sb.from("estoque").select("*")) || []; },
+  async precos() { S.precos = ok(await sb.from("precos_loja").select("*").eq("loja_id", S.loja.id)) || []; },
+  async clientes() { S.clientes = ok(await sb.from("clientes").select("*").eq("loja_id", S.loja.id).order("nome")) || []; },
+  async tudo() { await Promise.all([DB.catalogo(), DB.estoque(), DB.precos(), DB.clientes()]); },
 };
 
-/* ════════════════════════════════════════════════════════════
-   APP — boot, tempo real, navegação por abas
-   ════════════════════════════════════════════════════════════ */
-const App = {
-  async boot(){
-    const perfil = await DB.carregarPerfil();
-    if(!perfil || !S.minhasLojas.length){
-      toast("Este usuário não tem acesso a nenhuma loja. Fale com o administrador.");
-      await sb.auth.signOut();
-      return;
-    }
-    $("loginScreen").style.display = "none";
-    if(S.minhasLojas.length === 1){
-      await App.entrarNaLoja(S.minhasLojas[0]);
-    } else {
-      App.mostrarSeletorLoja();
-    }
+/* ───────── autenticação ───────── */
+const Auth = {
+  async login(ev) {
+    ev.preventDefault();
+    const usuario = $("loginUsuario").value.trim().toLowerCase().replace(/\s+/g, "");
+    const senha = $("loginSenha").value, err = $("loginErr"), btn = $("btnLogin");
+    err.textContent = "";
+    if (!usuario || !senha) { err.textContent = "Preencha usuário e senha."; return; }
+    btn.disabled = true; btn.textContent = "Entrando...";
+    try {
+      const { error } = await sb.auth.signInWithPassword({ email: usuario + "@painel.local", password: senha });
+      if (error) {
+        err.textContent = /Invalid login/i.test(error.message) ? "Usuário ou senha inválidos." : "Não foi possível entrar: " + msgErro(error);
+        return;
+      }
+      await App.boot();
+    } catch (e) { err.textContent = msgErro(e); }
+    finally { btn.disabled = false; btn.textContent = "Entrar"; }
   },
+  async logout() { try { if (S.channel) await sb.removeChannel(S.channel); await sb.auth.signOut(); } finally { location.reload(); } },
+};
 
-  mostrarSeletorLoja(){
+/* ───────── app ───────── */
+const App = {
+  async boot() {
+    let tem;
+    try { tem = await DB.perfil(); } catch (e) { $("loginErr").textContent = msgErro(e); return; }
+    if (!tem || !S.minhasLojas.length) {
+      $("loginErr").textContent = "Este usuário não tem acesso a nenhuma loja. Fale com o administrador.";
+      await sb.auth.signOut(); return;
+    }
+    $("loginScreen").classList.add("hidden");
+    if (S.minhasLojas.length === 1) await App.entrarNaLoja(S.minhasLojas[0].id); else App.seletor();
+  },
+  seletor() {
     $("app").classList.remove("show");
     $("seletorSub").textContent = S.perfil.nome ? `Olá, ${S.perfil.nome}` : "Escolha a loja";
-    $("seletorCards").innerHTML = S.minhasLojas.map(l =>
-      `<button class="loja-card" onclick='App.entrarNaLoja(${JSON.stringify(l)})'><span class="ic">🏪</span>${l.nome}</button>`
-    ).join("");
-    $("seletorLoja").classList.add("show");
+    $("seletorCards").innerHTML = S.minhasLojas.map(l => `<button class="loja-card" data-a="entrarLoja" data-id="${esc(l.id)}"><span class="ic">🏪</span>${esc(l.nome)}</button>`).join("");
+    $("seletorLoja").classList.remove("hidden");
   },
-
-  async entrarNaLoja(loja){
-    if(S.channel){ sb.removeChannel(S.channel); S.channel = null; }
-    S.loja = loja;
-    S.vendaCart = [];
-    await DB.recarregarTudo();
-    $("lojaNomeChip").textContent = `${S.loja.nome} · ${S.perfil.nome || S.perfil.papel}`;
+  async entrarNaLoja(id) {
+    const loja = S.minhasLojas.find(l => l.id === id); if (!loja) return;
+    await App.pararRealtime();
+    S.loja = loja; S.cart = []; S.chave = null;
+    try { await DB.tudo(); } catch (e) { toast(msgErro(e), true); return; }
+    $("lojaNomeChip").textContent = `${loja.nome} · ${S.perfil.nome || S.perfil.papel}`;
     $("btnTrocarLoja").classList.toggle("hidden", S.minhasLojas.length <= 1);
-    $("seletorLoja").classList.remove("show");
+    $("seletorLoja").classList.add("hidden");
     $("app").classList.add("show");
-    App.buildTabs();
-    App.goTab("painel");
-    App.startRealtime();
+    App.tabs(); App.goTab("painel"); App.iniciarRealtime();
   },
-
-  trocarLoja(){
-    if(S.channel){ sb.removeChannel(S.channel); S.channel = null; }
-    App.mostrarSeletorLoja();
+  async trocarLoja() { await App.pararRealtime(); App.seletor(); },
+  tabs() {
+    const t = [["painel", "📊 Painel"], ["venda", "🛒 Nova venda"], ["vendas", "🧾 Vendas"], ["estoque", "📦 Estoque"], ["clientes", "👥 Clientes"], ["financeiro", "💰 Financeiro"], ["whats", "📋 Lista WhatsApp"]];
+    if (isGerente()) t.push(["catalogo", "🏷️ Catálogo"]);
+    $("tabsNav").innerHTML = t.map(([id, l]) => `<button class="tabbtn" id="tab-${id}" data-a="tab" data-id="${id}">${l}</button>`).join("");
   },
-
-  buildTabs(){
-    const isGerente = S.perfil.papel === "gerente" || S.perfil.papel === "dono";
-    const tabs = [
-      ["painel","📊 Painel"], ["estoque","📦 Estoque"], ["venda","🛒 Nova venda"],
-      ["clientes","👥 Clientes"], ["financeiro","💰 Financeiro"], ["whats","📋 Lista WhatsApp"],
-    ];
-    if(isGerente) tabs.push(["catalogo","🏷️ Catálogo"]);
-    $("tabsNav").innerHTML = tabs.map(([id,label]) =>
-      `<button class="tabbtn" id="tab-${id}" onclick="App.goTab('${id}')">${label}</button>`).join("");
-  },
-
-  goTab(id){
+  goTab(id) {
     S.tab = id;
-    document.querySelectorAll(".tabbtn").forEach(b => b.classList.toggle("active", b.id === "tab-"+id));
-    const renderers = { painel:Views.painel, estoque:Views.estoque, venda:Views.venda,
-      clientes:Views.clientes, financeiro:Views.financeiro, whats:Views.whats, catalogo:Views.catalogo };
-    (renderers[id] || Views.painel)();
+    document.querySelectorAll(".tabbtn").forEach(b => b.classList.toggle("active", b.id === "tab-" + id));
+    const v = Views[id] || Views.painel;
+    Promise.resolve(v.render()).catch(e => toast(msgErro(e), true));
+    window.scrollTo(0, 0);
   },
-
-  refreshCurrentTab(){ App.goTab(S.tab); },
-
-  /* tempo real: qualquer loja que vender/ajustar estoque avisa todas as outras na hora */
-  startRealtime(){
-    S.channel = sb.channel("painel-realtime")
-      .on("postgres_changes", { event:"*", schema:"public", table:"estoque" }, async () => {
-        await DB.carregarEstoque();
-        toast("📦 Estoque atualizado");
-        if(["estoque","venda","whats","painel"].includes(S.tab)) App.refreshCurrentTab();
+  /* atualização parcial (não destrói campos digitados) */
+  async atualizar() {
+    if (!S.loja) return;
+    const v = Views[S.tab];
+    if (modalOpen()) return;
+    try { await (v.update ? v.update() : v.render()); } catch (e) { toast(msgErro(e), true); }
+  },
+  setRt(st) { S.realtime = st; const d = $("liveDot"); d.className = "live-dot " + (st === "on" ? "on" : st === "off" ? "off" : ""); d.title = st === "on" ? "Tempo real ativo" : "Sem tempo real — o painel atualiza ao trocar de aba"; },
+  iniciarRealtime() {
+    const recarregarEstoque = debounce(async () => { try { await DB.estoque(); await App.atualizar(); } catch (e) { /* tenta de novo no próximo evento */ } }, 400);
+    const recarregarTela = debounce(() => App.atualizar(), 500);
+    App.setRt("conectando");
+    S.channel = sb.channel("painel-" + S.loja.id)
+      .on("postgres_changes", { event: "*", schema: "public", table: "estoque" }, recarregarEstoque)
+      .on("postgres_changes", { event: "*", schema: "public", table: "vendas" }, (p) => {
+        const l = (p.new && p.new.loja_id); if (p.eventType === "INSERT" && l && l !== S.loja.id) toast("🔔 Venda registrada em outra loja");
+        recarregarTela();
       })
-      .on("postgres_changes", { event:"INSERT", schema:"public", table:"vendas" }, async (payload) => {
-        await DB.carregarVendas();
-        if(payload.new.loja_id !== S.loja.id) toast("🔔 Uma venda foi registrada em outra loja");
-        if(["painel","financeiro"].includes(S.tab)) App.refreshCurrentTab();
-      })
-      .on("postgres_changes", { event:"*", schema:"public", table:"financeiro_lancamentos" }, async () => {
-        await DB.carregarFinanceiro();
-        if(S.tab === "financeiro" || S.tab === "painel") App.refreshCurrentTab();
-      })
-      .subscribe();
-  }
+      .on("postgres_changes", { event: "*", schema: "public", table: "financeiro_lancamentos" }, recarregarTela)
+      .subscribe(st => App.setRt(st === "SUBSCRIBED" ? "on" : (st === "CLOSED" || st === "CHANNEL_ERROR" || st === "TIMED_OUT") ? "off" : "conectando"));
+  },
+  async pararRealtime() { if (S.channel) { try { await sb.removeChannel(S.channel); } catch (e) {} S.channel = null; } App.setRt("off"); },
 };
 
-/* ════════════════════════════════════════════════════════════
-   VIEWS
-   ════════════════════════════════════════════════════════════ */
-const Views = {
+/* ───────── views ───────── */
+const Views = {};
 
-  /* ---------- PAINEL (dashboard) ---------- */
-  painel(){
-    const hoje = new Date().toDateString();
-    const vendasHoje = S.vendasRecentes.filter(v => v.status==="concluida" && new Date(v.criado_em).toDateString()===hoje);
-    const saldo = S.financeiro.filter(f=>f.status==="pago").reduce((a,f)=> a + (f.tipo==="entrada"?Number(f.valor):-Number(f.valor)), 0);
-    const pendentes = S.financeiro.filter(f=>f.status!=="pago");
-    const baixoEstoque = S.estoque.filter(e => e.quantidade <= e.estoque_minimo);
-
+/* PAINEL */
+Views.painel = {
+  async render() {
+    $("viewRoot").innerHTML = `<div class="empty">Carregando…</div>`;
+    const [r, ultimas] = await Promise.all([
+      rpc("painel_resumo", { p_loja_id: S.loja.id }),
+      sb.from("vendas").select("id,total,status,criado_em,forma_pagamento,cliente_nome,clientes(nome)").eq("loja_id", S.loja.id).order("criado_em", { ascending: false }).limit(6).then(ok),
+    ]);
+    if (S.tab !== "painel") return;
+    const linhas = linhasEstoque().filter(l => l.item.ativo);
+    const baixos = linhas.filter(l => nivel(l.e) !== "ok").sort((a, b) => a.e.quantidade - b.e.quantidade).slice(0, 8);
+    const max = Math.max(1, ...r.por_dia.map(d => Number(d.total)));
+    const dow = d => ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"][new Date(d + "T12:00:00Z").getUTCDay()];
     $("viewRoot").innerHTML = `
       <div class="kpi-grid">
-        <div class="kpi"><div class="v">${vendasHoje.length}</div><div class="l">VENDAS HOJE</div></div>
-        <div class="kpi"><div class="v">${fmt(vendasHoje.reduce((a,v)=>a+Number(v.total),0))}</div><div class="l">FATURAMENTO HOJE</div></div>
-        <div class="kpi ${saldo<0?'warn':''}"><div class="v">${fmt(saldo)}</div><div class="l">SALDO EM CAIXA</div></div>
-        <div class="kpi ${baixoEstoque.length?'warn':''}"><div class="v">${baixoEstoque.length}</div><div class="l">ITENS COM ESTOQUE BAIXO</div></div>
-        <div class="kpi ${pendentes.length?'warn':''}"><div class="v">${pendentes.length}</div><div class="l">LANÇAMENTOS PENDENTES</div></div>
+        <div class="kpi"><div class="v">${fmt(r.hoje.total)}</div><div class="l">Vendas hoje · ${r.hoje.qtd} venda(s)</div></div>
+        <div class="kpi"><div class="v">${fmt(r.mes.total)}</div><div class="l">Vendas no mês · ${r.mes.qtd} venda(s)</div></div>
+        <div class="kpi ${r.saldo_caixa < 0 ? "warn" : "good"}"><div class="v">${fmt(r.saldo_caixa)}</div><div class="l">Saldo em caixa</div></div>
+        <div class="kpi"><div class="v">${fmt(r.a_receber.total)}</div><div class="l">A receber · ${r.a_receber.qtd}</div></div>
+        <div class="kpi"><div class="v">${fmt(r.a_pagar.total)}</div><div class="l">A pagar · ${r.a_pagar.qtd}</div></div>
+        <div class="kpi ${r.atrasados.qtd ? "warn" : ""}"><div class="v">${r.atrasados.qtd}</div><div class="l">Contas atrasadas · ${fmt(r.atrasados.total)}</div></div>
       </div>
-      <div class="card">
-        <h3>⚠️ Estoque baixo ou zerado (compartilhado entre as lojas)</h3>
-        ${baixoEstoque.length ? baixoEstoque.slice(0,12).map(e => {
-          const item = S.itens.find(i=>i.id===e.item_id); const sabor = S.sabores.find(s=>s.id===e.sabor_id);
-          return `<div class="list-row"><span style="flex:1">${item?itemNome(item,sabor):"?"}</span><span class="qtd-badge ${e.quantidade===0?'zero':'baixo'}">${e.quantidade}</span></div>`;
-        }).join("") : `<div class="empty">Tudo certo por aqui 🎉</div>`}
-      </div>
-      <div class="card">
-        <h3>🕒 Últimas vendas — ${S.loja.nome}</h3>
-        ${S.vendasRecentes.slice(0,8).map(v => `
-          <div class="list-row">
-            <span style="flex:1">${v.clientes?.nome || "Cliente balcão"}</span>
-            <span style="color:var(--muted);font-size:.78rem">${fmtDate(v.criado_em)}</span>
-            <b>${fmt(v.total)}</b>
-          </div>`).join("") || `<div class="empty">Nenhuma venda ainda</div>`}
-      </div>
-    `;
-  },
-
-  /* ---------- ESTOQUE ---------- */
-  estoque(busca=""){
-    const q = busca.trim().toLowerCase();
-    const isGerente = S.perfil.papel === "gerente" || S.perfil.papel === "dono";
-
-    function linhaItem(item){
-      const linhasSabor = S.sabores.filter(s => s.item_id === item.id);
-      if(linhasSabor.length === 0){
-        const e = estoqueDe(item.id, null);
-        if(!e) return "";
-        if(q && !item.nome.toLowerCase().includes(q)) return "";
-        return itemRowHtml(item, null, e);
-      }
-      const rows = linhasSabor.map(s => {
-        const e = estoqueDe(item.id, s.id);
-        if(!e) return "";
-        if(q && !(item.nome+" "+s.nome).toLowerCase().includes(q)) return "";
-        return itemRowHtml(item, s, e);
-      }).join("");
-      return rows;
-    }
-    function itemRowHtml(item, sabor, e){
-      const cls = e.quantidade===0 ? "zero" : (e.quantidade<=e.estoque_minimo ? "baixo" : "");
-      return `<div class="item-row">
-        <div class="ic">${item.emoji||"📦"}</div>
-        <div class="in"><b>${itemNome(item,sabor)}</b><small>mín. ${e.estoque_minimo}</small></div>
-        <div class="qtd-badge ${cls}">${e.quantidade}</div>
-        ${isGerente ? `<div class="adj-btns">
-          <button onclick="Actions.ajustarEstoque('${e.id}',-1,'${item.nome.replace(/'/g,"")}')">−</button>
-          <button class="plus" onclick="Actions.ajustarEstoque('${e.id}',1,'${item.nome.replace(/'/g,"")}')">+</button>
-        </div>` : ""}
+      <div class="two-col">
+        <div>
+          <div class="card"><h3>Vendas dos últimos 7 dias</h3>
+            <div class="bars">${r.por_dia.map(d => { const h = Math.round(Number(d.total) / max * 100); return `<div class="bar" title="${esc(fmtD(d.dia))}: ${esc(fmt(d.total))} (${d.qtd} venda(s))"><b>${Number(d.total) ? esc(Math.round(d.total)) : ""}</b><i class="${Number(d.total) ? "" : "zero"}" style="height:${Math.max(h, 2)}%"></i><span>${dow(d.dia)}</span></div>`; }).join("")}</div>
+          </div>
+          <div class="card"><h3>Últimas vendas</h3>
+            ${ultimas.length ? ultimas.map(v => `<div class="list-row"><div class="grow"><b>${esc(v.cliente_nome || (v.clientes && v.clientes.nome) || "Sem cliente")}</b><small>${esc(fmtDT(v.criado_em))} · ${esc(v.forma_pagamento || "—")}</small></div><span class="tag ${v.status}">${v.status === "cancelada" ? "cancelada" : esc(fmt(v.total))}</span></div>`).join("") : `<div class="empty">Nenhuma venda ainda.</div>`}
+          </div>
+        </div>
+        <div>
+          <div class="card"><h3>⚠️ Estoque baixo ou zerado</h3>
+            ${baixos.length ? baixos.map(l => `<div class="list-row"><div class="grow">${esc(l.nome)}<small>mínimo ${l.e.estoque_minimo}</small></div><span class="qtd-badge ${nivel(l.e)}">${l.e.quantidade}</span></div>`).join("") : `<div class="empty">Tudo certo por aqui ✅</div>`}
+          </div>
+          <div class="card"><h3>🏆 Mais vendidos do mês</h3>
+            ${r.top_produtos.length ? r.top_produtos.map((p, i) => `<div class="list-row"><div class="grow">${i + 1}. ${esc(p.nome)}<small>${esc(fmt(p.total))}</small></div><b>${p.qtd}</b></div>`).join("") : `<div class="empty">Sem vendas no mês.</div>`}
+          </div>
+        </div>
       </div>`;
-    }
-
-    let corpo = "";
-    S.marcas.forEach(marca => {
-      const itensMarca = S.itens.filter(i => i.marca_id === marca.id && i.tipo === "modelo");
-      const linhas = itensMarca.map(linhaItem).join("");
-      if(linhas.trim()) corpo += `<div class="grupo-h">${marca.nome}</div>${linhas}`;
-    });
-    S.categorias.forEach(cat => {
-      const itensCat = S.itens.filter(i => i.categoria_id === cat.id && i.tipo === "produto");
-      const linhas = itensCat.map(linhaItem).join("");
-      if(linhas.trim()) corpo += `<div class="grupo-h">${cat.nome}</div>${linhas}`;
-    });
-
-    $("viewRoot").innerHTML = `
-      <input class="field stock-search" placeholder="🔍 Buscar produto ou sabor..." oninput="Views.estoque(this.value)" value="${busca.replace(/"/g,'')}">
-      ${corpo.trim() ? corpo : `<div class="empty">Nada encontrado.</div>`}
-    `;
-  },
-
-  /* ---------- NOVA VENDA ---------- */
-  venda(){
-    const totalItens = S.vendaCart.reduce((a,c)=>a+c.quantidade,0);
-    const subtotal = S.vendaCart.reduce((a,c)=>a+c.quantidade*c.preco_unitario,0);
-    $("viewRoot").innerHTML = `
-      <div class="card">
-        <h3>Buscar produto</h3>
-        <input class="field" id="vBusca" placeholder="Digite o nome do produto..." oninput="Views.buscaVenda(this.value)">
-        <div id="vResultados"></div>
-      </div>
-      <div class="card">
-        <h3>Comanda (${totalItens} ${totalItens===1?"item":"itens"})</h3>
-        <div id="vCarrinho">${S.vendaCart.length ? S.vendaCart.map((c,idx)=>`
-          <div class="cart-item">
-            <div class="ci-info"><b>${c.quantidade}x ${c.nome}</b><small>${fmt(c.preco_unitario)} cada</small></div>
-            <b>${fmt(c.quantidade*c.preco_unitario)}</b>
-            <button class="rm" onclick="Views.rmCarrinho(${idx})">✕</button>
-          </div>`).join("") : `<div class="empty">Adicione produtos acima</div>`}</div>
-        <div class="tt-row big"><span>Subtotal</span><span>${fmt(subtotal)}</span></div>
-      </div>
-      <div class="card">
-        <h3>Cliente (opcional)</h3>
-        <div class="grid2">
-          <div><label>Nome</label><input class="field" id="vClienteNome"></div>
-          <div><label>Telefone</label><input class="field" id="vClienteTel" placeholder="11999999999"></div>
-        </div>
-        <label>Forma de pagamento</label>
-        <div class="row" id="vPagRow">
-          ${["Pix","Cartão","Dinheiro"].map(p=>`<button type="button" class="pill ${p==='Pix'?'sel':''}" data-pag="${p}" onclick="Views.setPag(this,'${p}')">${p}</button>`).join("")}
-        </div>
-        <label>Desconto (R$)</label>
-        <input class="field" id="vDesconto" type="number" min="0" step="0.01" value="0">
-        <button class="btn btn-red" id="btnFinalizarVenda" style="margin-top:6px" onclick="Actions.finalizarVenda()" ${S.vendaCart.length?'':'disabled'}>✅ Finalizar venda</button>
-      </div>
-    `;
-  },
-
-  buscaVenda(q){
-    q = q.trim().toLowerCase();
-    const box = $("vResultados");
-    if(!box) return;
-    if(!q){ box.innerHTML = ""; return; }
-    const achados = [];
-    S.itens.forEach(item => {
-      if(!item.ativo) return;
-      const precoRow = precoDe(item.id);
-      if(!precoRow || !precoRow.ativo) return;
-      const linhasSabor = S.sabores.filter(s => s.item_id === item.id);
-      if(linhasSabor.length === 0){
-        if(item.nome.toLowerCase().includes(q)){
-          const e = estoqueDe(item.id, null);
-          achados.push({item, sabor:null, preco:precoRow, estoque:e});
-        }
-      } else {
-        linhasSabor.forEach(s => {
-          if((item.nome+" "+s.nome).toLowerCase().includes(q)){
-            const e = estoqueDe(item.id, s.id);
-            achados.push({item, sabor:s, preco:precoRow, estoque:e});
-          }
-        });
-      }
-    });
-    box.innerHTML = achados.slice(0,10).map(a => `
-      <div class="sel-result" onclick="Views.addCarrinho('${a.item.id}',${a.sabor?`'${a.sabor.id}'`:null})">
-        <span>${itemNome(a.item,a.sabor)}<small>${a.estoque ? a.estoque.quantidade+" em estoque" : "sem estoque cadastrado"}</small></span>
-        <b>${fmt(a.preco.preco)}</b>
-      </div>`).join("") || `<div class="empty">Nada encontrado</div>`;
-  },
-
-  addCarrinho(itemId, saborId){
-    const item = S.itens.find(i=>i.id===itemId);
-    const sabor = saborId ? S.sabores.find(s=>s.id===saborId) : null;
-    const e = estoqueDe(itemId, saborId);
-    const precoRow = precoDe(itemId);
-    if(!e || e.quantidade <= 0){ toast("⚠️ Item sem estoque disponível"); return; }
-    const existente = S.vendaCart.find(c => c.item_id===itemId && (c.sabor_id||null)===(saborId||null));
-    const jaNaComanda = existente ? existente.quantidade : 0;
-    if(jaNaComanda + 1 > e.quantidade){ toast("⚠️ Estoque insuficiente para adicionar mais"); return; }
-    if(existente){ existente.quantidade++; }
-    else S.vendaCart.push({ item_id:itemId, sabor_id:saborId, nome:itemNome(item,sabor), quantidade:1, preco_unitario:Number(precoRow.preco) });
-    $("vBusca").value = ""; $("vResultados").innerHTML = "";
-    Views.venda();
-  },
-  rmCarrinho(idx){ S.vendaCart.splice(idx,1); Views.venda(); },
-  setPag(btn, p){ document.querySelectorAll("#vPagRow .pill").forEach(b=>b.classList.remove("sel")); btn.classList.add("sel"); },
-
-  /* ---------- CLIENTES ---------- */
-  clientes(busca=""){
-    const q = busca.trim().toLowerCase();
-    const lista = S.clientes.filter(c => !q || (c.nome+" "+(c.telefone||"")).toLowerCase().includes(q));
-    $("viewRoot").innerHTML = `
-      <input class="field" placeholder="🔍 Buscar cliente..." oninput="Views.clientes(this.value)" value="${busca.replace(/"/g,'')}">
-      <div class="card">
-        ${lista.length ? lista.map(c => `
-          <div class="list-row" style="cursor:pointer" onclick="Views.historicoCliente('${c.id}')">
-            <span style="flex:1"><b>${c.nome}</b><br><small style="color:var(--muted)">${c.telefone||"sem telefone"}</small></span>
-            <span style="color:var(--muted);font-size:.78rem">desde ${fmtDate(c.criado_em)}</span>
-          </div>`).join("") : `<div class="empty">Nenhum cliente cadastrado ainda</div>`}
-      </div>
-    `;
-  },
-  historicoCliente(clienteId){
-    const c = S.clientes.find(x=>x.id===clienteId);
-    const vendas = S.vendasRecentes.filter(v=>v.cliente_id===clienteId);
-    openModal(`
-      <h3>${c.nome}</h3>
-      <p style="color:var(--muted);font-size:.85rem;margin-bottom:10px">${c.telefone||""} ${c.endereco?"· "+c.endereco:""}</p>
-      ${vendas.length ? vendas.map(v=>`<div class="tt-row"><span>${fmtDate(v.criado_em)}</span><b style="color:var(--text)">${fmt(v.total)}</b></div>`).join("") : `<div class="empty">Sem compras registradas</div>`}
-      <div class="modal-close-row"><button class="abtn soft" onclick="closeModal()">Fechar</button></div>
-    `);
-  },
-
-  /* ---------- FINANCEIRO ---------- */
-  financeiro(){
-    const lista = S.financeiro;
-    const saldo = lista.filter(f=>f.status==="pago").reduce((a,f)=> a + (f.tipo==="entrada"?Number(f.valor):-Number(f.valor)), 0);
-    $("viewRoot").innerHTML = `
-      <div class="kpi-grid">
-        <div class="kpi ${saldo<0?'warn':''}"><div class="v">${fmt(saldo)}</div><div class="l">SALDO</div></div>
-        <div class="kpi"><div class="v">${lista.filter(f=>f.status==='pendente').length}</div><div class="l">PENDENTES</div></div>
-        <div class="kpi warn"><div class="v">${lista.filter(f=>f.status==='atrasado').length}</div><div class="l">ATRASADOS</div></div>
-      </div>
-      <button class="abtn red" style="margin-bottom:12px" onclick="Views.novoLancamento()">+ Lançar pedido / despesa / recebimento</button>
-      <div class="card">
-        <h3>Lançamentos — ${S.loja.nome}</h3>
-        ${lista.length ? lista.map(f => `
-          <div class="list-row">
-            <span class="tag ${f.tipo}">${f.tipo==='entrada'?'ENTRADA':'SAÍDA'}</span>
-            <span style="flex:1"><b>${f.descricao||f.categoria}</b><br><small style="color:var(--muted)">${f.categoria} · ${fmtDate(f.criado_em)}</small></span>
-            <span class="tag ${f.status}">${f.status}</span>
-            <b style="color:${f.tipo==='entrada'?'#1a7a40':'var(--red)'}">${f.tipo==='entrada'?'+':'-'}${fmt(f.valor)}</b>
-            ${f.status!=='pago' ? `<button class="abtn soft" onclick="Actions.marcarPago('${f.id}')">Marcar pago</button>` : ""}
-          </div>`).join("") : `<div class="empty">Nenhum lançamento ainda</div>`}
-      </div>
-    `;
-  },
-  novoLancamento(){
-    openModal(`
-      <h3>Novo lançamento</h3>
-      <label>Tipo</label>
-      <div class="row">
-        <button type="button" class="pill sel" data-t="saida" onclick="Views.setTipoLanc(this,'saida')">Saída (despesa/pedido)</button>
-        <button type="button" class="pill" data-t="entrada" onclick="Views.setTipoLanc(this,'entrada')">Entrada (recebimento)</button>
-      </div>
-      <label>Categoria</label>
-      <select class="field" id="lCategoria">
-        <option value="compra_estoque">Compra de mercadoria</option>
-        <option value="aluguel">Aluguel</option>
-        <option value="salario">Salário</option>
-        <option value="conta">Conta (água/luz/internet)</option>
-        <option value="recebimento">Recebimento de cliente</option>
-        <option value="outro">Outro</option>
-      </select>
-      <label>Descrição</label>
-      <input class="field" id="lDescricao" placeholder="Ex: Pedido de essências - fornecedor X">
-      <div class="grid2">
-        <div><label>Valor (R$)</label><input class="field" id="lValor" type="number" min="0" step="0.01"></div>
-        <div><label>Vencimento</label><input class="field" id="lVencimento" type="date"></div>
-      </div>
-      <label>Status</label>
-      <select class="field" id="lStatus">
-        <option value="pago">Já pago/recebido</option>
-        <option value="pendente">Pendente</option>
-      </select>
-      <div class="modal-close-row">
-        <button class="abtn soft" onclick="closeModal()">Cancelar</button>
-        <button class="abtn red" onclick="Actions.salvarLancamento()">Salvar</button>
-      </div>
-    `);
-    S._tipoLanc = "saida";
-  },
-  setTipoLanc(btn, t){ document.querySelectorAll("[data-t]").forEach(b=>b.classList.remove("sel")); btn.classList.add("sel"); S._tipoLanc = t; },
-
-  /* ---------- LISTA WHATSAPP ---------- */
-  whats(){
-    const grupos = [];
-    S.marcas.filter(m=>m.ativo).forEach(marca => {
-      const linhas = [];
-      S.itens.filter(i=>i.marca_id===marca.id && i.tipo==="modelo" && i.ativo).forEach(item => {
-        const precoRow = precoDe(item.id); if(!precoRow || !precoRow.ativo) return;
-        const saboresItem = S.sabores.filter(s=>s.item_id===item.id);
-        if(saboresItem.length===0){
-          const e = estoqueDe(item.id,null);
-          if(e && e.quantidade>0) linhas.push(`▪ ${item.nome} — ${fmt(precoRow.preco)}`);
-        } else {
-          const disponiveis = saboresItem.filter(s => { const e=estoqueDe(item.id,s.id); return e && e.quantidade>0; });
-          if(disponiveis.length) linhas.push(`▪ ${item.nome} — ${fmt(precoRow.preco)}\n   Sabores: ${disponiveis.map(s=>s.nome).join(", ")}`);
-        }
-      });
-      if(linhas.length) grupos.push(`*${marca.nome}*\n${linhas.join("\n")}`);
-    });
-    S.categorias.forEach(cat => {
-      const linhas = [];
-      S.itens.filter(i=>i.categoria_id===cat.id && i.tipo==="produto" && i.ativo).forEach(item => {
-        const precoRow = precoDe(item.id); if(!precoRow || !precoRow.ativo) return;
-        const e = estoqueDe(item.id,null);
-        if(e && e.quantidade>0) linhas.push(`▪ ${item.nome} — ${fmt(precoRow.preco)}`);
-      });
-      if(linhas.length) grupos.push(`*${cat.nome}*\n${linhas.join("\n")}`);
-    });
-    const texto = `📋 *ESTOQUE DISPONÍVEL — ${S.loja.nome.toUpperCase()}*\n\n${grupos.join("\n\n")}\n\n_Peça já pelo WhatsApp!_`;
-    const wa = S.loja.whatsapp ? `https://wa.me/${S.loja.whatsapp}?text=${encodeURIComponent(texto)}` : null;
-    $("viewRoot").innerHTML = `
-      <div class="card">
-        <h3>📋 Lista de estoque disponível</h3>
-        <p style="color:var(--muted);font-size:.82rem;margin-bottom:10px">Gerada em tempo real: produtos zerados, inativos ou sem preço definido pra sua loja não aparecem aqui.</p>
-        <div id="waPreview">${texto.replace(/</g,"&lt;")}</div>
-        <div class="row" style="margin-top:12px">
-          <button class="abtn dark" onclick="Actions.copiarLista()">📄 Copiar texto</button>
-          ${wa ? `<a class="abtn green" style="text-decoration:none;display:inline-block" href="${wa}" target="_blank">💬 Enviar no WhatsApp</a>` : `<span style="color:var(--muted);font-size:.8rem">Cadastre o WhatsApp da loja na aba Catálogo para habilitar o envio direto.</span>`}
-        </div>
-      </div>
-    `;
-    S._waTexto = texto;
-  },
-
-  /* ---------- CATÁLOGO (gerente/dono) ---------- */
-  catalogo(){
-    $("viewRoot").innerHTML = `
-      <div class="row" style="margin-bottom:12px">
-        <button class="abtn red" onclick="Views.novaMarca()">+ Marca</button>
-        <button class="abtn red" onclick="Views.novoItem('modelo')">+ Modelo de marca</button>
-        <button class="abtn red" onclick="Views.novoItem('produto')">+ Produto avulso</button>
-        <button class="abtn dark" onclick="Views.novaCategoria()">+ Categoria</button>
-      </div>
-      <div class="card"><h3>Marcas</h3>
-        ${S.marcas.map(m=>`<div class="list-row"><span style="flex:1"><b>${m.nome}</b> ${m.ativo?'':'<small style="color:var(--muted)">(inativa)</small>'}</span></div>`).join("") || `<div class="empty">Nenhuma marca cadastrada</div>`}
-      </div>
-      <div class="card"><h3>Itens do catálogo (compartilhado entre as 4 lojas)</h3>
-        ${S.itens.map(item => {
-          const marca = S.marcas.find(m=>m.id===item.marca_id);
-          const cat = S.categorias.find(c=>c.id===item.categoria_id);
-          const precoRow = precoDe(item.id);
-          return `<div class="list-row">
-            <span style="flex:1">${item.emoji||"📦"} <b>${item.nome}</b><br><small style="color:var(--muted)">${marca?marca.nome:cat?.nome||""}</small></span>
-            <span>${precoRow ? fmt(precoRow.preco) : `<span style="color:var(--red)">sem preço</span>`}</span>
-            <button class="abtn soft" onclick="Views.definirPreco('${item.id}')">Meu preço</button>
-            <button class="abtn soft" onclick="Views.addSaborItem('${item.id}')">+ Sabor</button>
-          </div>`;
-        }).join("") || `<div class="empty">Nenhum item cadastrado</div>`}
-      </div>
-    `;
-  },
-  novaMarca(){
-    openModal(`<h3>Nova marca</h3><label>Nome</label><input class="field" id="mNome">
-      <div class="modal-close-row"><button class="abtn soft" onclick="closeModal()">Cancelar</button><button class="abtn red" onclick="Actions.salvarMarca()">Salvar</button></div>`);
-  },
-  novaCategoria(){
-    openModal(`<h3>Nova categoria</h3><label>Nome</label><input class="field" id="catNome">
-      <div class="modal-close-row"><button class="abtn soft" onclick="closeModal()">Cancelar</button><button class="abtn red" onclick="Actions.salvarCategoria()">Salvar</button></div>`);
-  },
-  novoItem(tipo){
-    const opcoesMarca = S.marcas.map(m=>`<option value="${m.id}">${m.nome}</option>`).join("");
-    const opcoesCat = S.categorias.map(c=>`<option value="${c.id}">${c.nome}</option>`).join("");
-    openModal(`
-      <h3>Novo ${tipo==='modelo'?'modelo de marca':'produto avulso'}</h3>
-      ${tipo==='modelo' ? `<label>Marca</label><select class="field" id="iMarca">${opcoesMarca}</select>`
-                         : `<label>Categoria</label><select class="field" id="iCategoria">${opcoesCat}</select>`}
-      <label>Nome</label><input class="field" id="iNome">
-      <label>Emoji</label><input class="field" id="iEmoji" placeholder="💨" maxlength="4">
-      <label>Estoque inicial</label><input class="field" id="iEstoque" type="number" min="0" value="0">
-      <div class="modal-close-row"><button class="abtn soft" onclick="closeModal()">Cancelar</button><button class="abtn red" onclick="Actions.salvarItem('${tipo}')">Salvar</button></div>
-    `);
-  },
-  definirPreco(itemId){
-    const atual = precoDe(itemId);
-    openModal(`
-      <h3>Meu preço — ${S.loja.nome}</h3>
-      <label>Preço (R$)</label><input class="field" id="pValor" type="number" min="0" step="0.01" value="${atual?atual.preco:''}">
-      <label>Preço "de" (riscado, opcional)</label><input class="field" id="pDe" type="number" min="0" step="0.01" value="${atual?.preco_de||''}">
-      <div class="modal-close-row"><button class="abtn soft" onclick="closeModal()">Cancelar</button><button class="abtn red" onclick="Actions.salvarPreco('${itemId}')">Salvar</button></div>
-    `);
-  },
-  addSaborItem(itemId){
-    openModal(`<h3>Novo sabor</h3><label>Nome do sabor</label><input class="field" id="sNome">
-      <label>Estoque inicial</label><input class="field" id="sEstoque" type="number" min="0" value="0">
-      <div class="modal-close-row"><button class="abtn soft" onclick="closeModal()">Cancelar</button><button class="abtn red" onclick="Actions.salvarSabor('${itemId}')">Salvar</button></div>`);
   },
 };
 
-/* ════════════════════════════════════════════════════════════
-   AÇÕES — chamadas ao Supabase que alteram dados
-   ════════════════════════════════════════════════════════════ */
-const Actions = {
-  async ajustarEstoque(estoqueId, delta, nome){
-    const { error } = await sb.rpc("ajustar_estoque", { p_estoque_id: estoqueId, p_quantidade: delta, p_loja_id: S.loja.id, p_observacao: `Ajuste manual (${nome})` });
-    if(error){ toast("❌ " + error.message); return; }
-    await DB.carregarEstoque();
-    Views.estoque();
+/* ESTOQUE */
+Views.estoque = {
+  render() {
+    const f = S.f;
+    $("viewRoot").innerHTML = `
+      <div class="page-h"><h2>📦 Estoque compartilhado</h2></div>
+      <input class="field" id="estBusca" placeholder="Buscar produto ou sabor…" value="${esc(f.estBusca)}">
+      <div class="chips" id="estChips">${[["todos", "Todos"], ["baixo", "Baixo"], ["zero", "Zerados"], ["inativo", "Inativos"]].map(([k, l]) => `<button class="chip ${f.estFiltro === k ? "sel" : ""}" data-a="estFiltro" data-id="${k}">${l}</button>`).join("")}</div>
+      <div id="estLista"></div>`;
+    Views.estoque.update();
   },
-
-  async finalizarVenda(){
-    if(!S.vendaCart.length) return;
-    if(S._enviandoVenda) return; // trava contra clique duplo (evita registrar a mesma venda 2x)
-    S._enviandoVenda = true;
-    const btn = $("btnFinalizarVenda");
-    if(btn){ btn.disabled = true; btn.textContent = "Enviando..."; }
-
-    const desconto = Number($("vDesconto").value || 0);
-    const nome = $("vClienteNome").value.trim();
-    const tel = $("vClienteTel").value.trim();
-    const pagBtn = document.querySelector("#vPagRow .pill.sel");
-    const forma = pagBtn ? pagBtn.dataset.pag : "Pix";
-    const cliente = (nome || tel) ? { nome: nome||"Cliente", telefone: tel||null } : null;
-
+  update() {
+    const el = $("estLista"); if (!el) return;
+    const q = norm(S.f.estBusca);
+    let linhas = linhasEstoque().filter(l => !q || norm(l.nome + " " + l.grupo).includes(q));
+    const fl = S.f.estFiltro;
+    if (fl === "baixo") linhas = linhas.filter(l => nivel(l.e) === "baixo");
+    else if (fl === "zero") linhas = linhas.filter(l => nivel(l.e) === "zero");
+    else if (fl === "inativo") linhas = linhas.filter(l => !l.item.ativo);
+    else linhas = linhas.filter(l => l.item.ativo);
+    if (!linhas.length) { el.innerHTML = `<div class="empty">Nada encontrado.</div>`; return; }
+    let g = "", h = "";
+    for (const l of linhas) {
+      if (l.grupo !== g) { g = l.grupo; h += `<div class="grupo-h">${esc(g)}</div>`; }
+      const p = precoAtivo(l.item.id), n = nivel(l.e);
+      h += `<div class="item-row click" data-a="estDetalhe" data-id="${esc(l.e.id)}"><div class="ic">${esc(l.item.emoji || "📦")}</div><div class="in"><b>${esc(l.nome)}</b><small>${p == null ? "⚠️ sem preço nesta loja" : esc(fmt(p))} · mín. ${l.e.estoque_minimo}${l.item.ativo ? "" : " · inativo"}</small></div><span class="qtd-badge ${n}">${l.e.quantidade}</span></div>`;
+    }
+    el.innerHTML = h;
+  },
+  async detalhe(id) {
+    const l = linhasEstoque().find(x => x.e.id === id); if (!l) return;
+    let mov = [];
     try {
-      const { data, error } = await sb.rpc("registrar_venda", {
-        p_loja_id: S.loja.id,
-        p_itens: S.vendaCart.map(c => ({ item_id:c.item_id, sabor_id:c.sabor_id, quantidade:c.quantidade, preco_unitario:c.preco_unitario, nome:c.nome })),
-        p_cliente: cliente, p_forma_pagamento: forma, p_desconto: desconto,
-      });
-      if(error){ toast("❌ Venda não registrada: " + error.message); return; }
-      toast("✅ Venda registrada! Estoque atualizado para todas as lojas.");
-      S.vendaCart = [];
-      await Promise.all([DB.carregarEstoque(), DB.carregarVendas(), DB.carregarClientes(), DB.carregarFinanceiro()]);
-      App.goTab("painel");
-    } finally {
-      S._enviandoVenda = false;
-    }
-  },
-
-  async marcarPago(id){
-    const { error } = await sb.from("financeiro_lancamentos").update({ status:"pago" }).eq("id", id);
-    if(error){ toast("❌ " + error.message); return; }
-    await DB.carregarFinanceiro();
-    Views.financeiro();
-  },
-  async salvarLancamento(){
-    const valor = Number($("lValor").value || 0);
-    if(valor <= 0){ toast("Informe um valor válido"); return; }
-    const { error } = await sb.from("financeiro_lancamentos").insert({
-      loja_id: S.loja.id, tipo: S._tipoLanc||"saida", categoria: $("lCategoria").value,
-      descricao: $("lDescricao").value.trim() || null, valor,
-      vencimento: $("lVencimento").value || null, status: $("lStatus").value,
-    });
-    if(error){ toast("❌ " + error.message); return; }
-    closeModal(); toast("✅ Lançamento salvo");
-    await DB.carregarFinanceiro(); Views.financeiro();
-  },
-
-  copiarLista(){
-    navigator.clipboard.writeText(S._waTexto || "").then(()=>toast("📄 Texto copiado!")).catch(()=>toast("Não foi possível copiar automaticamente — selecione o texto manualmente."));
-  },
-
-  async salvarMarca(){
-    const nome = $("mNome").value.trim(); if(!nome) return;
-    const { error } = await sb.from("marcas").insert({ nome });
-    if(error){ toast("❌ "+error.message); return; }
-    closeModal(); toast("✅ Marca criada"); await DB.carregarCatalogo(); Views.catalogo();
-  },
-  async salvarCategoria(){
-    const nome = $("catNome").value.trim(); if(!nome) return;
-    const { error } = await sb.from("categorias").insert({ nome });
-    if(error){ toast("❌ "+error.message); return; }
-    closeModal(); toast("✅ Categoria criada"); await DB.carregarCatalogo(); Views.catalogo();
-  },
-  async salvarItem(tipo){
-    const nome = $("iNome").value.trim(); if(!nome) return;
-    const emoji = $("iEmoji").value.trim() || "📦";
-    const estoqueInicial = Number($("iEstoque").value || 0);
-    const payload = { tipo, nome, emoji };
-    if(tipo==='modelo') payload.marca_id = $("iMarca").value; else payload.categoria_id = $("iCategoria").value;
-    const { data, error } = await sb.from("itens").insert(payload).select().single();
-    if(error){ toast("❌ "+error.message); return; }
-    await sb.from("estoque").insert({ item_id: data.id, sabor_id: null, quantidade: estoqueInicial });
-    closeModal(); toast("✅ Item criado — defina o preço da sua loja em seguida");
-    await Promise.all([DB.carregarCatalogo(), DB.carregarEstoque()]); Views.catalogo();
-  },
-  async salvarPreco(itemId){
-    const preco = Number($("pValor").value || 0);
-    if(preco <= 0){ toast("Informe um preço válido"); return; }
-    const de = $("pDe").value ? Number($("pDe").value) : null;
-    const { error } = await sb.from("precos_loja").upsert({ loja_id:S.loja.id, item_id:itemId, preco, preco_de:de, ativo:true });
-    if(error){ toast("❌ "+error.message); return; }
-    closeModal(); toast("✅ Preço salvo"); await DB.carregarPrecos(); Views.catalogo();
-  },
-  async salvarSabor(itemId){
-    const nome = $("sNome").value.trim(); if(!nome) return;
-    const estoqueInicial = Number($("sEstoque").value || 0);
-    const { data, error } = await sb.from("sabores").insert({ item_id:itemId, nome }).select().single();
-    if(error){ toast("❌ "+error.message); return; }
-    await sb.from("estoque").insert({ item_id:itemId, sabor_id:data.id, quantidade:estoqueInicial });
-    closeModal(); toast("✅ Sabor adicionado");
-    await Promise.all([DB.carregarCatalogo(), DB.carregarEstoque()]); Views.catalogo();
+      mov = ok(await sb.from("estoque_movimentos").select("*, perfis(nome), lojas(nome)").eq("estoque_id", id).order("criado_em", { ascending: false }).limit(25));
+    } catch (e) { toast(msgErro(e), true); }
+    const tipoL = { venda: "Venda", entrada: "Entrada", ajuste: "Ajuste", estorno: "Estorno" };
+    openModal(`
+      <h3>${esc(l.item.emoji || "📦")} ${esc(l.nome)}</h3>
+      <div class="row" style="margin-bottom:6px"><span class="qtd-badge ${nivel(l.e)}">${l.e.quantidade}</span><small style="color:var(--muted)">em estoque (todas as lojas) · mínimo ${l.e.estoque_minimo}</small></div>
+      ${isGerente() ? `
+        <label>Entrada / saída (use − para retirar)</label>
+        <div class="row"><input class="field grow" id="adjQtd" type="number" step="1" placeholder="Ex: 10 ou -2" style="margin:0"><input class="field grow" id="adjObs" placeholder="Motivo (opcional)" style="margin:0"></div>
+        <div class="row" style="margin-top:8px"><button class="abtn dark" data-a="estAjustar" data-id="${esc(id)}">Aplicar</button></div>
+        <label>Contagem física (define o total exato)</label>
+        <div class="row"><input class="field grow" id="cntQtd" type="number" min="0" step="1" placeholder="Contei…" style="margin:0"><button class="abtn soft" data-a="estContar" data-id="${esc(id)}">Salvar contagem</button></div>
+        <label>Estoque mínimo (alerta)</label>
+        <div class="row"><input class="field grow" id="minQtd" type="number" min="0" step="1" value="${l.e.estoque_minimo}" style="margin:0"><button class="abtn soft" data-a="estMinimo" data-id="${esc(id)}">Salvar</button></div>` : `<div class="banner" style="margin-top:8px">Só gerente/dono ajusta o estoque.</div>`}
+      <label>Histórico</label>
+      ${mov.length ? mov.map(m => `<div class="list-row"><div class="grow">${esc(tipoL[m.tipo] || m.tipo)} <b class="${m.quantidade < 0 ? "neg" : "pos"}">${m.quantidade > 0 ? "+" : ""}${m.quantidade}</b> → ${m.saldo_resultante}<small>${esc(fmtDT(m.criado_em))} · ${esc((m.perfis && m.perfis.nome) || "—")} · ${esc((m.lojas && m.lojas.nome) || "—")}${m.observacao ? " · " + esc(m.observacao) : ""}</small></div></div>`).join("") : `<div class="empty">Sem movimentos.</div>`}
+      <div class="modal-actions"><button class="btn btn-soft" data-a="fechar">Fechar</button></div>`);
   },
 };
 
-/* ════════════════════════════════════════════════════════════
-   BOOT — retoma sessão se já estava logado
-   ════════════════════════════════════════════════════════════ */
-(async function init(){
-  const { data: { session } } = await sb.auth.getSession();
-  if(session) await App.boot();
+/* NOVA VENDA */
+Views.venda = {
+  render() {
+    $("viewRoot").innerHTML = `
+      <div class="page-h"><h2>🛒 Nova venda</h2></div>
+      <div class="two-col">
+        <div><input class="field" id="vBusca" placeholder="Buscar produto ou sabor…" value="${esc(S.f.vendaBusca)}" autocomplete="off"><div id="vResultados"></div></div>
+        <div class="card" id="vCarrinho"></div>
+      </div>`;
+    Views.venda.update();
+  },
+  update() {
+    if (!$("vResultados")) return;
+    Views.venda.resultados(); Views.venda.carrinho();
+  },
+  resultados() {
+    const q = norm(S.f.vendaBusca);
+    const linhas = linhasEstoque().filter(l => l.item.ativo && (!q || norm(l.nome + " " + l.grupo).includes(q))).slice(0, 60);
+    $("vResultados").innerHTML = linhas.length ? linhas.map(l => {
+      const p = precoAtivo(l.item.id), semEst = l.e.quantidade <= 0, off = p == null || semEst;
+      return `<div class="sel-result ${off ? "off" : ""}" ${off ? "" : `data-a="vAdd" data-id="${esc(l.e.id)}"`}><div><b>${esc(l.item.emoji || "")} ${esc(l.nome)}</b><small>${esc(l.grupo)} · ${semEst ? "sem estoque" : l.e.quantidade + " em estoque"}</small></div><b>${p == null ? "sem preço" : esc(fmt(p))}</b></div>`;
+    }).join("") : `<div class="empty">Nada encontrado.</div>`;
+  },
+  carrinho() {
+    const lin = S.cart.map(c => { const l = linhasEstoque().find(x => x.e.id === c.estoque_id); return l ? { c, l, p: precoAtivo(l.item.id) } : null; }).filter(Boolean);
+    S.cart = lin.map(x => x.c);                          // remove linhas que sumiram
+    const sub = lin.reduce((s, x) => s + (x.p || 0) * x.c.qtd, 0);
+    const desc = Math.min(Math.max(num($("vDesc") ? $("vDesc").value : "") || 0, 0), sub);
+    // preserva o que já foi digitado
+    const keep = id => ($(id) ? $(id).value : "");
+    const cli = { nome: keep("vCliNome"), tel: keep("vCliTel"), end: keep("vCliEnd"), forma: keep("vForma") || "Pix", desc: keep("vDesc") };
+    $("vCarrinho").innerHTML = `
+      <h3>Carrinho</h3>
+      ${lin.length ? lin.map(({ c, l, p }) => `<div class="cart-item"><div class="ci-info"><b>${esc(l.nome)}</b><small>${esc(fmt(p))} cada · disp. ${l.e.quantidade}</small></div>
+        <div class="qty"><button data-a="vMenos" data-id="${esc(c.estoque_id)}" aria-label="menos">−</button><span>${c.qtd}</span><button data-a="vMais" data-id="${esc(c.estoque_id)}" aria-label="mais">+</button></div>
+        <b style="min-width:70px;text-align:right">${esc(fmt((p || 0) * c.qtd))}</b></div>`).join("") : `<div class="empty">Toque num produto para adicionar.</div>`}
+      <label>Cliente</label>
+      <input class="field" id="vCliNome" list="vCliList" placeholder="Nome do cliente (opcional)" value="${esc(cli.nome)}" autocomplete="off">
+      <datalist id="vCliList">${S.clientes.map(c => `<option value="${esc(c.nome)}">${esc(c.telefone || "")}</option>`).join("")}</datalist>
+      <div class="grid2"><input class="field" id="vCliTel" placeholder="Telefone" inputmode="tel" value="${esc(cli.tel)}"><input class="field" id="vCliEnd" placeholder="Endereço" value="${esc(cli.end)}"></div>
+      <div class="grid2"><div><label>Pagamento</label><select class="field" id="vForma">${FORMAS.map(f => `<option ${f === cli.forma ? "selected" : ""}>${f}</option>`).join("")}</select></div>
+        <div><label>Desconto (R$)</label><input class="field" id="vDesc" inputmode="decimal" placeholder="0,00" value="${esc(cli.desc)}"></div></div>
+      <div class="tt-row"><span>Subtotal</span><span>${esc(fmt(sub))}</span></div>
+      <div class="tt-row"><span>Desconto</span><span>− ${esc(fmt(desc))}</span></div>
+      <div class="tt-row big"><span>Total</span><span>${esc(fmt(sub - desc))}</span></div>
+      <button class="btn btn-red" style="margin-top:12px" data-a="vConfirmar" ${lin.length ? "" : "disabled"}>Finalizar venda</button>
+      ${lin.length ? `<button class="btn btn-soft" style="margin-top:8px" data-a="vLimpar">Limpar carrinho</button>` : ""}`;
+  },
+  add(estId) {
+    const l = linhasEstoque().find(x => x.e.id === estId); if (!l) return;
+    const c = S.cart.find(x => x.estoque_id === estId);
+    if ((c ? c.qtd : 0) + 1 > l.e.quantidade) return toast(`Só há ${l.e.quantidade} em estoque`, true);
+    if (c) c.qtd++; else S.cart.push({ estoque_id: estId, item_id: l.item.id, sabor_id: l.sabor ? l.sabor.id : null, qtd: 1 });
+    Views.venda.carrinho();
+  },
+  mudar(estId, d) {
+    const c = S.cart.find(x => x.estoque_id === estId); if (!c) return;
+    const l = linhasEstoque().find(x => x.e.id === estId);
+    if (d > 0 && l && c.qtd + 1 > l.e.quantidade) return toast(`Só há ${l.e.quantidade} em estoque`, true);
+    c.qtd += d; if (c.qtd <= 0) S.cart = S.cart.filter(x => x !== c);
+    Views.venda.carrinho();
+  },
+  dados() {
+    const lin = S.cart.map(c => { const l = linhasEstoque().find(x => x.e.id === c.estoque_id); return { c, l, p: l ? precoAtivo(l.item.id) : null }; });
+    if (!lin.length) throw new Error("Carrinho vazio");
+    if (lin.some(x => !x.l || x.p == null)) throw new Error("Há item sem preço ou removido no carrinho");
+    const sub = lin.reduce((s, x) => s + x.p * x.c.qtd, 0);
+    const descRaw = ($("vDesc").value || "").trim();
+    const desc = descRaw === "" ? 0 : num(descRaw);
+    if (!Number.isFinite(desc) || desc < 0) throw new Error("Desconto inválido");
+    if (desc > sub) throw new Error("O desconto não pode ser maior que o subtotal");
+    const nome = $("vCliNome").value.trim(), tel = $("vCliTel").value.trim(), end = $("vCliEnd").value.trim();
+    return { lin, sub, desc, total: sub - desc, forma: $("vForma").value, cliente: (nome || tel) ? { nome, telefone: tel, endereco: end } : null };
+  },
+  confirmar() {
+    let d; try { d = Views.venda.dados(); } catch (e) { return toast(e.message, true); }
+    openModal(`<h3>Confirmar venda</h3>
+      ${d.lin.map(x => `<div class="list-row"><div class="grow">${x.c.qtd}× ${esc(x.l.nome)}</div><b>${esc(fmt(x.p * x.c.qtd))}</b></div>`).join("")}
+      <div class="tt-row"><span>Desconto</span><span>− ${esc(fmt(d.desc))}</span></div>
+      <div class="tt-row big"><span>Total · ${esc(d.forma)}</span><span>${esc(fmt(d.total))}</span></div>
+      ${d.cliente ? `<div class="tt-row"><span>Cliente</span><span>${esc(d.cliente.nome || d.cliente.telefone)}</span></div>` : ""}
+      <div class="modal-actions"><button class="btn btn-soft" data-a="fechar">Voltar</button><button class="btn btn-red" data-a="vEnviar">✔ Confirmar</button></div>`);
+  },
+  async enviar(btn) {
+    let d; try { d = Views.venda.dados(); } catch (e) { closeModal(); return toast(e.message, true); }
+    const itens = d.lin.map(x => ({ item_id: x.l.item.id, sabor_id: x.l.sabor ? x.l.sabor.id : null, quantidade: x.c.qtd }));
+    const sig = JSON.stringify([itens, d.cliente, d.forma, d.desc]);
+    if (!S.chave || S.chaveSig !== sig) { S.chave = uuid(); S.chaveSig = sig; }   // mesma chave só para reenvio idêntico
+    await busy(btn, async () => {
+      const r = await rpc("registrar_venda", { p_loja_id: S.loja.id, p_itens: itens, p_cliente: d.cliente, p_forma_pagamento: d.forma, p_desconto: d.desc, p_chave: S.chave });
+      S.cart = []; S.chave = null; S.chaveSig = "";
+      await Promise.all([DB.estoque(), DB.clientes()]);
+      openModal(`<h3>✅ Venda registrada${r.repetida ? " (já estava registrada)" : ""}</h3>
+        <div class="tt-row big"><span>Total</span><span>${esc(fmt(r.total))}</span></div>
+        <div class="modal-actions"><button class="btn btn-soft" data-a="vCancelarUltima" data-id="${esc(r.id)}">Desfazer venda</button><button class="btn btn-red" data-a="fechar">Nova venda</button></div>`);
+      Views.venda.render();
+    });
+  },
+};
+
+/* VENDAS (histórico) */
+Views.vendas = {
+  async render() {
+    const f = S.f, hoje = hojeISO();
+    const ini = { hoje, "7d": addDias(hoje, -6), mes: hoje.slice(0, 8) + "01", tudo: null }[f.vendasPeriodo];
+    $("viewRoot").innerHTML = `<div class="page-h"><h2>🧾 Vendas</h2></div>
+      <div class="chips">${[["hoje", "Hoje"], ["7d", "7 dias"], ["mes", "Este mês"], ["tudo", "Tudo"]].map(([k, l]) => `<button class="chip ${f.vendasPeriodo === k ? "sel" : ""}" data-a="vendasPeriodo" data-id="${k}">${l}</button>`).join("")}</div>
+      <div class="card" id="vendasLista"><div class="empty">Carregando…</div></div>`;
+    let q = sb.from("vendas").select("*, clientes(nome), venda_itens(nome_snapshot,quantidade,preco_unitario)").eq("loja_id", S.loja.id).order("criado_em", { ascending: false }).limit(300);
+    if (ini) q = q.gte("criado_em", ini + "T00:00:00-03:00");
+    const vs = ok(await q);
+    if (S.tab !== "vendas") return;
+    S.vendasLista = vs;
+    const conc = vs.filter(v => v.status === "concluida");
+    $("vendasLista").innerHTML = `<div class="row" style="margin-bottom:8px"><b>${conc.length} venda(s) · ${esc(fmt(conc.reduce((s, v) => s + Number(v.total), 0)))}</b>${vs.length >= 300 ? '<span class="tag pendente">mostrando as 300 mais recentes</span>' : ""}</div>` +
+      (vs.length ? vs.map(v => `<div class="list-row click" data-a="vendaDetalhe" data-id="${esc(v.id)}"><div class="grow"><b>${esc(v.cliente_nome || (v.clientes && v.clientes.nome) || "Sem cliente")}</b><small>${esc(fmtDT(v.criado_em))} · ${esc(v.forma_pagamento || "—")} · ${(v.venda_itens || []).reduce((s, i) => s + i.quantidade, 0)} item(ns)</small></div><span class="tag ${v.status}">${v.status === "cancelada" ? "cancelada" : esc(fmt(v.total))}</span></div>`).join("") : `<div class="empty">Nenhuma venda no período.</div>`);
+  },
+  detalhe(id) {
+    const v = (S.vendasLista || []).find(x => x.id === id); if (!v) return;
+    openModal(`<h3>Venda · ${esc(fmtDT(v.criado_em))}</h3>
+      <div class="row" style="margin-bottom:8px"><span class="tag ${v.status}">${esc(v.status)}</span><small>${esc(v.cliente_nome || (v.clientes && v.clientes.nome) || "Sem cliente")} · ${esc(v.forma_pagamento || "—")}</small></div>
+      ${(v.venda_itens || []).map(i => `<div class="list-row"><div class="grow">${i.quantidade}× ${esc(i.nome_snapshot)}<small>${esc(fmt(i.preco_unitario))} cada</small></div><b>${esc(fmt(i.quantidade * i.preco_unitario))}</b></div>`).join("")}
+      <div class="tt-row"><span>Subtotal</span><span>${esc(fmt(v.subtotal))}</span></div><div class="tt-row"><span>Desconto</span><span>− ${esc(fmt(v.desconto))}</span></div>
+      <div class="tt-row big"><span>Total</span><span>${esc(fmt(v.total))}</span></div>
+      ${v.status === "cancelada" ? `<div class="banner" style="margin-top:10px">Cancelada em ${esc(fmtDT(v.cancelada_em))}${v.motivo_cancelamento ? " — " + esc(v.motivo_cancelamento) : ""}</div>` : `<label>Motivo do cancelamento</label><input class="field" id="cancMotivo" placeholder="Ex: cliente desistiu">`}
+      <div class="modal-actions"><button class="btn btn-soft" data-a="fechar">Fechar</button>${v.status === "cancelada" ? "" : `<button class="btn btn-red" data-a="vendaCancelar" data-id="${esc(v.id)}">Cancelar venda</button>`}</div>`);
+  },
+  async cancelar(id, btn, motivo) {
+    await busy(btn, async () => {
+      await rpc("cancelar_venda", { p_venda_id: id, p_motivo: motivo || null });
+      closeModal(); toast("Venda cancelada e estoque devolvido");
+      await DB.estoque(); await App.atualizar();
+    });
+  },
+};
+
+/* CLIENTES */
+Views.clientes = {
+  render() {
+    $("viewRoot").innerHTML = `<div class="page-h"><h2>👥 Clientes · ${esc(S.loja.nome)}</h2><button class="abtn red" data-a="cliForm">+ Novo cliente</button></div>
+      <input class="field" id="cliBusca" placeholder="Buscar por nome ou telefone…" value="${esc(S.f.cliBusca)}"><div class="card" id="cliLista"></div>`;
+    Views.clientes.update();
+  },
+  update() {
+    const el = $("cliLista"); if (!el) return;
+    const q = norm(S.f.cliBusca);
+    const l = S.clientes.filter(c => !q || norm(c.nome + " " + (c.telefone || "")).includes(q));
+    el.innerHTML = l.length ? l.map(c => `<div class="list-row click" data-a="cliDetalhe" data-id="${esc(c.id)}"><div class="grow"><b>${esc(c.nome)}</b><small>${esc(c.telefone || "sem telefone")}</small></div><span style="color:var(--muted)">›</span></div>`).join("") : `<div class="empty">Nenhum cliente.</div>`;
+  },
+  async detalhe(id) {
+    const c = S.clientes.find(x => x.id === id); if (!c) return;
+    const vs = ok(await sb.from("vendas").select("id,total,status,criado_em,venda_itens(nome_snapshot,quantidade)").eq("cliente_id", id).eq("loja_id", S.loja.id).order("criado_em", { ascending: false }).limit(200));
+    const conc = vs.filter(v => v.status === "concluida"), gasto = conc.reduce((s, v) => s + Number(v.total), 0);
+    openModal(`<h3>${esc(c.nome)}</h3>
+      <small style="color:var(--muted)">${esc(c.telefone || "sem telefone")}${c.endereco ? " · " + esc(c.endereco) : ""}</small>
+      <div class="kpi-grid" style="margin-top:10px"><div class="kpi"><div class="v">${conc.length}</div><div class="l">compras</div></div><div class="kpi"><div class="v">${esc(fmt(gasto))}</div><div class="l">total gasto</div></div><div class="kpi"><div class="v">${esc(fmt(conc.length ? gasto / conc.length : 0))}</div><div class="l">ticket médio</div></div></div>
+      ${vs.length ? vs.map(v => `<div class="list-row"><div class="grow">${esc(fmtDT(v.criado_em))}<small>${esc((v.venda_itens || []).map(i => i.quantidade + "× " + i.nome_snapshot).join(", "))}</small></div><span class="tag ${v.status}">${v.status === "cancelada" ? "cancelada" : esc(fmt(v.total))}</span></div>`).join("") : `<div class="empty">Sem compras.</div>`}
+      <div class="modal-actions"><button class="btn btn-soft" data-a="fechar">Fechar</button><button class="btn btn-red" data-a="cliForm" data-id="${esc(id)}">Editar</button></div>`);
+  },
+  form(id) {
+    const c = id ? S.clientes.find(x => x.id === id) : null;
+    openModal(`<h3>${c ? "Editar cliente" : "Novo cliente"}</h3>
+      <label>Nome *</label><input class="field" id="cNome" value="${esc(c ? c.nome : "")}"><label>Telefone</label><input class="field" id="cTel" inputmode="tel" value="${esc(c ? c.telefone : "")}">
+      <label>Endereço</label><input class="field" id="cEnd" value="${esc(c ? c.endereco : "")}"><label>Observações</label><textarea class="field" id="cObs">${esc(c ? c.observacoes : "")}</textarea>
+      <div class="modal-actions"><button class="btn btn-soft" data-a="fechar">Cancelar</button><button class="btn btn-red" data-a="cliSalvar" data-id="${esc(id || "")}">Salvar</button></div>`);
+  },
+  async salvar(id, btn) {
+    const nome = $("cNome").value.trim(); if (!nome) return toast("Informe o nome", true);
+    const tel = $("cTel").value.replace(/\D/g, "") || null;
+    const row = { nome, telefone: tel, endereco: $("cEnd").value.trim() || null, observacoes: $("cObs").value.trim() || null };
+    await busy(btn, async () => {
+      if (id) ok(await sb.from("clientes").update(row).eq("id", id)); else ok(await sb.from("clientes").insert({ ...row, loja_id: S.loja.id }));
+      await DB.clientes(); closeModal(); toast("Cliente salvo"); if (S.tab === "clientes") Views.clientes.render();
+    });
+  },
+};
+
+/* FINANCEIRO */
+Views.financeiro = {
+  periodo() {
+    const hoje = hojeISO(), p = S.f.finPeriodo;
+    if (p === "hoje") return [hoje, hoje]; if (p === "7d") return [addDias(hoje, -6), hoje];
+    if (p === "mes") return [hoje.slice(0, 8) + "01", hoje]; return [null, null];
+  },
+  async render() {
+    const f = S.f, [ini, fim] = Views.financeiro.periodo(), hoje = hojeISO();
+    $("viewRoot").innerHTML = `<div class="page-h"><h2>💰 Financeiro · ${esc(S.loja.nome)}</h2><button class="abtn red" data-a="finForm">+ Lançamento</button><button class="abtn soft" data-a="finCsv">⬇ CSV</button></div>
+      <div class="chips">${[["hoje", "Hoje"], ["7d", "7 dias"], ["mes", "Este mês"], ["tudo", "Tudo"]].map(([k, l]) => `<button class="chip ${f.finPeriodo === k ? "sel" : ""}" data-a="finPeriodo" data-id="${k}">${l}</button>`).join("")}</div>
+      <div id="finResumo"></div>
+      <div class="chips">${[["todos", "Todos"], ["pendentes", "Pendentes"], ["atrasados", "Atrasados"], ["pagos", "Pagos"]].map(([k, l]) => `<button class="chip ${f.finStatus === k ? "sel" : ""}" data-a="finStatus" data-id="${k}">${l}</button>`).join("")}</div>
+      <div class="card" id="finLista"><div class="empty">Carregando…</div></div>`;
+    let q = sb.from("financeiro_lancamentos").select("*").eq("loja_id", S.loja.id).order("data_ref", { ascending: false }).limit(500);
+    if (ini) q = q.gte("data_ref", ini + "T00:00:00-03:00");
+    if (fim) q = q.lte("data_ref", fim + "T23:59:59.999-03:00");
+    const [r, ls] = await Promise.all([rpc("financeiro_resumo", { p_loja_id: S.loja.id, p_inicio: ini, p_fim: fim }), q.then(ok)]);
+    if (S.tab !== "financeiro") return;
+    S.finLista = ls;
+    const atras = l => l.status !== "pago" && l.vencimento && l.vencimento < hoje;
+    $("finResumo").innerHTML = `<div class="kpi-grid">
+      <div class="kpi good"><div class="v">${esc(fmt(r.entradas))}</div><div class="l">Entradas (pagas) no período</div></div>
+      <div class="kpi warn"><div class="v">${esc(fmt(r.saidas))}</div><div class="l">Saídas (pagas) no período</div></div>
+      <div class="kpi"><div class="v">${esc(fmt(r.saldo_periodo))}</div><div class="l">Resultado do período</div></div>
+      <div class="kpi"><div class="v">${esc(fmt(r.saldo_caixa))}</div><div class="l">Saldo em caixa (total)</div></div>
+      <div class="kpi"><div class="v">${esc(fmt(r.a_receber.total))}</div><div class="l">A receber · ${r.a_receber.qtd}</div></div>
+      <div class="kpi ${r.atrasados.qtd ? "warn" : ""}"><div class="v">${esc(fmt(r.a_pagar.total))}</div><div class="l">A pagar · ${r.a_pagar.qtd} (${r.atrasados.qtd} atrasada)</div></div></div>`;
+    let vis = ls.filter(l => ({ todos: true, pendentes: l.status !== "pago", atrasados: atras(l), pagos: l.status === "pago" })[f.finStatus]);
+    $("finLista").innerHTML = vis.length ? vis.map(l => { const a = atras(l), st = a ? "atrasado" : l.status;
+      return `<div class="list-row"><span class="tag ${l.tipo}">${l.tipo === "entrada" ? "ENTRADA" : "SAÍDA"}</span><div class="grow"><b>${esc(l.descricao || l.categoria)}</b><small>${esc(l.categoria)} · ${esc(fmtDT(l.data_ref))}${l.vencimento ? " · vence " + esc(fmtD(l.vencimento)) : ""}${l.forma_pagamento ? " · " + esc(l.forma_pagamento) : ""}</small></div>
+      <div style="text-align:right"><b class="${l.tipo === "entrada" ? "pos" : "neg"}">${l.tipo === "entrada" ? "+" : "−"}${esc(fmt(l.valor))}</b><br><span class="tag ${st}">${esc(st)}</span></div>
+      ${l.status !== "pago" ? `<button class="abtn green sm" data-a="finPagar" data-id="${esc(l.id)}">Pagar</button>` : ""}</div>`; }).join("") : `<div class="empty">Nenhum lançamento.</div>`;
+  },
+  form() {
+    openModal(`<h3>Novo lançamento</h3>
+      <div class="grid2"><div><label>Tipo</label><select class="field" id="lTipo"><option value="saida">Saída (despesa)</option><option value="entrada">Entrada</option></select></div>
+      <div><label>Categoria</label><select class="field" id="lCat">${["compra de mercadoria", "aluguel", "salário", "frete", "taxas", "impostos", "marketing", "outro"].map(c => `<option>${c}</option>`).join("")}</select></div></div>
+      <label>Descrição</label><input class="field" id="lDesc" placeholder="Ex: Compra de pods — fornecedor X">
+      <div class="grid2"><div><label>Valor (R$)</label><input class="field" id="lValor" inputmode="decimal" placeholder="0,00"></div><div><label>Vencimento</label><input class="field" id="lVenc" type="date"></div></div>
+      <div class="grid2"><div><label>Situação</label><select class="field" id="lStatus"><option value="pago">Já pago</option><option value="pendente">Pendente</option></select></div>
+      <div><label>Forma</label><select class="field" id="lForma"><option value="">—</option>${FORMAS.map(f => `<option>${f}</option>`).join("")}</select></div></div>
+      <div class="modal-actions"><button class="btn btn-soft" data-a="fechar">Cancelar</button><button class="btn btn-red" data-a="finSalvar">Salvar</button></div>`);
+  },
+  async salvar(btn) {
+    const valor = num($("lValor").value);
+    if (!Number.isFinite(valor) || valor <= 0) return toast("Informe um valor maior que zero", true);
+    const status = $("lStatus").value, venc = $("lVenc").value || null;
+    if (status === "pendente" && !venc) return toast("Lançamento pendente precisa de vencimento", true);
+    await busy(btn, async () => {
+      ok(await sb.from("financeiro_lancamentos").insert({ loja_id: S.loja.id, tipo: $("lTipo").value, categoria: $("lCat").value, descricao: $("lDesc").value.trim() || null,
+        valor: Math.round(valor * 100) / 100, status, vencimento: venc, forma_pagamento: $("lForma").value || null }));
+      closeModal(); toast("Lançamento salvo"); await Views.financeiro.render();
+    });
+  },
+  async pagar(id, btn) { await busy(btn, async () => { await rpc("pagar_lancamento", { p_id: id }); toast("Marcado como pago"); await Views.financeiro.render(); }); },
+  csv() {
+    const ls = S.finLista || []; if (!ls.length) return toast("Nada para exportar", true);
+    const cel = v => '"' + String(v ?? "").replace(/"/g, '""') + '"';
+    // proteção contra fórmulas em planilhas (=,+,-,@)
+    const seguro = v => { const s = String(v ?? ""); return /^[=+\-@]/.test(s) ? "'" + s : s; };
+    const linhas = [["Data", "Tipo", "Categoria", "Descrição", "Valor", "Situação", "Vencimento", "Forma"]].concat(ls.map(l => [fmtDT(l.data_ref), l.tipo, l.categoria, seguro(l.descricao), String(l.valor).replace(".", ","), l.status, l.vencimento || "", l.forma_pagamento || ""]));
+    const blob = new Blob(["﻿" + linhas.map(r => r.map(cel).join(";")).join("\r\n")], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `financeiro-${hojeISO()}.csv`; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  },
+};
+
+/* LISTA WHATSAPP */
+Views.whats = {
+  texto() {
+    const f = S.f, linhas = linhasEstoque().filter(l => l.item.ativo && l.e.quantidade > 0 && precoAtivo(l.item.id) != null);
+    const porGrupo = new Map();
+    for (const l of linhas) { if (!porGrupo.has(l.grupo)) porGrupo.set(l.grupo, new Map()); const m = porGrupo.get(l.grupo); if (!m.has(l.item.id)) m.set(l.item.id, []); m.get(l.item.id).push(l); }
+    let t = `*${S.loja.nome}* — lista de ${new Date().toLocaleDateString("pt-BR", { timeZone: TZ })}\n`;
+    for (const [g, itens] of porGrupo) {
+      t += `\n*${g.toUpperCase()}*\n`;
+      for (const ls of itens.values()) {
+        const it = ls[0].item, p = fmt(precoAtivo(it.id));
+        if (ls.length === 1 && !ls[0].sabor) { t += `${it.emoji || "▪️"} ${it.nome}${f.waPreco ? " — " + p : ""}${f.waQtd ? ` (${ls[0].e.quantidade} un)` : ""}\n`; continue; }
+        t += `${it.emoji || "▪️"} ${it.nome}${f.waPreco ? " — " + p : ""}\n`;
+        if (f.waSabores) for (const l of ls) t += `   • ${l.sabor.nome}${f.waQtd ? ` (${l.e.quantidade})` : ""}\n`;
+      }
+    }
+    return { t: linhas.length ? t.trimEnd() : "", n: linhas.length };
+  },
+  render() {
+    const f = S.f, { t, n } = Views.whats.texto();
+    $("viewRoot").innerHTML = `<div class="page-h"><h2>📋 Lista para WhatsApp</h2></div>
+      <div class="card"><div class="check"><input type="checkbox" id="waPreco" ${f.waPreco ? "checked" : ""}><label for="waPreco" style="margin:0;font-size:.84rem;color:var(--text)">Mostrar preços</label></div>
+      <div class="check"><input type="checkbox" id="waQtd" ${f.waQtd ? "checked" : ""}><label for="waQtd" style="margin:0;font-size:.84rem;color:var(--text)">Mostrar quantidades</label></div>
+      <div class="check"><input type="checkbox" id="waSabores" ${f.waSabores ? "checked" : ""}><label for="waSabores" style="margin:0;font-size:.84rem;color:var(--text)">Listar sabores</label></div></div>
+      <div class="banner">Só entram itens ativos, com estoque e com preço nesta loja (${n} linha(s)). Itens esgotados somem sozinhos.</div>
+      <div id="waPreview">${t ? esc(t) : "Nada disponível para listar."}</div>
+      <div class="row" style="margin-top:10px"><button class="abtn dark" data-a="waCopiar" ${t ? "" : "disabled"}>📋 Copiar</button><button class="abtn green" data-a="waEnviar" ${t ? "" : "disabled"}>Enviar no WhatsApp</button></div>`;
+  },
+  async copiar() {
+    const { t } = Views.whats.texto();
+    try { await navigator.clipboard.writeText(t); toast("Lista copiada"); }
+    catch (e) { const r = document.createRange(); r.selectNodeContents($("waPreview")); const s = getSelection(); s.removeAllRanges(); s.addRange(r); toast("Selecionei o texto — copie manualmente", true); }
+  },
+  enviar() { const { t } = Views.whats.texto(); window.open("https://wa.me/?text=" + encodeURIComponent(t), "_blank", "noopener"); },
+};
+
+/* CATÁLOGO (gerente/dono) */
+Views.catalogo = {
+  render() {
+    const marcaOpts = S.marcas.map(m => `<option value="m:${esc(m.id)}">${esc(m.nome)} (modelo)</option>`).join("");
+    const catOpts = S.categorias.map(c => `<option value="c:${esc(c.id)}">${esc(c.nome)} (produto)</option>`).join("");
+    $("viewRoot").innerHTML = `<div class="page-h"><h2>🏷️ Catálogo</h2></div>
+      <div class="card"><h3>Nova marca / categoria</h3><div class="row"><input class="field grow" id="novoGrupo" placeholder="Nome (ex: Ignite, Essências)" style="margin:0">
+        <button class="abtn dark" data-a="catGrupo" data-id="marca">+ Marca</button><button class="abtn soft" data-a="catGrupo" data-id="categoria">+ Categoria</button></div></div>
+      <div class="card"><h3>Novo item</h3>
+        <div class="grid2"><div><label>Pertence a</label><select class="field" id="niGrupo">${marcaOpts}${catOpts}</select></div><div><label>Emoji</label><input class="field" id="niEmoji" placeholder="💨" maxlength="4"></div></div>
+        <label>Nome</label><input class="field" id="niNome" placeholder="Ex: Ignite V50">
+        <label>Sabores (separe por vírgula — deixe vazio se não tiver)</label><input class="field" id="niSabores" placeholder="Menta, Uva, Morango">
+        <div class="grid2"><div><label>Estoque inicial (por sabor)</label><input class="field" id="niQtd" type="number" min="0" value="0"></div><div><label>Estoque mínimo</label><input class="field" id="niMin" type="number" min="0" value="3"></div></div>
+        <button class="btn btn-red" data-a="catItem">Criar item</button></div>
+      <div class="card"><h3>Itens e preços da loja ${esc(S.loja.nome)}</h3>${S.itens.length ? S.itens.map(it => { const p = precoRow(it.id);
+        return `<div class="list-row"><div class="ic">${esc(it.emoji || "📦")}</div><div class="grow"><b>${esc(it.nome)}</b><small>${esc(marcaNome(it) || "")} · ${saboresDe(it.id).length} sabor(es) · ${it.ativo ? "ativo" : "inativo"}</small></div>
+        <b>${p ? (p.ativo ? esc(fmt(p.preco)) : "oculto") : '<span class="neg">sem preço</span>'}</b><button class="abtn soft sm" data-a="catEditar" data-id="${esc(it.id)}">Editar</button></div>`; }).join("") : `<div class="empty">Nenhum item ainda.</div>`}</div>
+      <div class="card"><h3>WhatsApp da loja</h3><div class="row"><input class="field grow" id="lojaWpp" inputmode="tel" placeholder="5511999999999" value="${esc(S.loja.whatsapp || "")}" style="margin:0"><button class="abtn dark" data-a="catWpp">Salvar</button></div></div>`;
+  },
+  async grupo(tipo, btn) {
+    const nome = $("novoGrupo").value.trim(); if (!nome) return toast("Informe o nome", true);
+    await busy(btn, async () => { ok(await sb.from(tipo === "marca" ? "marcas" : "categorias").insert({ nome })); await DB.catalogo(); toast(tipo === "marca" ? "Marca criada" : "Categoria criada"); Views.catalogo.render(); });
+  },
+  async item(btn) {
+    const g = $("niGrupo").value; if (!g) return toast("Crie uma marca ou categoria primeiro", true);
+    const nome = $("niNome").value.trim(); if (!nome) return toast("Informe o nome do item", true);
+    const sabores = $("niSabores").value.split(",").map(s => s.trim()).filter(Boolean);
+    if (new Set(sabores.map(norm)).size !== sabores.length) return toast("Há sabores repetidos", true);
+    const q = parseInt($("niQtd").value || "0", 10), min = parseInt($("niMin").value || "0", 10);
+    if (!(q >= 0) || !(min >= 0)) return toast("Quantidades inválidas", true);
+    await busy(btn, async () => {
+      await rpc("criar_item", { p_loja_id: S.loja.id, p_tipo: g[0] === "m" ? "modelo" : "produto", p_marca_id: g[0] === "m" ? g.slice(2) : null, p_categoria_id: g[0] === "c" ? g.slice(2) : null,
+        p_nome: nome, p_emoji: $("niEmoji").value.trim() || null, p_sabores: sabores, p_estoque_inicial: q, p_estoque_minimo: min });
+      await Promise.all([DB.catalogo(), DB.estoque()]); toast("Item criado — defina o preço em Editar"); Views.catalogo.render();
+    });
+  },
+  editar(id) {
+    const it = itemById(id); if (!it) return; const p = precoRow(id);
+    openModal(`<h3>${esc(it.emoji || "")} ${esc(it.nome)}</h3>
+      <label>Preço nesta loja (R$)</label><input class="field" id="pPreco" inputmode="decimal" value="${p ? esc(String(p.preco).replace(".", ",")) : ""}" placeholder="0,00">
+      <div class="check"><input type="checkbox" id="pAtivo" ${!p || p.ativo ? "checked" : ""}><label for="pAtivo" style="margin:0;font-size:.84rem;color:var(--text)">Vender nesta loja</label></div>
+      <div class="check"><input type="checkbox" id="iAtivo" ${it.ativo ? "checked" : ""}><label for="iAtivo" style="margin:0;font-size:.84rem;color:var(--text)">Item ativo (todas as lojas)</label></div>
+      <label>Adicionar sabor</label><div class="row"><input class="field grow" id="sNome" placeholder="Nome do sabor" style="margin:0"><input class="field" id="sQtd" type="number" min="0" value="0" style="margin:0;width:90px" title="Quantidade inicial"><button class="abtn dark" data-a="catSabor" data-id="${esc(id)}">+</button></div>
+      <small style="color:var(--muted)">Sabores: ${esc(saboresDe(id).map(s => s.nome).join(", ") || "nenhum")}</small>
+      <div class="modal-actions"><button class="btn btn-soft" data-a="fechar">Cancelar</button><button class="btn btn-red" data-a="catSalvar" data-id="${esc(id)}">Salvar</button></div>`);
+  },
+  async salvar(id, btn) {
+    const raw = $("pPreco").value.trim(), preco = raw === "" ? null : num(raw);
+    if (preco !== null && (!Number.isFinite(preco) || preco < 0)) return toast("Preço inválido", true);
+    await busy(btn, async () => {
+      if (preco !== null) ok(await sb.from("precos_loja").upsert({ loja_id: S.loja.id, item_id: id, preco: Math.round(preco * 100) / 100, ativo: $("pAtivo").checked }, { onConflict: "loja_id,item_id" }));
+      ok(await sb.from("itens").update({ ativo: $("iAtivo").checked }).eq("id", id));
+      await Promise.all([DB.catalogo(), DB.precos()]); closeModal(); toast("Salvo"); Views.catalogo.render();
+    });
+  },
+  async sabor(id, btn) {
+    const nome = $("sNome").value.trim(); if (!nome) return toast("Informe o sabor", true);
+    const q = parseInt($("sQtd").value || "0", 10); if (!(q >= 0)) return toast("Quantidade inválida", true);
+    await busy(btn, async () => { await rpc("adicionar_sabor", { p_loja_id: S.loja.id, p_item_id: id, p_nome: nome, p_quantidade: q }); await Promise.all([DB.catalogo(), DB.estoque()]); toast("Sabor adicionado"); Views.catalogo.editar(id); });
+  },
+  async wpp(btn) { await busy(btn, async () => { const n = await rpc("definir_whatsapp_loja", { p_loja_id: S.loja.id, p_whatsapp: $("lojaWpp").value }); S.loja.whatsapp = n; toast("WhatsApp salvo"); }); },
+};
+
+/* ───────── ações (delegação de eventos — sem onclick inline) ───────── */
+const Act = {
+  logout: () => Auth.logout(), trocarLoja: () => App.trocarLoja(), fechar: () => closeModal(),
+  entrarLoja: (id) => App.entrarNaLoja(id), tab: (id) => App.goTab(id),
+  estFiltro: (id) => { S.f.estFiltro = id; Views.estoque.render(); },
+  estDetalhe: (id) => Views.estoque.detalhe(id),
+  estAjustar: (id, b) => { const q = parseInt($("adjQtd").value, 10); if (!q) return toast("Informe uma quantidade diferente de zero", true);
+    busy(b, async () => { await rpc("ajustar_estoque", { p_estoque_id: id, p_quantidade: q, p_loja_id: S.loja.id, p_observacao: $("adjObs").value || null }); await DB.estoque(); toast("Estoque ajustado"); await Views.estoque.detalhe(id); Views.estoque.update(); }); },
+  estContar: (id, b) => { const q = parseInt($("cntQtd").value, 10); if (!(q >= 0)) return toast("Informe a quantidade contada", true);
+    busy(b, async () => { await rpc("contar_estoque", { p_estoque_id: id, p_quantidade_contada: q, p_loja_id: S.loja.id, p_observacao: "Contagem física" }); await DB.estoque(); toast("Contagem registrada"); await Views.estoque.detalhe(id); Views.estoque.update(); }); },
+  estMinimo: (id, b) => { const q = parseInt($("minQtd").value, 10); if (!(q >= 0)) return toast("Mínimo inválido", true);
+    busy(b, async () => { await rpc("definir_estoque_minimo", { p_estoque_id: id, p_minimo: q }); await DB.estoque(); toast("Mínimo salvo"); await Views.estoque.detalhe(id); Views.estoque.update(); }); },
+  vAdd: (id) => Views.venda.add(id), vMais: (id) => Views.venda.mudar(id, 1), vMenos: (id) => Views.venda.mudar(id, -1),
+  vLimpar: () => { S.cart = []; S.chave = null; Views.venda.carrinho(); },
+  vConfirmar: () => Views.venda.confirmar(), vEnviar: (id, b) => Views.venda.enviar(b),
+  vCancelarUltima: (id, b) => Views.vendas.cancelar(id, b, "Desfeita logo após o registro"),
+  vendasPeriodo: (id) => { S.f.vendasPeriodo = id; Views.vendas.render().catch(e => toast(msgErro(e), true)); },
+  vendaDetalhe: (id) => Views.vendas.detalhe(id),
+  vendaCancelar: (id, b) => Views.vendas.cancelar(id, b, ($("cancMotivo") || {}).value),
+  cliForm: (id) => Views.clientes.form(id), cliDetalhe: (id) => Views.clientes.detalhe(id).catch(e => toast(msgErro(e), true)), cliSalvar: (id, b) => Views.clientes.salvar(id, b),
+  finForm: () => Views.financeiro.form(), finSalvar: (id, b) => Views.financeiro.salvar(b), finPagar: (id, b) => Views.financeiro.pagar(id, b), finCsv: () => Views.financeiro.csv(),
+  finPeriodo: (id) => { S.f.finPeriodo = id; Views.financeiro.render().catch(e => toast(msgErro(e), true)); },
+  finStatus: (id) => { S.f.finStatus = id; Views.financeiro.render().catch(e => toast(msgErro(e), true)); },
+  waCopiar: () => Views.whats.copiar(), waEnviar: () => Views.whats.enviar(),
+  catGrupo: (id, b) => Views.catalogo.grupo(id, b), catItem: (id, b) => Views.catalogo.item(b), catEditar: (id) => Views.catalogo.editar(id),
+  catSalvar: (id, b) => Views.catalogo.salvar(id, b), catSabor: (id, b) => Views.catalogo.sabor(id, b), catWpp: (id, b) => Views.catalogo.wpp(b),
+};
+document.addEventListener("click", ev => {
+  if (ev.target === $("modalOv")) return closeModal();
+  const el = ev.target.closest("[data-a]"); if (!el || el.disabled) return;
+  const fn = Act[el.dataset.a]; if (fn) fn(el.dataset.id, el);
+});
+document.addEventListener("input", ev => {
+  const id = ev.target.id;
+  if (id === "estBusca") { S.f.estBusca = ev.target.value; Views.estoque.update(); }
+  else if (id === "vBusca") { S.f.vendaBusca = ev.target.value; Views.venda.resultados(); }       // só a lista muda — o campo nunca é recriado
+  else if (id === "cliBusca") { S.f.cliBusca = ev.target.value; Views.clientes.update(); }
+  else if (id === "vDesc") { Views.venda.carrinho(); const d = $("vDesc"); d.focus(); d.setSelectionRange(d.value.length, d.value.length); }
+  else if (id === "vCliNome") {
+    const c = S.clientes.find(x => x.nome === ev.target.value);
+    if (c) { $("vCliTel").value = c.telefone || ""; $("vCliEnd").value = c.endereco || ""; }
+  }
+  else if (id === "waPreco" || id === "waQtd" || id === "waSabores") { S.f[id] = ev.target.checked; Views.whats.render(); }
+});
+document.addEventListener("change", ev => {
+  const id = ev.target.id;
+  if (id === "waPreco" || id === "waQtd" || id === "waSabores") { S.f[id] = ev.target.checked; Views.whats.render(); }
+});
+document.addEventListener("keydown", ev => { if (ev.key === "Escape" && modalOpen()) closeModal(); });
+document.addEventListener("visibilitychange", async () => {
+  if (document.visibilityState !== "visible" || !S.loja) return;
+  try { await DB.estoque(); await App.atualizar(); } catch (e) {}
+});
+
+/* ───────── início ───────── */
+$("loginForm").addEventListener("submit", Auth.login);
+$("loginFoot").textContent = "Servidor: " + new URL(SUPABASE_URL).hostname.split(".")[0];
+(async () => {
+  try { const { data: { session } } = await sb.auth.getSession(); if (session) await App.boot(); } catch (e) { /* mostra login */ }
 })();
 </script>
 </body>
