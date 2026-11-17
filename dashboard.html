@@ -1041,7 +1041,8 @@ Views.historico = {
         <div><label>Período</label><select class="field" id="hPeriodo">${[["7d", "Últimos 7 dias"], ["30d", "Últimos 30 dias"], ["mes", "Este mês"], ["90d", "Últimos 90 dias"]].map(([k, l]) => `<option value="${k}" ${f.hPeriodo === k ? "selected" : ""}>${l}</option>`).join("")}</select></div>
         <div><label>Responsável</label><select class="field" id="hResp"><option value="">Todos</option>${S.respLista.map(p => `<option value="${esc(p.id)}" ${f.hResp === p.id ? "selected" : ""}>${esc(p.nome || "—")}</option>`).join("")}</select></div>
         <div><label>Situação do caixa</label><select class="field" id="hSit">${[["", "Todas"], ["aberto", "Aberto"], ["fechado", "Fechado"], ["diferenca", "Com diferença"]].map(([k, l]) => `<option value="${k}" ${f.hSit === k ? "selected" : ""}>${l}</option>`).join("")}</select></div></div></div>
-      <div id="hLista"><div class="empty">Carregando…</div></div>`;
+      <div id="hLista"><div class="empty">Carregando…</div></div>
+      <div id="hSemCaixa"></div>`;
     await Views.historico.update();
   },
   async update() {
@@ -1050,12 +1051,28 @@ Views.historico = {
     const ini = { "7d": addDias(hoje, -6), "30d": addDias(hoje, -29), "90d": addDias(hoje, -89), mes: hoje.slice(0, 8) + "01" }[f.hPeriodo];
     const dias = await rpc("historico_financeiro", { p_loja_id: f.hLoja || null, p_inicio: ini, p_fim: hoje, p_responsavel: f.hResp || null, p_situacao: f.hSit || null });
     if (S.tab !== "historico" || !$("hLista")) return;
+    Views.historico.semCaixa(ini, hoje);   // seção separada: falha dela não derruba o histórico
     S.hDias = dias;
     const sit = { aberto: ["pendente", "caixa aberto"], fechado: ["pago", "fechado"], sem_caixa: ["neutro", "sem caixa"] };
     $("hLista").innerHTML = dias.length ? dias.map((d, i) => `<div class="dia-row"><div class="dia-h" data-a="hDia" data-id="${i}"><div class="grow"><b>${esc(fmtD(d.dia))}</b> · ${esc(d.loja_nome)}</div><span class="tag ${sit[d.situacao][0]}">${sit[d.situacao][1]}</span>
         <div class="dia-nums"><div><span>Abertura</span><b>${esc(fmt(d.abertura))}</b></div><div><span>Entradas</span><b class="pos">${esc(fmt(d.entradas))}</b></div><div><span>Saídas</span><b class="neg">${esc(fmt(d.saidas))}</b></div>
         <div><span>Estornos</span><b>${esc(fmt(d.estornos))}</b></div><div><span>Resultado do dia</span><b>${esc(fmt(d.saldo))}</b></div><div><span>Fechamento (dinheiro)</span><b>${d.situacao === "fechado" ? esc(fmt(d.fechamento)) : "—"}</b></div>
         <div><span>Diferença</span><b class="${Number(d.diferenca) ? "neg" : ""}">${d.situacao === "fechado" ? esc(fmt(d.diferenca)) : "—"}</b></div></div></div><div class="dia-det hidden" id="hdet-${i}"></div></div>`).join("") : `<div class="empty">Nenhum movimento no período/filtro.</div>`;
+  },
+  /* Entradas em dinheiro que não pertencem a nenhum caixa (só consulta — nada é vinculado automaticamente) */
+  async semCaixa(ini, fim) {
+    const el = $("hSemCaixa"); if (!el) return;
+    const f = S.f;
+    let r;
+    try { r = await rpc("entradas_sem_caixa", { p_loja_id: f.hLoja || null, p_inicio: ini, p_fim: fim, p_responsavel: f.hResp || null }); }
+    catch (e) { if ($("hSemCaixa")) $("hSemCaixa").innerHTML = `<div class="banner">Valores sem caixa indisponíveis: ${esc(/Could not find the function|schema cache/i.test(e.message) ? "falta aplicar a migração 004_entradas_sem_caixa.sql" : msgErro(e))}</div>`; return; }
+    if (S.tab !== "historico" || !$("hSemCaixa")) return;
+    // se o filtro for "situação do caixa", o conceito não se aplica (não há caixa): mantém a seção, mas avisa
+    $("hSemCaixa").innerHTML = `<div class="card"><h3>💵 Valores não vinculados a caixa</h3>
+      <div class="banner">Vendas em <b>dinheiro</b> feitas sem caixa aberto. Elas <b>não</b> entram no esperado de nenhum caixa e não são vinculadas automaticamente a nenhum caixa.${f.hSit ? " (O filtro de situação do caixa não se aplica a esta seção.)" : ""}</div>
+      ${r.quantidade ? `<div class="kpi-grid"><div class="kpi warn"><div class="v">${esc(fmt(r.total))}</div><div class="l">Total sem caixa no período</div></div><div class="kpi"><div class="v">${r.quantidade}</div><div class="l">venda(s)</div></div></div>
+      ${r.por_dia.map(d => `<div class="list-row"><div class="grow"><b>${esc(fmtD(d.dia))}</b> · ${esc(d.loja_nome)}<small>${d.quantidade} venda(s)</small></div><b>${esc(fmt(d.total))}</b></div>`).join("")}
+      <label>Vendas</label>${r.itens.map(x => `<div class="list-row"><div class="grow">${esc(fmtDT(x.criado_em))} · ${esc(x.loja_nome)}<small>${esc(x.responsavel || "—")}</small></div><b>${esc(fmt(x.valor))}</b></div>`).join("")}` : `<div class="empty">Nenhum valor sem caixa no período ✅</div>`}</div>`;
   },
   async dia(i, el) {
     const d = (S.hDias || [])[i], box = $("hdet-" + i); if (!d || !box) return;

@@ -204,6 +204,15 @@
     marcar_alerta_lido(a) { db.alertasLidos[a.p_chave] = db.financeiro_lancamentos.filter(l => l.loja_id === a.p_loja_id && l.status !== "pago" && l.vencimento && l.vencimento < new Date().toLocaleDateString("en-CA")).length; },
     arquivar_aviso(a) { db.avisos.find(x => x.id === a.p_id).arquivado = true; },
     marcar_comprovante_enviado(a) { db.financeiro_lancamentos.find(l => l.id === a.p_id).comprovante_enviado_em = new Date().toISOString(); },
+    entradas_sem_caixa(a) {
+      const lojas = minhas(); if (a.p_loja_id && !lojas.includes(a.p_loja_id)) throw new Error("Você não tem permissão para esta loja");
+      const sem = db.vendas.filter(v => lojas.includes(v.loja_id) && (!a.p_loja_id || v.loja_id === a.p_loja_id) && v.status === "concluida" && v.forma_pagamento === "Dinheiro"
+        && !db.caixas.some(c => c.loja_id === v.loja_id && v.criado_em >= c.aberto_em && (!c.fechado_em || v.criado_em <= c.fechado_em)));
+      const nome = id => db.lojas.find(l => l.id === id).nome, dia = v => v.criado_em.slice(0, 10), porDia = {};
+      sem.forEach(v => { const k = v.loja_id + dia(v); porDia[k] = porDia[k] || { dia: dia(v), loja_id: v.loja_id, loja_nome: nome(v.loja_id), total: 0, quantidade: 0 }; porDia[k].total += v.total; porDia[k].quantidade++; });
+      return { total: sem.reduce((s, v) => s + v.total, 0), quantidade: sem.length, por_dia: Object.values(porDia),
+        itens: sem.map(v => ({ venda_id: v.id, loja_id: v.loja_id, loja_nome: nome(v.loja_id), criado_em: v.criado_em, dia: dia(v), valor: v.total, responsavel: "Luiz" })) };
+    },
     definir_whatsapp_loja(a) { const n = (a.p_whatsapp || "").replace(/\D/g, ""); db.lojas.find(l => l.id === a.p_loja_id).whatsapp = n; return n; },
   };
 
@@ -223,6 +232,7 @@
       log.push({ name, args: JSON.parse(JSON.stringify(args || {})) });
       await new Promise(r => setTimeout(r, 5));
       if (window.__netDown) return err("Failed to fetch");
+      if (window.__missing === name) return err('Could not find the function public.' + name + ' in the schema cache');
       try { checkParams(name, args || {}); const d = R[name].call(R, args || {}); return { data: d === undefined ? null : d, error: null }; }
       catch (e) { return err(e.message); }
     },
