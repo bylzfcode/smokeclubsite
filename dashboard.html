@@ -142,6 +142,19 @@ label{display:block;font-size:.74rem;font-weight:700;color:var(--muted);margin:8
 .modal-box{background:var(--card);border-radius:16px;padding:22px;max-width:460px;width:100%;max-height:88vh;overflow-y:auto;box-shadow:var(--shadow-lg)}
 .modal-box h3{margin-bottom:12px}
 .modal-actions{display:flex;gap:8px;margin-top:14px}.modal-actions button{flex:1}
+.aviso{border:1px solid var(--line);border-left:5px solid #7A8AA0;border-radius:10px;padding:10px 12px;margin-bottom:8px;background:#fff;display:flex;gap:10px;align-items:flex-start}
+.aviso.atencao{border-left-color:#D9A400;background:#FFFBEC}.aviso.urgente{border-left-color:var(--red);background:#FFF5F6}
+.aviso.destaque{box-shadow:0 0 0 2px rgba(227,19,43,.25)}
+.aviso .tx{flex:1;min-width:0;overflow-wrap:anywhere;font-size:.84rem}.aviso .tx b{display:block;font-size:.88rem}
+.aviso .tx small{display:block;color:var(--muted);font-size:.7rem;margin-top:3px}
+.aviso.lido{opacity:.62}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--red);margin-right:6px}
+.dia-row{border:1px solid var(--line);border-radius:10px;background:#fff;margin-bottom:8px;overflow:hidden}
+.dia-h{display:flex;gap:10px;align-items:center;padding:11px 12px;cursor:pointer;flex-wrap:wrap}
+.dia-h .grow{flex:1;min-width:150px}
+.dia-nums{display:grid;grid-template-columns:repeat(auto-fit,minmax(92px,1fr));gap:6px;width:100%;font-size:.74rem}
+.dia-nums span{display:block;color:var(--muted)}.dia-nums b{font-size:.84rem}
+.dia-det{border-top:1px solid var(--line);padding:10px 12px;background:var(--soft)}
 .banner{background:var(--amber-bg);color:var(--amber);border-radius:10px;padding:9px 12px;font-size:.8rem;font-weight:600;margin-bottom:12px}
 </style>
 </head>
@@ -224,6 +237,7 @@ async function busy(btn, fn) {
 function msgErro(e) {
   const m = (e && e.message) || String(e);
   if (/Failed to fetch|NetworkError|Load failed/i.test(m)) return "Sem conexão com o servidor. Verifique a internet e tente de novo.";
+  if (/Could not find the function|schema cache/i.test(m)) return "Falta aplicar a migração 003_caixa_avisos.sql no Supabase (veja o README).";
   return m;
 }
 async function rpc(nome, args) {
@@ -240,7 +254,8 @@ const S = {
   cart: [], chave: null, chaveSig: "",
   tab: "painel", channel: null, realtime: "off",
   f: { estBusca: "", estFiltro: "todos", vendaBusca: "", vendasPeriodo: "hoje", finStatus: "todos", finPeriodo: "mes", cliBusca: "",
-       waPreco: true, waQtd: true, waSabores: true },
+       waPreco: true, waQtd: true, waSabores: true,
+       hLoja: "", hPeriodo: "30d", hResp: "", hSit: "" },
 };
 const isGerente = () => S.perfil && (S.perfil.papel === "gerente" || S.perfil.papel === "dono");
 const itemById = id => S.itens.find(i => i.id === id);
@@ -343,7 +358,7 @@ const App = {
   },
   async trocarLoja() { await App.pararRealtime(); App.seletor(); },
   tabs() {
-    const t = [["painel", "📊 Painel"], ["venda", "🛒 Nova venda"], ["vendas", "🧾 Vendas"], ["estoque", "📦 Estoque"], ["clientes", "👥 Clientes"], ["financeiro", "💰 Financeiro"], ["whats", "📋 Lista WhatsApp"]];
+    const t = [["painel", "📊 Painel"], ["venda", "🛒 Nova venda"], ["vendas", "🧾 Vendas"], ["estoque", "📦 Estoque"], ["clientes", "👥 Clientes"], ["financeiro", "💰 Financeiro"], ["caixa", "💵 Caixa"], ["historico", "📅 Histórico"], ["whats", "📋 Lista WhatsApp"]];
     if (isGerente()) t.push(["catalogo", "🏷️ Catálogo"]);
     $("tabsNav").innerHTML = t.map(([id, l]) => `<button class="tabbtn" id="tab-${id}" data-a="tab" data-id="${id}">${l}</button>`).join("");
   },
@@ -385,16 +400,19 @@ const Views = {};
 Views.painel = {
   async render() {
     $("viewRoot").innerHTML = `<div class="empty">Carregando…</div>`;
-    const [r, ultimas] = await Promise.all([
+    const [r, ultimas, avisos] = await Promise.all([
       rpc("painel_resumo", { p_loja_id: S.loja.id }),
       sb.from("vendas").select("id,total,status,criado_em,forma_pagamento,cliente_nome,clientes(nome)").eq("loja_id", S.loja.id).order("criado_em", { ascending: false }).limit(6).then(ok),
+      rpc("listar_avisos", { p_loja_id: S.loja.id }).catch(e => ({ erro: msgErro(e) })),
     ]);
     if (S.tab !== "painel") return;
+    S.avisos = Array.isArray(avisos) ? avisos : [];
     const linhas = linhasEstoque().filter(l => l.item.ativo);
     const baixos = linhas.filter(l => nivel(l.e) !== "ok").sort((a, b) => a.e.quantidade - b.e.quantidade).slice(0, 8);
     const max = Math.max(1, ...r.por_dia.map(d => Number(d.total)));
     const dow = d => ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"][new Date(d + "T12:00:00Z").getUTCDay()];
     $("viewRoot").innerHTML = `
+      ${Avisos.html(avisos)}
       <div class="kpi-grid">
         <div class="kpi"><div class="v">${fmt(r.hoje.total)}</div><div class="l">Vendas hoje · ${r.hoje.qtd} venda(s)</div></div>
         <div class="kpi"><div class="v">${fmt(r.mes.total)}</div><div class="l">Vendas no mês · ${r.mes.qtd} venda(s)</div></div>
@@ -686,7 +704,7 @@ Views.financeiro = {
     $("finLista").innerHTML = vis.length ? vis.map(l => { const a = atras(l), st = a ? "atrasado" : l.status;
       return `<div class="list-row"><span class="tag ${l.tipo}">${l.tipo === "entrada" ? "ENTRADA" : "SAÍDA"}</span><div class="grow"><b>${esc(l.descricao || l.categoria)}</b><small>${esc(l.categoria)} · ${esc(fmtDT(l.data_ref))}${l.vencimento ? " · vence " + esc(fmtD(l.vencimento)) : ""}${l.forma_pagamento ? " · " + esc(l.forma_pagamento) : ""}</small></div>
       <div style="text-align:right"><b class="${l.tipo === "entrada" ? "pos" : "neg"}">${l.tipo === "entrada" ? "+" : "−"}${esc(fmt(l.valor))}</b><br><span class="tag ${st}">${esc(st)}</span></div>
-      ${l.status !== "pago" ? `<button class="abtn green sm" data-a="finPagar" data-id="${esc(l.id)}">Pagar</button>` : ""}</div>`; }).join("") : `<div class="empty">Nenhum lançamento.</div>`;
+      ${l.status !== "pago" ? `<button class="abtn green sm" data-a="finPagar" data-id="${esc(l.id)}">Pagar</button>` : ""}${l.exige_comprovante && !l.comprovante_enviado_em ? `<button class="abtn soft sm" data-a="finComprovante" data-id="${esc(l.id)}">Comprovante enviado</button>` : ""}</div>`; }).join("") : `<div class="empty">Nenhum lançamento.</div>`;
   },
   form() {
     openModal(`<h3>Novo lançamento</h3>
@@ -696,6 +714,7 @@ Views.financeiro = {
       <div class="grid2"><div><label>Valor (R$)</label><input class="field" id="lValor" inputmode="decimal" placeholder="0,00"></div><div><label>Vencimento</label><input class="field" id="lVenc" type="date"></div></div>
       <div class="grid2"><div><label>Situação</label><select class="field" id="lStatus"><option value="pago">Já pago</option><option value="pendente">Pendente</option></select></div>
       <div><label>Forma</label><select class="field" id="lForma"><option value="">—</option>${FORMAS.map(f => `<option>${f}</option>`).join("")}</select></div></div>
+      <div class="check"><input type="checkbox" id="lComp"><label for="lComp" style="margin:0;font-size:.84rem;color:var(--text)">Exige comprovante</label></div>
       <div class="modal-actions"><button class="btn btn-soft" data-a="fechar">Cancelar</button><button class="btn btn-red" data-a="finSalvar">Salvar</button></div>`);
   },
   async salvar(btn) {
@@ -705,7 +724,7 @@ Views.financeiro = {
     if (status === "pendente" && !venc) return toast("Lançamento pendente precisa de vencimento", true);
     await busy(btn, async () => {
       ok(await sb.from("financeiro_lancamentos").insert({ loja_id: S.loja.id, tipo: $("lTipo").value, categoria: $("lCat").value, descricao: $("lDesc").value.trim() || null,
-        valor: Math.round(valor * 100) / 100, status, vencimento: venc, forma_pagamento: $("lForma").value || null }));
+        valor: Math.round(valor * 100) / 100, status, vencimento: venc, forma_pagamento: $("lForma").value || null, exige_comprovante: $("lComp").checked }));
       closeModal(); toast("Lançamento salvo"); await Views.financeiro.render();
     });
   },
@@ -821,6 +840,236 @@ Views.catalogo = {
   async wpp(btn) { await busy(btn, async () => { const n = await rpc("definir_whatsapp_loja", { p_loja_id: S.loja.id, p_whatsapp: $("lojaWpp").value }); S.loja.whatsapp = n; toast("WhatsApp salvo"); }); },
 };
 
+/* AVISOS E ATUALIZAÇÕES (seção do Painel) */
+const Avisos = {
+  html(a) {
+    if (a && a.erro) return `<div class="banner">Avisos indisponíveis: ${esc(a.erro)}</div>`;
+    const lista = Array.isArray(a) ? a : [];
+    const naoLidos = lista.filter(x => !x.lido).length;
+    const rotulo = { atencao: "Atenção", urgente: "Urgente", info: "Informação" };
+    return `<div class="card"><div class="page-h" style="margin-bottom:8px"><h3 style="flex:1;margin:0">🔔 Avisos e atualizações ${naoLidos ? `<span class="tag saida">${naoLidos} novo(s)</span>` : ""}</h3>${isGerente() ? `<button class="abtn dark sm" data-a="avisoForm" data-id="">+ Novo aviso</button>` : ""}</div>
+      ${lista.length ? lista.map((x, i) => `<div class="aviso ${esc(x.prioridade)} ${x.destaque ? "destaque" : ""} ${x.lido ? "lido" : ""}">
+        <div class="tx"><b>${x.lido ? "" : '<span class="dot"></span>'}${esc(x.titulo)} ${x.atualizado ? '<span class="tag pendente">atualizado</span>' : ""}</b>${esc(x.descricao)}
+          <small>${x.origem === "alerta" ? "Alerta automático" : x.tipo === "sistema" ? "Mudança no sistema" : "Comunicado"} · ${esc(rotulo[x.prioridade] || x.prioridade)} · ${esc(fmtD(String(x.atualizado_em || x.criado_em).slice(0, 10)))}${x.origem === "aviso" ? " · " + (x.global ? "todas as lojas" : esc((x.lojas || []).join(", "))) : ""}${x.valido_ate ? " · válido até " + esc(fmtD(String(x.valido_ate).slice(0, 10))) : ""}</small></div>
+        <div style="display:flex;flex-direction:column;gap:5px">${x.acao ? `<button class="abtn soft sm" data-a="avisoIr" data-id="${esc(x.acao)}">Ver</button>` : ""}
+          ${x.lido ? "" : `<button class="abtn dark sm" data-a="avisoLido" data-id="${i}">Lido</button>`}
+          ${x.pode_editar ? `<button class="abtn soft sm" data-a="avisoForm" data-id="${i}">Editar</button><button class="abtn soft sm" data-a="avisoArquivar" data-id="${i}">Arquivar</button>` : ""}</div></div>`).join("") : `<div class="empty">Nenhum aviso no momento.</div>`}
+      ${lista.some(x => x.origem === "alerta") ? `<small style="color:var(--muted)">Marcar um alerta como lido só o silencia — a pendência continua até ser resolvida.</small>` : ""}</div>`;
+  },
+  async lido(i, btn) {
+    const x = (S.avisos || [])[i]; if (!x) return;
+    await busy(btn, async () => {
+      if (x.origem === "alerta") await rpc("marcar_alerta_lido", { p_loja_id: S.loja.id, p_chave: x.chave });
+      else await rpc("marcar_aviso_lido", { p_aviso_id: x.id, p_loja_id: S.loja.id });
+      await Views.painel.render();
+    });
+  },
+  async form(i) {
+    const x = i === "" ? null : (S.avisos || [])[i];
+    let lojas = S.minhasLojas;
+    if (S.perfil.papel === "dono") { try { lojas = ok(await sb.from("lojas").select("id,nome,ativo").order("nome")).filter(l => l.ativo !== false); } catch (e) { /* usa as minhas */ } }
+    const marcadas = x ? new Set(lojas.filter(l => (x.lojas || []).includes(l.nome)).map(l => l.id)) : new Set([S.loja.id]);
+    openModal(`<h3>${x ? "Editar aviso" : "Novo aviso"}</h3>
+      <label>Título</label><input class="field" id="avTitulo" maxlength="120" value="${esc(x ? x.titulo : "")}">
+      <label>Descrição</label><textarea class="field" id="avDesc" maxlength="2000">${esc(x ? x.descricao : "")}</textarea>
+      <div class="grid2"><div><label>Prioridade</label><select class="field" id="avPrio">${[["info", "Informação"], ["atencao", "Atenção"], ["urgente", "Urgente"]].map(([k, l]) => `<option value="${k}" ${x && x.prioridade === k ? "selected" : ""}>${l}</option>`).join("")}</select></div>
+        <div><label>Válido até (opcional)</label><input class="field" id="avValido" type="date" value="${x && x.valido_ate ? esc(String(x.valido_ate).slice(0, 10)) : ""}"></div></div>
+      <div class="check"><input type="checkbox" id="avDestaque" ${x && x.destaque ? "checked" : ""}><label for="avDestaque" style="margin:0;font-size:.84rem;color:var(--text)">Destacar no topo</label></div>
+      ${S.perfil.papel === "dono" ? `<div class="check"><input type="checkbox" id="avGlobal" ${x && x.global ? "checked" : ""}><label for="avGlobal" style="margin:0;font-size:.84rem;color:var(--text)">Aviso global (todas as lojas)</label></div>
+      <div class="check"><input type="checkbox" id="avSistema" ${x && x.tipo === "sistema" ? "checked" : ""}><label for="avSistema" style="margin:0;font-size:.84rem;color:var(--text)">É uma mudança no sistema</label></div>` : ""}
+      <label>Lojas</label>${lojas.map(l => `<div class="check"><input type="checkbox" class="avLoja" value="${esc(l.id)}" id="avl-${esc(l.id)}" ${marcadas.has(l.id) ? "checked" : ""}><label for="avl-${esc(l.id)}" style="margin:0;font-size:.84rem;color:var(--text)">${esc(l.nome)}</label></div>`).join("")}
+      <div class="modal-actions"><button class="btn btn-soft" data-a="fechar">Cancelar</button><button class="btn btn-red" data-a="avisoSalvar" data-id="${x ? esc(x.id) : ""}">Publicar</button></div>`);
+  },
+  async salvar(id, btn) {
+    const titulo = $("avTitulo").value.trim(), desc = $("avDesc").value.trim();
+    if (titulo.length < 3) return toast("Título muito curto", true);
+    if (!desc) return toast("Escreva a descrição", true);
+    const global = !!($("avGlobal") && $("avGlobal").checked), sistema = !!($("avSistema") && $("avSistema").checked);
+    const lojas = [...document.querySelectorAll(".avLoja:checked")].map(c => c.value);
+    if (!global && !lojas.length) return toast("Escolha pelo menos uma loja", true);
+    const v = $("avValido").value;
+    await busy(btn, async () => {
+      await rpc("publicar_aviso", { p_id: id || null, p_tipo: sistema ? "sistema" : "comunicado", p_titulo: titulo, p_descricao: desc, p_prioridade: $("avPrio").value,
+        p_destaque: $("avDestaque").checked, p_valido_ate: v ? `${v}T23:59:59-03:00` : null, p_global: global, p_lojas: global ? [] : lojas });
+      closeModal(); toast("Aviso publicado"); if (S.tab === "painel") await Views.painel.render();
+    });
+  },
+  async arquivar(i, btn) {
+    const x = (S.avisos || [])[i]; if (!x || !confirm("Arquivar este aviso?")) return;
+    await busy(btn, async () => { await rpc("arquivar_aviso", { p_id: x.id }); toast("Aviso arquivado"); await Views.painel.render(); });
+  },
+};
+
+/* CAIXA */
+const MEIOS = { dinheiro: "Dinheiro", pix: "Pix", cartao: "Cartão", outro: "Outro" };
+const TIPOS_MOV = { entrada: "Entrada", saida: "Saída", retirada: "Retirada", ajuste: "Ajuste", estorno: "Estorno" };
+const centavosOk = v => Number.isFinite(v) && v > 0 && Math.abs(Math.round(v * 100) - v * 100) < 1e-6;
+Views.caixa = {
+  async render() {
+    $("viewRoot").innerHTML = `<div class="empty">Carregando…</div>`;
+    const d = await rpc("caixa_atual", { p_loja_id: S.loja.id });
+    if (S.tab !== "caixa") return;
+    S.caixa = d;
+    const c = d.aberto, ult = d.ultimo_fechado;
+    if (!c) {
+      $("viewRoot").innerHTML = `<div class="page-h"><h2>💵 Caixa · ${esc(S.loja.nome)}</h2></div>
+        <div class="card"><h3>Nenhum caixa aberto</h3>
+          <label>Saldo inicial em dinheiro (R$)</label><input class="field" id="cxSaldo" inputmode="decimal" placeholder="0,00">
+          <label>Observação (opcional)</label><input class="field" id="cxObs" placeholder="Ex: troco do dia">
+          <button class="btn btn-red" data-a="cxAbrir">Abrir caixa</button>
+          <small style="color:var(--muted);display:block;margin-top:8px">Só pode haver um caixa aberto por loja.</small></div>
+        ${ult ? `<div class="card"><h3>Último fechamento</h3>${Views.caixa.resumoFechado(ult)}${isGerente() ? `<button class="abtn soft" data-a="cxReabrir" data-id="${esc(ult.id)}">Reabrir (gerente)</button>` : ""}<button class="abtn soft" style="margin-left:6px" data-a="cxDetalhe" data-id="${esc(ult.id)}">Ver auditoria</button></div>` : ""}`;
+      return;
+    }
+    const antigo = Math.floor((Date.now() - new Date(c.aberto_em)) / 864e5) >= 1 && new Date(c.aberto_em).toLocaleDateString("en-CA", { timeZone: TZ }) !== hojeISO();
+    $("viewRoot").innerHTML = `<div class="page-h"><h2>💵 Caixa aberto · ${esc(S.loja.nome)}</h2><button class="abtn red" data-a="cxFechar">Fechar caixa</button></div>
+      ${antigo ? `<div class="banner">⚠️ Este caixa foi aberto em ${esc(fmtDT(c.aberto_em))}. Feche-o antes de seguir.</div>` : ""}
+      <div class="kpi-grid">
+        <div class="kpi good"><div class="v">${esc(fmt(c.esperado_dinheiro))}</div><div class="l">Dinheiro esperado na gaveta</div></div>
+        <div class="kpi"><div class="v">${esc(fmt(c.saldo_inicial))}</div><div class="l">Saldo inicial · ${esc(c.aberto_por_nome || "—")}</div></div>
+        <div class="kpi"><div class="v">${esc(fmt(c.vendas_dinheiro))}</div><div class="l">Vendas em dinheiro</div></div>
+        <div class="kpi"><div class="v">${esc(fmt(c.vendas_pix))}</div><div class="l">Vendas Pix (fora da gaveta)</div></div>
+        <div class="kpi"><div class="v">${esc(fmt(c.vendas_cartao))}</div><div class="l">Vendas cartão (fora da gaveta)</div></div>
+        <div class="kpi"><div class="v">${esc(fmt(c.mov_outros_meios))}</div><div class="l">Outros meios lançados</div></div></div>
+      <div class="banner">Aberto em ${esc(fmtDT(c.aberto_em))}. Pix e cartão aparecem separados e <b>não</b> entram no dinheiro esperado.</div>
+      <div class="row" style="margin-bottom:10px">
+        <button class="abtn green" data-a="cxMov" data-id="entrada">+ Entrada</button><button class="abtn dark" data-a="cxMov" data-id="saida">− Saída</button>
+        <button class="abtn dark" data-a="cxMov" data-id="retirada">Retirada</button>${isGerente() ? `<button class="abtn soft" data-a="cxMov" data-id="ajuste">± Ajuste</button>` : ""}
+        <button class="abtn soft" data-a="cxDetalhe" data-id="${esc(c.id)}">Auditoria</button></div>
+      <div class="card"><h3>Movimentações</h3>${d.movimentos.length ? d.movimentos.map(m => `<div class="list-row"><span class="tag ${m.sentido > 0 ? "entrada" : "saida"}">${esc(TIPOS_MOV[m.tipo] || m.tipo)}</span>
+        <div class="grow"><b>${esc(m.categoria)}</b>${m.estornado ? ' <span class="tag cancelada">estornada</span>' : ""}<small>${esc(MEIOS[m.meio] || m.meio)} · ${esc(fmtDT(m.criado_em))} · ${esc(m.criado_por_nome || "—")}${m.observacao ? " · " + esc(m.observacao) : ""}</small></div>
+        <b class="${m.sentido > 0 ? "pos" : "neg"}">${m.sentido > 0 ? "+" : "−"}${esc(fmt(m.valor))}</b>
+        ${isGerente() && m.tipo !== "estorno" && !m.estornado ? `<button class="abtn soft sm" data-a="cxEstornar" data-id="${esc(m.id)}">Estornar</button>` : ""}</div>`).join("") : `<div class="empty">Sem movimentações manuais. As vendas já entram sozinhas.</div>`}</div>`;
+  },
+  resumoFechado(c) {
+    return `<div class="tt-row"><span>Fechado em</span><span>${esc(fmtDT(c.fechado_em))} · ${esc(c.fechado_por_nome || "—")}</span></div>
+      <div class="tt-row"><span>Esperado</span><span>${esc(fmt(c.esperado_dinheiro))}</span></div><div class="tt-row"><span>Conferido</span><span>${esc(fmt(c.valor_conferido))}</span></div>
+      <div class="tt-row big"><span>Diferença</span><span class="${Number(c.diferenca) ? "neg" : "pos"}">${esc(fmt(c.diferenca))}</span></div>${c.justificativa ? `<small style="color:var(--muted)">Justificativa: ${esc(c.justificativa)}</small><br>` : ""}`;
+  },
+  async abrir(btn) {
+    const raw = $("cxSaldo").value.trim(), v = raw === "" ? 0 : num(raw);
+    if (!Number.isFinite(v) || v < 0 || Math.abs(Math.round(v * 100) - v * 100) > 1e-6) return toast("Saldo inicial inválido (use no máximo 2 casas)", true);
+    if (!confirm(`Abrir o caixa de ${S.loja.nome} com ${fmt(v)}?`)) return;
+    await busy(btn, async () => { await rpc("abrir_caixa", { p_loja_id: S.loja.id, p_saldo_inicial: v, p_observacao: $("cxObs").value || null }); toast("Caixa aberto"); await Views.caixa.render(); });
+  },
+  mov(tipo) {
+    openModal(`<h3>${esc(TIPOS_MOV[tipo])} de caixa</h3>
+      ${tipo === "retirada" ? `<div class="banner">Retirada é sempre em dinheiro.</div>` : `<label>Meio</label><select class="field" id="mvMeio">${Object.entries(MEIOS).map(([k, l]) => `<option value="${k}">${l}</option>`).join("")}</select>`}
+      ${tipo === "ajuste" ? `<label>Sentido</label><select class="field" id="mvSent"><option value="1">Soma (+)</option><option value="-1">Subtrai (−)</option></select>` : ""}
+      <label>Valor (R$)</label><input class="field" id="mvValor" inputmode="decimal" placeholder="0,00">
+      <label>Categoria</label><input class="field" id="mvCat" list="mvCats" placeholder="Ex: ${tipo === "entrada" ? "suprimento" : tipo === "retirada" ? "sangria" : "despesa"}"><datalist id="mvCats">${["suprimento", "sangria", "despesa", "troco", "quebra de caixa", "fornecedor"].map(c => `<option value="${c}">`).join("")}</datalist>
+      <label>Observação${tipo === "ajuste" ? " (obrigatória)" : ""}</label><input class="field" id="mvObs">
+      <div class="modal-actions"><button class="btn btn-soft" data-a="fechar">Cancelar</button><button class="btn btn-red" data-a="cxMovSalvar" data-id="${tipo}">Registrar</button></div>`);
+  },
+  async movSalvar(tipo, btn) {
+    const v = num($("mvValor").value);
+    if (!centavosOk(v)) return toast("Informe um valor maior que zero, com até 2 casas decimais", true);
+    const cat = $("mvCat").value.trim(); if (!cat) return toast("Informe a categoria", true);
+    const obs = $("mvObs").value.trim(); if (tipo === "ajuste" && !obs) return toast("Ajuste exige observação", true);
+    await busy(btn, async () => {
+      await rpc("registrar_movimento_caixa", { p_caixa_id: S.caixa.aberto.id, p_tipo: tipo, p_meio: tipo === "retirada" ? "dinheiro" : $("mvMeio").value, p_valor: v, p_categoria: cat,
+        p_observacao: obs || null, p_sentido: tipo === "ajuste" ? parseInt($("mvSent").value, 10) : null });
+      closeModal(); toast("Movimentação registrada"); await Views.caixa.render();
+    });
+  },
+  estornar(id) {
+    openModal(`<h3>Estornar movimentação</h3><div class="banner">O lançamento original continua no histórico; um estorno é registrado ao lado dele.</div>
+      <label>Motivo</label><input class="field" id="esMotivo" placeholder="Ex: valor digitado errado">
+      <div class="modal-actions"><button class="btn btn-soft" data-a="fechar">Cancelar</button><button class="btn btn-red" data-a="cxEstornarOk" data-id="${esc(id)}">Estornar</button></div>`);
+  },
+  async estornarOk(id, btn) {
+    const m = $("esMotivo").value.trim(); if (!m) return toast("Informe o motivo", true);
+    await busy(btn, async () => { await rpc("estornar_movimento_caixa", { p_movimento_id: id, p_motivo: m }); closeModal(); toast("Estorno registrado"); await Views.caixa.render(); });
+  },
+  fechar() {
+    const c = S.caixa.aberto;
+    openModal(`<h3>Fechar caixa</h3>
+      <div class="tt-row"><span>Saldo inicial</span><span>${esc(fmt(c.saldo_inicial))}</span></div><div class="tt-row"><span>+ Vendas em dinheiro</span><span>${esc(fmt(c.vendas_dinheiro))}</span></div>
+      <div class="tt-row"><span>± Movimentos em dinheiro</span><span>${esc(fmt(c.mov_dinheiro))}</span></div><div class="tt-row big"><span>Esperado na gaveta</span><span id="fcEsp" data-v="${esc(c.esperado_dinheiro)}">${esc(fmt(c.esperado_dinheiro))}</span></div>
+      <small style="color:var(--muted)">Pix e cartão (${esc(fmt(Number(c.vendas_pix) + Number(c.vendas_cartao)))}) não entram na gaveta.</small>
+      <label>Dinheiro contado (R$)</label><input class="field" id="fcVal" inputmode="decimal" placeholder="0,00">
+      <div class="tt-row big"><span>Diferença</span><span id="fcDif">—</span></div>
+      <label>Justificativa (obrigatória se houver diferença)</label><textarea class="field" id="fcJust"></textarea>
+      <div class="modal-actions"><button class="btn btn-soft" data-a="fechar">Voltar</button><button class="btn btn-red" data-a="cxFecharOk">Fechar caixa</button></div>`);
+  },
+  atualizaDif() {
+    const v = num($("fcVal").value), esp = Number($("fcEsp").dataset.v);
+    $("fcDif").textContent = Number.isFinite(v) ? fmt(Math.round((v - esp) * 100) / 100) : "—";
+  },
+  async fecharOk(btn) {
+    const raw = $("fcVal").value.trim(), v = num(raw);
+    if (raw === "" || !Number.isFinite(v) || v < 0 || Math.abs(Math.round(v * 100) - v * 100) > 1e-6) return toast("Informe o dinheiro contado (até 2 casas)", true);
+    const dif = Math.round((v - Number($("fcEsp").dataset.v)) * 100) / 100, just = $("fcJust").value.trim();
+    if (dif !== 0 && !just) return toast("Há diferença — informe a justificativa", true);
+    if (!confirm(`Fechar o caixa com ${fmt(v)} contados${dif ? ` (diferença ${fmt(dif)})` : ""}?`)) return;
+    await busy(btn, async () => { await rpc("fechar_caixa", { p_caixa_id: S.caixa.aberto.id, p_valor_conferido: v, p_justificativa: just || null }); closeModal(); toast("Caixa fechado"); await Views.caixa.render(); });
+  },
+  reabrir(id) {
+    openModal(`<h3>Reabrir caixa</h3><div class="banner">Fica registrado quem reabriu, quando e por quê. O fechamento anterior é guardado na auditoria.</div>
+      <label>Motivo (mín. 5 letras)</label><input class="field" id="raMotivo">
+      <div class="modal-actions"><button class="btn btn-soft" data-a="fechar">Cancelar</button><button class="btn btn-red" data-a="cxReabrirOk" data-id="${esc(id)}">Reabrir</button></div>`);
+  },
+  async reabrirOk(id, btn) {
+    const m = $("raMotivo").value.trim(); if (m.length < 5) return toast("Informe o motivo (mín. 5 letras)", true);
+    await busy(btn, async () => { await rpc("reabrir_caixa", { p_caixa_id: id, p_motivo: m }); closeModal(); toast("Caixa reaberto"); await Views.caixa.render(); });
+  },
+  async detalhe(id) {
+    const d = await rpc("caixa_detalhe", { p_caixa_id: id }), c = d.caixa;
+    openModal(`<h3>Caixa de ${esc(c.loja_nome)} · ${esc(fmtD(String(c.aberto_em).slice(0, 10)))}</h3>
+      <div class="row" style="margin-bottom:6px"><span class="tag ${c.status === "aberto" ? "pendente" : "pago"}">${esc(c.status)}</span><small style="color:var(--muted)">Aberto por ${esc(c.aberto_por_nome || "—")} com ${esc(fmt(c.saldo_inicial))}${c.reaberturas ? " · reaberto " + c.reaberturas + "×" : ""}</small></div>
+      ${c.status === "fechado" ? Views.caixa.resumoFechado(c) : `<div class="tt-row"><span>Esperado agora</span><span>${esc(fmt(c.esperado_dinheiro))}</span></div>`}
+      <label>Movimentações</label>${d.movimentos.length ? d.movimentos.map(m => `<div class="list-row"><div class="grow">${esc(TIPOS_MOV[m.tipo] || m.tipo)} · ${esc(m.categoria)} · ${esc(MEIOS[m.meio] || m.meio)}${m.estornado ? " (estornada)" : ""}<small>${esc(fmtDT(m.criado_em))} · ${esc(m.criado_por_nome || "—")}${m.observacao ? " · " + esc(m.observacao) : ""}</small></div><b>${m.sentido > 0 ? "+" : "−"}${esc(fmt(m.valor))}</b></div>`).join("") : `<div class="empty">Nenhuma.</div>`}
+      <label>Auditoria</label>${d.auditoria.map(a => `<div class="list-row"><div class="grow">${esc(a.acao)}${a.motivo ? " — " + esc(a.motivo) : ""}<small>${esc(fmtDT(a.em))} · ${esc(a.por || "—")}</small></div></div>`).join("")}
+      <div class="modal-actions"><button class="btn btn-soft" data-a="fechar">Fechar</button></div>`);
+  },
+};
+
+Views.caixa.update = async function () {   // atualização em segundo plano: não apaga o que está sendo digitado
+  const a = document.activeElement; if (a && ["cxSaldo", "cxObs"].includes(a.id)) return;
+  if ($("cxSaldo") && $("cxSaldo").value) return;
+  return Views.caixa.render();
+};
+
+/* HISTÓRICO FINANCEIRO (por dia) */
+Views.historico = {
+  async render() {
+    const f = S.f;
+    if (!S.respLista) { try { S.respLista = ok(await sb.from("perfis").select("id,nome").order("nome")); } catch (e) { S.respLista = []; } }
+    if (!S.lojasFiltro) { S.lojasFiltro = S.minhasLojas; if (S.perfil.papel === "dono") { try { S.lojasFiltro = ok(await sb.from("lojas").select("id,nome,ativo").order("nome")).filter(l => l.ativo !== false); } catch (e) {} } }
+    $("viewRoot").innerHTML = `<div class="page-h"><h2>📅 Histórico financeiro</h2></div>
+      <div class="card"><div class="grid2"><div><label>Loja</label><select class="field" id="hLoja"><option value="">${S.perfil.papel === "dono" ? "Todas (consolidado)" : "Todas as minhas"}</option>${S.lojasFiltro.map(l => `<option value="${esc(l.id)}" ${f.hLoja === l.id ? "selected" : ""}>${esc(l.nome)}</option>`).join("")}</select></div>
+        <div><label>Período</label><select class="field" id="hPeriodo">${[["7d", "Últimos 7 dias"], ["30d", "Últimos 30 dias"], ["mes", "Este mês"], ["90d", "Últimos 90 dias"]].map(([k, l]) => `<option value="${k}" ${f.hPeriodo === k ? "selected" : ""}>${l}</option>`).join("")}</select></div>
+        <div><label>Responsável</label><select class="field" id="hResp"><option value="">Todos</option>${S.respLista.map(p => `<option value="${esc(p.id)}" ${f.hResp === p.id ? "selected" : ""}>${esc(p.nome || "—")}</option>`).join("")}</select></div>
+        <div><label>Situação do caixa</label><select class="field" id="hSit">${[["", "Todas"], ["aberto", "Aberto"], ["fechado", "Fechado"], ["diferenca", "Com diferença"]].map(([k, l]) => `<option value="${k}" ${f.hSit === k ? "selected" : ""}>${l}</option>`).join("")}</select></div></div></div>
+      <div id="hLista"><div class="empty">Carregando…</div></div>`;
+    await Views.historico.update();
+  },
+  async update() {
+    const el = $("hLista"); if (!el) return;
+    const f = S.f, hoje = hojeISO();
+    const ini = { "7d": addDias(hoje, -6), "30d": addDias(hoje, -29), "90d": addDias(hoje, -89), mes: hoje.slice(0, 8) + "01" }[f.hPeriodo];
+    const dias = await rpc("historico_financeiro", { p_loja_id: f.hLoja || null, p_inicio: ini, p_fim: hoje, p_responsavel: f.hResp || null, p_situacao: f.hSit || null });
+    if (S.tab !== "historico" || !$("hLista")) return;
+    S.hDias = dias;
+    const sit = { aberto: ["pendente", "caixa aberto"], fechado: ["pago", "fechado"], sem_caixa: ["neutro", "sem caixa"] };
+    $("hLista").innerHTML = dias.length ? dias.map((d, i) => `<div class="dia-row"><div class="dia-h" data-a="hDia" data-id="${i}"><div class="grow"><b>${esc(fmtD(d.dia))}</b> · ${esc(d.loja_nome)}</div><span class="tag ${sit[d.situacao][0]}">${sit[d.situacao][1]}</span>
+        <div class="dia-nums"><div><span>Abertura</span><b>${esc(fmt(d.abertura))}</b></div><div><span>Entradas</span><b class="pos">${esc(fmt(d.entradas))}</b></div><div><span>Saídas</span><b class="neg">${esc(fmt(d.saidas))}</b></div>
+        <div><span>Estornos</span><b>${esc(fmt(d.estornos))}</b></div><div><span>Resultado do dia</span><b>${esc(fmt(d.saldo))}</b></div><div><span>Fechamento (dinheiro)</span><b>${d.situacao === "fechado" ? esc(fmt(d.fechamento)) : "—"}</b></div>
+        <div><span>Diferença</span><b class="${Number(d.diferenca) ? "neg" : ""}">${d.situacao === "fechado" ? esc(fmt(d.diferenca)) : "—"}</b></div></div></div><div class="dia-det hidden" id="hdet-${i}"></div></div>`).join("") : `<div class="empty">Nenhum movimento no período/filtro.</div>`;
+  },
+  async dia(i, el) {
+    const d = (S.hDias || [])[i], box = $("hdet-" + i); if (!d || !box) return;
+    if (!box.classList.contains("hidden")) { box.classList.add("hidden"); return; }
+    box.classList.remove("hidden"); box.innerHTML = `<div class="empty">Carregando…</div>`;
+    try {
+      const x = await rpc("detalhe_dia_financeiro", { p_loja_id: d.loja_id, p_dia: d.dia });
+      box.innerHTML = `${x.caixas.map(c => `<div class="list-row click" data-a="cxDetalhe" data-id="${esc(c.id)}"><div class="grow"><b>Caixa ${esc(c.status)}</b><small>${esc(c.aberto_por_nome || "—")} · abriu ${esc(fmtDT(c.aberto_em))} com ${esc(fmt(c.saldo_inicial))}${c.status === "fechado" ? ` · contou ${esc(fmt(c.valor_conferido))} (esperado ${esc(fmt(c.esperado_dinheiro))}, diferença ${esc(fmt(c.diferenca))})` : ""}</small></div><span style="color:var(--muted)">›</span></div>`).join("")}
+        <label>Movimentações do caixa</label>${x.movimentos.length ? x.movimentos.map(m => `<div class="list-row"><span class="tag ${m.sentido > 0 ? "entrada" : "saida"}">${esc(TIPOS_MOV[m.tipo] || m.tipo)}</span><div class="grow">${esc(m.categoria)} · ${esc(MEIOS[m.meio] || m.meio)}<small>${esc(fmtDT(m.criado_em))} · ${esc(m.criado_por_nome || "—")}${m.observacao ? " · " + esc(m.observacao) : ""}</small></div><b>${m.sentido > 0 ? "+" : "−"}${esc(fmt(m.valor))}</b></div>`).join("") : `<div class="empty">Nenhuma.</div>`}
+        <label>Financeiro (vendas, despesas, estornos)</label>${x.lancamentos.length ? x.lancamentos.map(l => `<div class="list-row"><span class="tag ${l.tipo}">${l.tipo === "entrada" ? "ENTRADA" : "SAÍDA"}</span><div class="grow">${esc(l.descricao || l.categoria)}<small>${esc(l.categoria)}${l.forma_pagamento ? " · " + esc(l.forma_pagamento) : ""} · ${esc(fmtDT(l.data_ref))}</small></div><b>${l.tipo === "entrada" ? "+" : "−"}${esc(fmt(l.valor))}</b></div>`).join("") : `<div class="empty">Nenhum.</div>`}`;
+    } catch (e) { box.innerHTML = `<div class="empty">${esc(msgErro(e))}</div>`; }
+  },
+};
+
 /* ───────── ações (delegação de eventos — sem onclick inline) ───────── */
 const Act = {
   logout: () => Auth.logout(), trocarLoja: () => App.trocarLoja(), fechar: () => closeModal(),
@@ -844,6 +1093,13 @@ const Act = {
   finForm: () => Views.financeiro.form(), finSalvar: (id, b) => Views.financeiro.salvar(b), finPagar: (id, b) => Views.financeiro.pagar(id, b), finCsv: () => Views.financeiro.csv(),
   finPeriodo: (id) => { S.f.finPeriodo = id; Views.financeiro.render().catch(e => toast(msgErro(e), true)); },
   finStatus: (id) => { S.f.finStatus = id; Views.financeiro.render().catch(e => toast(msgErro(e), true)); },
+  avisoForm: (id) => Avisos.form(id), avisoSalvar: (id, b) => Avisos.salvar(id, b), avisoLido: (id, b) => Avisos.lido(id, b), avisoArquivar: (id, b) => Avisos.arquivar(id, b),
+  avisoIr: (id) => App.goTab(id),
+  cxAbrir: (id, b) => Views.caixa.abrir(b), cxMov: (id) => Views.caixa.mov(id), cxMovSalvar: (id, b) => Views.caixa.movSalvar(id, b),
+  cxEstornar: (id) => Views.caixa.estornar(id), cxEstornarOk: (id, b) => Views.caixa.estornarOk(id, b),
+  cxFechar: () => Views.caixa.fechar(), cxFecharOk: (id, b) => Views.caixa.fecharOk(b), cxReabrir: (id) => Views.caixa.reabrir(id), cxReabrirOk: (id, b) => Views.caixa.reabrirOk(id, b),
+  cxDetalhe: (id) => Views.caixa.detalhe(id).catch(e => toast(msgErro(e), true)), hDia: (id, el) => Views.historico.dia(id, el),
+  finComprovante: (id, b) => busy(b, async () => { await rpc("marcar_comprovante_enviado", { p_id: id }); toast("Comprovante confirmado"); await Views.financeiro.render(); }),
   waCopiar: () => Views.whats.copiar(), waEnviar: () => Views.whats.enviar(),
   catGrupo: (id, b) => Views.catalogo.grupo(id, b), catItem: (id, b) => Views.catalogo.item(b), catEditar: (id) => Views.catalogo.editar(id),
   catSalvar: (id, b) => Views.catalogo.salvar(id, b), catSabor: (id, b) => Views.catalogo.sabor(id, b), catWpp: (id, b) => Views.catalogo.wpp(b),
@@ -863,11 +1119,13 @@ document.addEventListener("input", ev => {
     const c = S.clientes.find(x => x.nome === ev.target.value);
     if (c) { $("vCliTel").value = c.telefone || ""; $("vCliEnd").value = c.endereco || ""; }
   }
+  else if (id === "fcVal") Views.caixa.atualizaDif();
   else if (id === "waPreco" || id === "waQtd" || id === "waSabores") { S.f[id] = ev.target.checked; Views.whats.render(); }
 });
 document.addEventListener("change", ev => {
   const id = ev.target.id;
   if (id === "waPreco" || id === "waQtd" || id === "waSabores") { S.f[id] = ev.target.checked; Views.whats.render(); }
+  else if (["hLoja", "hPeriodo", "hResp", "hSit"].includes(id)) { S.f[id] = ev.target.value; Views.historico.update().catch(e => toast(msgErro(e), true)); }
 });
 document.addEventListener("keydown", ev => { if (ev.key === "Escape" && modalOpen()) closeModal(); });
 document.addEventListener("visibilitychange", async () => {

@@ -23,6 +23,7 @@
     precos_loja: [{ loja_id: L1, item_id: "i1", preco: 100, ativo: true }, { loja_id: L1, item_id: "i2", preco: 12.5, ativo: true }, { loja_id: L1, item_id: "i3", preco: 5, ativo: true }, { loja_id: L2, item_id: "i1", preco: 90, ativo: true }],
     clientes: [{ id: "c-ana", loja_id: L1, nome: "Ana", telefone: "11999990000", endereco: "Rua A" }],
     vendas: [], venda_itens: [], financeiro_lancamentos: [], estoque_movimentos: [],
+    caixas: [], caixa_movs: [], avisos: [{ id: 'av1', origem: 'aviso', tipo: 'sistema', titulo: 'Novo: caixa <b onmouseover="window.__xss=2">e avisos</b>', descricao: 'Texto', prioridade: 'info', destaque: false, global: true, lojas: [], lido: false, atualizado: false, criado_em: new Date().toISOString(), atualizado_em: new Date().toISOString() }], alertasLidos: {},
   };
   const log = window.__rpcLog = [];
   const users = { luiz: { id: "u-luiz", pw: "1234" }, enzo: { id: "u-enzo", pw: "1234" } };
@@ -144,6 +145,65 @@
     },
     adicionar_sabor(a) { const sid = ids("sab"); db.sabores.push({ id: sid, item_id: a.p_item_id, nome: a.p_nome, ordem: 9 }); db.estoque.push({ id: ids("est"), item_id: a.p_item_id, sabor_id: sid, quantidade: a.p_quantidade, estoque_minimo: 3 }); return sid; },
     pagar_lancamento(a) { const l = db.financeiro_lancamentos.find(x => x.id === a.p_id); if (l.status === "pago") throw new Error("Lançamento já está pago"); l.status = "pago"; l.pago_em = new Date().toISOString(); l.data_ref = l.pago_em; },
+
+    /* ---- caixa / histórico / avisos (simplificado: valida permissões e regras principais) ---- */
+    _cx(id) { const c = db.caixas.find(x => x.id === id); if (!c) throw new Error("Caixa não encontrado"); return c; },
+    _res(c) {
+      const movs = db.caixa_movs.filter(m => m.caixa_id === c.id), vend = f => db.vendas.filter(v => v.loja_id === c.loja_id && v.status === "concluida" && f(v.forma_pagamento)).reduce((s, v) => s + v.total, 0);
+      const md = movs.filter(m => m.meio === "dinheiro").reduce((s, m) => s + m.sentido * m.valor, 0), vd = vend(f => f === "Dinheiro");
+      return { id: c.id, loja_id: c.loja_id, loja_nome: db.lojas.find(l => l.id === c.loja_id).nome, status: c.status, saldo_inicial: c.saldo_inicial, aberto_em: c.aberto_em, aberto_por_nome: "Luiz", fechado_em: c.fechado_em, fechado_por_nome: c.fechado_em ? "Luiz" : null,
+        esperado_dinheiro: c.status === "fechado" ? c.esperado : money(c.saldo_inicial + md + vd), valor_conferido: c.conferido ?? null, diferenca: c.diferenca ?? null, justificativa: c.justificativa || null, reaberturas: c.reaberturas || 0,
+        vendas_dinheiro: vd, vendas_pix: vend(f => f === "Pix"), vendas_cartao: vend(f => ["Cartão", "Débito", "Crédito"].includes(f)), vendas_outro: 0, mov_dinheiro: md, mov_outros_meios: movs.filter(m => m.meio !== "dinheiro").reduce((s, m) => s + m.sentido * m.valor, 0) };
+    },
+    _movs(id) { return db.caixa_movs.filter(m => m.caixa_id === id).map(m => ({ ...m, criado_por_nome: "Luiz", estornado: db.caixa_movs.some(e => e.estorno_de === m.id) })); },
+    abrir_caixa(a) {
+      if (!minhas().includes(a.p_loja_id)) throw new Error("Você não tem permissão para esta loja");
+      if (!(a.p_saldo_inicial >= 0) || Math.round(a.p_saldo_inicial * 100) !== a.p_saldo_inicial * 100) throw new Error("Valor inválido");
+      if (db.caixas.some(c => c.loja_id === a.p_loja_id && c.status === "aberto")) throw new Error("Já existe um caixa aberto nesta loja");
+      const c = { id: ids("cx"), loja_id: a.p_loja_id, status: "aberto", saldo_inicial: a.p_saldo_inicial, aberto_em: new Date().toISOString() }; db.caixas.push(c); return c.id;
+    },
+    caixa_atual(a) { const ab = db.caixas.find(c => c.loja_id === a.p_loja_id && c.status === "aberto"), ul = db.caixas.filter(c => c.loja_id === a.p_loja_id && c.status === "fechado").pop();
+      return { aberto: ab ? this._res(ab) : null, movimentos: ab ? this._movs(ab.id) : [], ultimo_fechado: ul ? this._res(ul) : null }; },
+    registrar_movimento_caixa(a) {
+      const c = this._cx(a.p_caixa_id); if (c.status !== "aberto") throw new Error("O caixa está fechado — reabra para lançar");
+      if (!(a.p_valor > 0) || Math.round(a.p_valor * 100) !== a.p_valor * 100) throw new Error("O valor deve ter no máximo 2 casas decimais (centavos)");
+      if (a.p_tipo === "ajuste" && !gerente()) throw new Error("Só gerente ou dono faz ajuste de caixa");
+      const sent = a.p_tipo === "entrada" ? 1 : a.p_tipo === "ajuste" ? a.p_sentido : -1;
+      if (sent === -1 && a.p_meio === "dinheiro" && this._res(c).esperado_dinheiro - a.p_valor < 0) throw new Error("Dinheiro insuficiente no caixa");
+      const m = { id: ids("mv"), caixa_id: c.id, tipo: a.p_tipo, sentido: sent, meio: a.p_meio, valor: a.p_valor, categoria: a.p_categoria, observacao: a.p_observacao, criado_em: new Date().toISOString() }; db.caixa_movs.push(m); return m.id;
+    },
+    estornar_movimento_caixa(a) {
+      if (!gerente()) throw new Error("Só gerente ou dono pode estornar"); const m = db.caixa_movs.find(x => x.id === a.p_movimento_id);
+      if (db.caixa_movs.some(e => e.estorno_de === m.id)) throw new Error("Esta movimentação já foi estornada");
+      db.caixa_movs.push({ ...m, id: ids("mv"), tipo: "estorno", sentido: -m.sentido, categoria: "estorno", estorno_de: m.id, observacao: a.p_motivo, criado_em: new Date().toISOString() }); return "ok";
+    },
+    fechar_caixa(a) {
+      const c = this._cx(a.p_caixa_id), esp = this._res(c).esperado_dinheiro, dif = money(a.p_valor_conferido - esp);
+      if (dif !== 0 && !a.p_justificativa) throw new Error("Há diferença — informe a justificativa");
+      Object.assign(c, { status: "fechado", esperado: esp, conferido: a.p_valor_conferido, diferenca: dif, justificativa: a.p_justificativa, fechado_em: new Date().toISOString() });
+      return { esperado: esp, conferido: a.p_valor_conferido, diferenca: dif };
+    },
+    reabrir_caixa(a) { if (!gerente()) throw new Error("Só gerente ou dono pode reabrir o caixa"); const c = this._cx(a.p_caixa_id); if (db.caixas.some(x => x.loja_id === c.loja_id && x.status === "aberto")) throw new Error("Já existe outro caixa aberto nesta loja");
+      Object.assign(c, { status: "aberto", reaberturas: (c.reaberturas || 0) + 1 }); },
+    caixa_detalhe(a) { const c = this._cx(a.p_caixa_id); return { caixa: this._res(c), movimentos: this._movs(c.id), auditoria: [{ acao: "abertura", em: c.aberto_em, por: "Luiz", motivo: null }] }; },
+    historico_financeiro(a) {
+      const hoje = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+      return db.caixas.filter(c => minhas().includes(c.loja_id) && (!a.p_loja_id || c.loja_id === a.p_loja_id) && (!a.p_situacao || c.status === a.p_situacao)).map(c => { const r = this._res(c);
+        return { dia: hoje, loja_id: c.loja_id, loja_nome: r.loja_nome, abertura: c.saldo_inicial, entradas: 10, saidas: 2, estornos: 0, saldo: 8, fechamento: c.conferido || 0, diferenca: c.diferenca || 0, situacao: c.status, caixas: [] }; });
+    },
+    detalhe_dia_financeiro(a) { return { caixas: db.caixas.filter(c => c.loja_id === a.p_loja_id).map(c => this._res(c)), movimentos: db.caixa_movs.map(m => ({ ...m, criado_por_nome: "Luiz" })), lancamentos: [] }; },
+    listar_avisos(a) {
+      const hoje = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" }), out = db.avisos.filter(x => !x.arquivado).map(x => ({ ...x, pode_editar: gerente() && x.tipo !== "sistema" }));
+      const venc = db.financeiro_lancamentos.filter(l => l.loja_id === a.p_loja_id && l.status !== "pago" && l.vencimento && l.vencimento < hoje);
+      if (venc.length) out.unshift({ origem: "alerta", chave: "contas_vencidas", tipo: "alerta", titulo: venc.length + " conta(s) vencida(s)", descricao: "Total em atraso", prioridade: "urgente", destaque: true, acao: "financeiro", lojas: [], lido: db.alertasLidos.contas_vencidas === venc.length, atualizado: false, criado_em: new Date().toISOString(), atualizado_em: new Date().toISOString() });
+      return out;
+    },
+    publicar_aviso(a) { if (!gerente()) throw new Error("Só gerente ou dono publica avisos"); if (a.p_global && meuPerfil().papel !== "dono") throw new Error("Só o administrador geral publica avisos globais");
+      db.avisos.push({ id: ids("av"), origem: "aviso", tipo: a.p_tipo, titulo: a.p_titulo, descricao: a.p_descricao, prioridade: a.p_prioridade, destaque: a.p_destaque, global: a.p_global, lojas: db.lojas.filter(l => (a.p_lojas || []).includes(l.id)).map(l => l.nome), lido: false, atualizado: false, criado_em: new Date().toISOString(), atualizado_em: new Date().toISOString() }); return "ok"; },
+    marcar_aviso_lido(a) { db.avisos.find(x => x.id === a.p_aviso_id).lido = true; },
+    marcar_alerta_lido(a) { db.alertasLidos[a.p_chave] = db.financeiro_lancamentos.filter(l => l.loja_id === a.p_loja_id && l.status !== "pago" && l.vencimento && l.vencimento < new Date().toLocaleDateString("en-CA")).length; },
+    arquivar_aviso(a) { db.avisos.find(x => x.id === a.p_id).arquivado = true; },
+    marcar_comprovante_enviado(a) { db.financeiro_lancamentos.find(l => l.id === a.p_id).comprovante_enviado_em = new Date().toISOString(); },
     definir_whatsapp_loja(a) { const n = (a.p_whatsapp || "").replace(/\D/g, ""); db.lojas.find(l => l.id === a.p_loja_id).whatsapp = n; return n; },
   };
 
@@ -163,7 +223,7 @@
       log.push({ name, args: JSON.parse(JSON.stringify(args || {})) });
       await new Promise(r => setTimeout(r, 5));
       if (window.__netDown) return err("Failed to fetch");
-      try { checkParams(name, args || {}); const d = R[name](args || {}); return { data: d === undefined ? null : d, error: null }; }
+      try { checkParams(name, args || {}); const d = R[name].call(R, args || {}); return { data: d === undefined ? null : d, error: null }; }
       catch (e) { return err(e.message); }
     },
     channel(name) { const ch = { on(_t, f, cb) { listeners.push({ table: f.table, cb }); return ch; }, subscribe(cb) { setTimeout(() => cb && cb("SUBSCRIBED"), 5); return ch; } }; return ch; },

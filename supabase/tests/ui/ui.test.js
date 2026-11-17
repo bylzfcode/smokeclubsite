@@ -4,7 +4,7 @@ const fs = require("fs"), path = require("path");
 const root = path.resolve(__dirname, "../../..");
 const html = fs.readFileSync(path.join(root, "dashboard.html"), "utf8");
 const fake = fs.readFileSync(path.join(__dirname, "fake-supabase.js"), "utf8");
-const sql = fs.readFileSync(path.join(root, "supabase/002_melhorias.sql"), "utf8");
+const sql = ["002_melhorias.sql", "003_caixa_avisos.sql"].map(f => fs.readFileSync(path.join(root, "supabase", f), "utf8")).join("\n");
 
 // contrato: nomes de parâmetros reais das funções (obrigatório = sem "default")
 const CONTRACT = {};
@@ -18,7 +18,7 @@ const check = (nome, cond, extra) => { if (cond) pass++; else { fail++; falhas.p
 
 async function novaPagina(browser) {
   const ctx = await browser.newContext({ viewport: { width: 1100, height: 900 } });
-  const page = await ctx.newPage();
+  const page = await ctx.newPage(); page.on('dialog', d => d.accept());
   const erros = []; page.on("pageerror", e => erros.push(e.message)); page.on("console", m => { if (m.type() === "error" && !/Failed to load resource/.test(m.text())) erros.push("console: " + m.text()); });
   await page.route("**/*", route => {
     const u = route.request().url();
@@ -174,6 +174,66 @@ const toastTxt = page => page.textContent("#toast");
   await page.waitForFunction(() => window.__db.lojas[0].whatsapp === "5511999990000");
   check("WhatsApp da loja normalizado", true);
 
+
+  /* AVISOS (painel) */
+  await page.click("#tab-painel"); await page.waitForSelector(".aviso");
+  check("avisos: seção aparece com aviso novo (não lido)", (await page.locator(".aviso:not(.lido)").count()) === 1 && (await page.textContent(".card h3")).includes("Avisos"));
+  check("avisos: título com HTML é escapado (sem XSS)", !(await page.evaluate(() => window.__xss)) && (await page.locator(".aviso b b").count()) === 0);
+  await page.click("[data-a=avisoLido]"); await page.waitForSelector(".aviso.lido");
+  check("avisos: marcar lido vai pelo servidor", await page.evaluate(() => window.__db.avisos[0].lido === true));
+  await page.evaluate(() => window.__db.financeiro_lancamentos.push({ id: "x1", loja_id: "loja-1", tipo: "saida", categoria: "aluguel", valor: 50, status: "pendente", vencimento: "2020-01-01", criado_em: new Date().toISOString(), data_ref: new Date().toISOString() }));
+  await page.click("#tab-caixa"); await page.click("#tab-painel"); await page.waitForSelector(".aviso.urgente");
+  check("alerta de conta vencida aparece como URGENTE no topo", /vencida/.test(await page.textContent(".aviso")) && await page.locator(".aviso.urgente").count() === 1);
+  await page.click(".aviso.urgente [data-a=avisoLido]"); await page.waitForSelector(".aviso.urgente.lido");
+  check("marcar alerta como lido NÃO resolve a pendência", await page.evaluate(() => window.__db.financeiro_lancamentos.filter(l => l.status === "pendente").length === 1));
+  await page.evaluate(() => { window.__db.financeiro_lancamentos = window.__db.financeiro_lancamentos.filter(l => l.id !== "x1"); });
+  await page.click("[data-a=avisoForm][data-id='']"); await page.fill("#avTitulo", "Comunicado Smoke"); await page.fill("#avDesc", "Fechar o caixa às 22h"); await page.selectOption("#avPrio", "atencao");
+  await page.click("[data-a=avisoSalvar]"); await page.waitForSelector(".aviso:has-text('Comunicado Smoke')");
+  check("gerente publica aviso para a loja", await page.evaluate(() => { const a = window.__db.avisos.find(x => x.titulo === "Comunicado Smoke"); return a && a.prioridade === "atencao" && a.lojas.includes("Smoke Club") && !a.global; }));
+
+  /* CAIXA */
+  await page.click("#tab-caixa"); await page.waitForSelector("#cxSaldo");
+  await page.fill("#cxSaldo", "100,505"); await page.click("[data-a=cxAbrir]");
+  check("saldo inicial com 3 casas é barrado", /casas/.test(await toastTxt(page)));
+  await page.fill("#cxSaldo", "100,50"); await page.click("[data-a=cxAbrir]"); await page.waitForSelector("[data-a=cxFechar]");
+  check("abrir caixa: dinheiro esperado = saldo inicial", /100,50/.test(await page.textContent(".kpi.good")));
+  check("sem formulário de abertura com caixa aberto (1 por loja)", await page.locator("#cxSaldo").count() === 0);
+  const lancar = async (tipo, valor, meio) => { await page.click(`[data-a=cxMov][data-id=${tipo}]`); if (meio) await page.selectOption("#mvMeio", meio); await page.fill("#mvValor", valor); await page.fill("#mvCat", "teste"); await page.click("[data-a=cxMovSalvar]"); };
+  await lancar("entrada", "40", "pix"); await page.waitForSelector(".list-row:has-text('Pix')");
+  check("Pix de 40 NÃO soma no dinheiro esperado", /100,50/.test(await page.textContent(".kpi.good")));
+  await lancar("saida", "1,005", "dinheiro");
+  check("valor com 3 casas é barrado na tela", /2 casas/.test(await toastTxt(page)));
+  await page.click("[data-a=fechar]");
+  await lancar("saida", "500", "dinheiro"); await page.waitForFunction(() => /insuficiente/.test(document.getElementById("toast").textContent));
+  check("saída maior que o dinheiro do caixa recusada (e botão reabilita)", await page.isEnabled("[data-a=cxMovSalvar]"));
+  await page.click("[data-a=fechar]");
+  await lancar("saida", "20,50", "dinheiro"); await page.waitForSelector(".list-row:has-text('20,50')");
+  check("saída em dinheiro reduz o esperado (80,00)", /80,00/.test(await page.textContent(".kpi.good")));
+  await page.click(".list-row:has-text('20,50') [data-a=cxEstornar]"); await page.fill("#esMotivo", "digitei errado"); await page.click("[data-a=cxEstornarOk]");
+  await page.waitForSelector(".tag.cancelada:has-text('estornada')");
+  check("estorno preserva o original e devolve o valor (100,50)", /100,50/.test(await page.textContent(".kpi.good")) && await page.evaluate(() => window.__db.caixa_movs.filter(m => m.categoria === "teste" && m.valor === 20.5).length === 1 && window.__db.caixa_movs.some(m => m.tipo === "estorno")));
+  check("estornado não oferece estornar de novo", await page.locator(".list-row:has-text('20,50'):has(.tag.cancelada) [data-a=cxEstornar]").count() === 0);
+  await page.click("[data-a=cxFechar]"); await page.fill("#fcVal", "90");
+  check("fechamento mostra a diferença ao digitar (−10,50)", /10,50/.test(await page.textContent("#fcDif")));
+  await page.click("[data-a=cxFecharOk]");
+  check("diferença sem justificativa é barrada", /justificativa/.test(await toastTxt(page)));
+  await page.fill("#fcJust", "faltou troco"); await page.click("[data-a=cxFecharOk]"); await page.waitForSelector("#cxSaldo");
+  check("caixa fechado com diferença registrada", await page.evaluate(() => { const c = window.__db.caixas[0]; return c.status === "fechado" && c.diferenca === -10.5 && c.esperado === 100.5; }));
+  check("após fechar: mostra o último fechamento e permite reabrir (gerente)", await page.locator("[data-a=cxReabrir]").count() === 1 && /10,50/.test(await page.textContent(".card:has(h3:has-text('Último'))")));
+  await page.click("[data-a=cxReabrir]"); await page.fill("#raMotivo", "abc"); await page.click("[data-a=cxReabrirOk]");
+  check("reabrir exige motivo (mín. 5 letras)", /motivo/.test(await toastTxt(page)));
+  await page.fill("#raMotivo", "contei errado"); await page.click("[data-a=cxReabrirOk]"); await page.waitForSelector("[data-a=cxFechar]");
+  check("caixa reaberto", await page.evaluate(() => window.__db.caixas[0].status === "aberto" && window.__db.caixas[0].reaberturas === 1));
+  await page.click("[data-a=cxFechar]"); await page.fill("#fcVal", "100,50"); await page.click("[data-a=cxFecharOk]"); await page.waitForSelector("#cxSaldo");
+
+  /* HISTÓRICO */
+  await page.click("#tab-historico"); await page.waitForSelector(".dia-row");
+  check("histórico por dia mostra abertura, entradas, saídas e fechamento", /Abertura/.test(await page.textContent(".dia-row")) && /Fechamento/.test(await page.textContent(".dia-row")) && /100,50/.test(await page.textContent(".dia-row")));
+  await page.click(".dia-h"); await page.waitForSelector(".dia-det:not(.hidden) >> text=Movimentações do caixa");
+  check("expandir o dia mostra os detalhes", /teste/.test(await page.textContent(".dia-det")));
+  await page.selectOption("#hSit", "aberto"); await page.waitForFunction(() => document.querySelectorAll(".dia-row").length === 0);
+  check("filtro de situação funciona (nenhum caixa aberto)", await page.locator(".dia-row").count() === 0);
+
   /* TROCAR LOJA sem novo login */
   await page.click("[data-a=trocarLoja]"); await page.waitForSelector("#seletorLoja:not(.hidden)");
   await page.click(".loja-card:has-text('EZ Store')");
@@ -190,6 +250,13 @@ const toastTxt = page => page.textContent("#toast");
   check("operador não vê Catálogo nem Trocar loja", await page.locator("#tab-catalogo").count() === 0 && await page.isHidden("#btnTrocarLoja"));
   await page.click("#tab-estoque"); await page.click("#estLista .item-row:has-text('Menta')");
   check("operador não vê controles de ajuste", await page.locator("#adjQtd").count() === 0);
+  await page.click("[data-a=fechar]");
+  await page.click("#tab-painel"); await page.waitForSelector(".aviso");
+  check("operador não vê '+ Novo aviso'", await page.locator("[data-a=avisoForm]").count() === 0);
+  await page.click("#tab-caixa"); await page.fill("#cxSaldo", "50"); await page.click("[data-a=cxAbrir]"); await page.waitForSelector("[data-a=cxFechar]");
+  check("operador abre caixa mas não vê Ajuste", await page.locator("[data-a=cxMov][data-id=ajuste]").count() === 0 && await page.locator("[data-a=cxMov][data-id=entrada]").count() === 1);
+  await page.click("[data-a=cxMov][data-id=entrada]"); await page.fill("#mvValor", "5"); await page.fill("#mvCat", "gorjeta"); await page.click("[data-a=cxMovSalvar]"); await page.waitForSelector(".list-row:has-text('gorjeta')");
+  check("operador não vê Estornar", await page.locator("[data-a=cxEstornar]").count() === 0);
 
   check("nenhum erro de JavaScript em toda a sessão", erros.length === 0, erros.join(" | "));
   await browser.close();
