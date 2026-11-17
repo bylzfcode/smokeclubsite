@@ -123,6 +123,7 @@ label{display:block;font-size:.74rem;font-weight:700;color:var(--muted);margin:8
 .tag.entrada,.tag.pago,.tag.concluida{background:var(--green-bg);color:#1a7a40}
 .tag.saida,.tag.atrasado,.tag.cancelada{background:var(--red-bg);color:var(--red)}
 .tag.pendente{background:var(--amber-bg);color:var(--amber)}
+.tag.parcial{background:#E3F0FF;color:#1B4F8F}
 .tag.neutro{background:#EEEEF2;color:var(--muted)}
 .abtn{border:none;border-radius:8px;padding:9px 14px;font-weight:700;font-size:.8rem}
 .abtn.red{background:var(--red);color:#fff}.abtn.dark{background:var(--ink);color:#fff}
@@ -672,7 +673,14 @@ Views.clientes = {
   },
 };
 
-/* FINANCEIRO */
+/* FINANCEIRO — contas com pagamentos parciais e comprovantes privados */
+const FORMAS_PAG = ["Pix", "Transferência", "Boleto", "Cartão", "Débito", "Crédito", "Dinheiro", "Outro"];
+const FIN_FILTROS = [["todos", "Todos", null], ["pendentes", "Pendentes", "pendente"], ["parciais", "Parciais", "parcial"], ["vencidas", "Vencidas", "vencida"],
+  ["pagas", "Pagas", "paga"], ["canceladas", "Canceladas", "cancelada"], ["comprovante", "Comprovante pendente", "comprovante_pendente"]];
+const SIT_TXT = { pendente: "pendente", parcial: "parcialmente paga", paga: "paga", cancelada: "cancelada" };
+const SIT_CLS = { pendente: "pendente", parcial: "parcial", paga: "pago", cancelada: "cancelada" };
+const TIPOS_ARQ = { "application/pdf": "pdf", "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
+const MAX_ARQ = 5 * 1024 * 1024;
 Views.financeiro = {
   periodo() {
     const hoje = hojeISO(), p = S.f.finPeriodo;
@@ -680,61 +688,183 @@ Views.financeiro = {
     if (p === "mes") return [hoje.slice(0, 8) + "01", hoje]; return [null, null];
   },
   async render() {
-    const f = S.f, [ini, fim] = Views.financeiro.periodo(), hoje = hojeISO();
-    $("viewRoot").innerHTML = `<div class="page-h"><h2>💰 Financeiro · ${esc(S.loja.nome)}</h2><button class="abtn red" data-a="finForm">+ Lançamento</button><button class="abtn soft" data-a="finCsv">⬇ CSV</button></div>
+    const f = S.f, [ini, fim] = Views.financeiro.periodo();
+    $("viewRoot").innerHTML = `<div class="page-h"><h2>💰 Financeiro · ${esc(S.loja.nome)}</h2><button class="abtn red" data-a="finForm">+ Conta / lançamento</button><button class="abtn soft" data-a="finCsv">⬇ CSV</button></div>
       <div class="chips">${[["hoje", "Hoje"], ["7d", "7 dias"], ["mes", "Este mês"], ["tudo", "Tudo"]].map(([k, l]) => `<button class="chip ${f.finPeriodo === k ? "sel" : ""}" data-a="finPeriodo" data-id="${k}">${l}</button>`).join("")}</div>
       <div id="finResumo"></div>
-      <div class="chips">${[["todos", "Todos"], ["pendentes", "Pendentes"], ["atrasados", "Atrasados"], ["pagos", "Pagos"]].map(([k, l]) => `<button class="chip ${f.finStatus === k ? "sel" : ""}" data-a="finStatus" data-id="${k}">${l}</button>`).join("")}</div>
+      <div class="chips">${FIN_FILTROS.map(([k, l]) => `<button class="chip ${f.finStatus === k ? "sel" : ""}" data-a="finStatus" data-id="${k}">${l}</button>`).join("")}</div>
+      <small style="color:var(--muted);display:block;margin-bottom:8px">O período filtra pela data do lançamento/pagamento; Pendentes, Parciais, Vencidas e Comprovante pendente mostram tudo que está em aberto.</small>
       <div class="card" id="finLista"><div class="empty">Carregando…</div></div>`;
-    let q = sb.from("financeiro_lancamentos").select("*").eq("loja_id", S.loja.id).order("data_ref", { ascending: false }).limit(500);
-    if (ini) q = q.gte("data_ref", ini + "T00:00:00-03:00");
-    if (fim) q = q.lte("data_ref", fim + "T23:59:59.999-03:00");
-    const [r, ls] = await Promise.all([rpc("financeiro_resumo", { p_loja_id: S.loja.id, p_inicio: ini, p_fim: fim }), q.then(ok)]);
+    const sit = (FIN_FILTROS.find(x => x[0] === f.finStatus) || [])[2] || null;
+    const [r, ls] = await Promise.all([rpc("financeiro_resumo", { p_loja_id: S.loja.id, p_inicio: ini, p_fim: fim }),
+      rpc("listar_contas", { p_loja_id: S.loja.id, p_inicio: ini, p_fim: fim, p_situacao: sit })]);
     if (S.tab !== "financeiro") return;
     S.finLista = ls;
-    const atras = l => l.status !== "pago" && l.vencimento && l.vencimento < hoje;
     $("finResumo").innerHTML = `<div class="kpi-grid">
-      <div class="kpi good"><div class="v">${esc(fmt(r.entradas))}</div><div class="l">Entradas (pagas) no período</div></div>
-      <div class="kpi warn"><div class="v">${esc(fmt(r.saidas))}</div><div class="l">Saídas (pagas) no período</div></div>
+      <div class="kpi good"><div class="v">${esc(fmt(r.entradas))}</div><div class="l">Entradas efetivadas no período</div></div>
+      <div class="kpi warn"><div class="v">${esc(fmt(r.saidas))}</div><div class="l">Saídas efetivadas no período</div></div>
       <div class="kpi"><div class="v">${esc(fmt(r.saldo_periodo))}</div><div class="l">Resultado do período</div></div>
-      <div class="kpi"><div class="v">${esc(fmt(r.saldo_caixa))}</div><div class="l">Saldo em caixa (total)</div></div>
-      <div class="kpi"><div class="v">${esc(fmt(r.a_receber.total))}</div><div class="l">A receber · ${r.a_receber.qtd}</div></div>
-      <div class="kpi ${r.atrasados.qtd ? "warn" : ""}"><div class="v">${esc(fmt(r.a_pagar.total))}</div><div class="l">A pagar · ${r.a_pagar.qtd} (${r.atrasados.qtd} atrasada)</div></div></div>`;
-    let vis = ls.filter(l => ({ todos: true, pendentes: l.status !== "pago", atrasados: atras(l), pagos: l.status === "pago" })[f.finStatus]);
-    $("finLista").innerHTML = vis.length ? vis.map(l => { const a = atras(l), st = a ? "atrasado" : l.status;
-      return `<div class="list-row"><span class="tag ${l.tipo}">${l.tipo === "entrada" ? "ENTRADA" : "SAÍDA"}</span><div class="grow"><b>${esc(l.descricao || l.categoria)}</b><small>${esc(l.categoria)} · ${esc(fmtDT(l.data_ref))}${l.vencimento ? " · vence " + esc(fmtD(l.vencimento)) : ""}${l.forma_pagamento ? " · " + esc(l.forma_pagamento) : ""}</small></div>
-      <div style="text-align:right"><b class="${l.tipo === "entrada" ? "pos" : "neg"}">${l.tipo === "entrada" ? "+" : "−"}${esc(fmt(l.valor))}</b><br><span class="tag ${st}">${esc(st)}</span></div>
-      ${l.status !== "pago" ? `<button class="abtn green sm" data-a="finPagar" data-id="${esc(l.id)}">Pagar</button>` : ""}${l.exige_comprovante && !l.comprovante_enviado_em ? `<button class="abtn soft sm" data-a="finComprovante" data-id="${esc(l.id)}">Comprovante enviado</button>` : ""}</div>`; }).join("") : `<div class="empty">Nenhum lançamento.</div>`;
+      <div class="kpi"><div class="v">${esc(fmt(r.saldo_caixa))}</div><div class="l">Saldo efetivado (total)</div></div>
+      <div class="kpi"><div class="v">${esc(fmt(r.a_receber.total))}</div><div class="l">A receber (saldo) · ${r.a_receber.qtd}</div></div>
+      <div class="kpi ${r.atrasados.qtd ? "warn" : ""}"><div class="v">${esc(fmt(r.a_pagar.total))}</div><div class="l">A pagar (saldo) · ${r.a_pagar.qtd} (${r.atrasados.qtd} vencida)</div></div></div>`;
+    $("finLista").innerHTML = ls.length ? ls.map(l => `<div class="list-row click" data-a="finDetalhe" data-id="${esc(l.id)}"><span class="tag ${l.tipo}">${l.tipo === "entrada" ? "ENTRADA" : "SAÍDA"}</span>
+      <div class="grow"><b>${esc(l.descricao || l.categoria)}</b><small>${esc(l.categoria)} · ${esc(fmtD(String(l.data_ref).slice(0, 10)))}${l.vencimento ? " · vence " + esc(fmtD(l.vencimento)) : ""} · original ${esc(fmt(l.valor))} · pago ${esc(fmt(l.total_pago))}${l.legado ? " · lançamento antigo" : ""}</small>
+        <span class="tag ${SIT_CLS[l.situacao]}">${SIT_TXT[l.situacao]}</span>${l.vencida ? ' <span class="tag atrasado">saldo vencido</span>' : ""}${l.envios_pendentes ? ' <span class="tag pendente">comprovante: envio pendente</span>' : ""}${l.qtd_comprovantes ? ` <span class="tag neutro">📎 ${l.qtd_comprovantes}</span>` : ""}</div>
+      <div style="text-align:right"><b class="${l.tipo === "entrada" ? "pos" : "neg"}">${esc(fmt(l.saldo))}</b><br><small style="color:var(--muted)">saldo</small></div></div>`).join("") : `<div class="empty">Nenhuma conta no filtro.</div>`;
   },
+
+  /* ---- nova conta ---- */
   form() {
-    openModal(`<h3>Novo lançamento</h3>
-      <div class="grid2"><div><label>Tipo</label><select class="field" id="lTipo"><option value="saida">Saída (despesa)</option><option value="entrada">Entrada</option></select></div>
+    S.chaveConta = uuid(); S.chaveContaPag = uuid();
+    openModal(`<h3>Nova conta / lançamento</h3>
+      <div class="grid2"><div><label>Tipo</label><select class="field" id="lTipo"><option value="saida">Saída (a pagar)</option><option value="entrada">Entrada (a receber)</option></select></div>
       <div><label>Categoria</label><select class="field" id="lCat">${["compra de mercadoria", "aluguel", "salário", "frete", "taxas", "impostos", "marketing", "outro"].map(c => `<option>${c}</option>`).join("")}</select></div></div>
       <label>Descrição</label><input class="field" id="lDesc" placeholder="Ex: Compra de pods — fornecedor X">
       <div class="grid2"><div><label>Valor (R$)</label><input class="field" id="lValor" inputmode="decimal" placeholder="0,00"></div><div><label>Vencimento</label><input class="field" id="lVenc" type="date"></div></div>
-      <div class="grid2"><div><label>Situação</label><select class="field" id="lStatus"><option value="pago">Já pago</option><option value="pendente">Pendente</option></select></div>
-      <div><label>Forma</label><select class="field" id="lForma"><option value="">—</option>${FORMAS.map(f => `<option>${f}</option>`).join("")}</select></div></div>
       <div class="check"><input type="checkbox" id="lComp"><label for="lComp" style="margin:0;font-size:.84rem;color:var(--text)">Exige comprovante</label></div>
+      <div class="check"><input type="checkbox" id="lJaPaga"><label for="lJaPaga" style="margin:0;font-size:.84rem;color:var(--text)">Já foi paga (registrar pagamento integral hoje)</label></div>
+      <div id="lPagBox" class="hidden"><label>Forma do pagamento</label><select class="field" id="lForma">${FORMAS_PAG.map(f => `<option>${f}</option>`).join("")}</select></div>
+      <small style="color:var(--muted)">Registrar pagamento apenas anota uma operação já realizada; não transfere dinheiro nem mexe no caixa.</small>
       <div class="modal-actions"><button class="btn btn-soft" data-a="fechar">Cancelar</button><button class="btn btn-red" data-a="finSalvar">Salvar</button></div>`);
   },
   async salvar(btn) {
-    const valor = num($("lValor").value);
-    if (!Number.isFinite(valor) || valor <= 0) return toast("Informe um valor maior que zero", true);
-    const status = $("lStatus").value, venc = $("lVenc").value || null;
-    if (status === "pendente" && !venc) return toast("Lançamento pendente precisa de vencimento", true);
+    const valor = num($("lValor").value), jaPaga = $("lJaPaga").checked, venc = $("lVenc").value || null;
+    if (!centavosOk(valor)) return toast("Informe um valor maior que zero, com até 2 casas decimais", true);
+    if (!jaPaga && !venc) return toast("Conta em aberto precisa de vencimento", true);
     await busy(btn, async () => {
-      ok(await sb.from("financeiro_lancamentos").insert({ loja_id: S.loja.id, tipo: $("lTipo").value, categoria: $("lCat").value, descricao: $("lDesc").value.trim() || null,
-        valor: Math.round(valor * 100) / 100, status, vencimento: venc, forma_pagamento: $("lForma").value || null, exige_comprovante: $("lComp").checked }));
-      closeModal(); toast("Lançamento salvo"); await Views.financeiro.render();
+      const id = await rpc("criar_conta", { p_loja_id: S.loja.id, p_tipo: $("lTipo").value, p_categoria: $("lCat").value, p_descricao: $("lDesc").value.trim() || null, p_valor: valor,
+        p_vencimento: venc, p_forma: jaPaga ? $("lForma").value : null, p_exige_comprovante: $("lComp").checked, p_chave: S.chaveConta });
+      if (jaPaga) {
+        try { await rpc("registrar_pagamento", { p_lancamento_id: id, p_valor: valor, p_data: null, p_forma: $("lForma").value, p_observacao: null, p_chave: S.chaveContaPag }); }
+        catch (e) { closeModal(); toast("Conta criada, mas o pagamento não foi registrado: " + msgErro(e), true); await Views.financeiro.render(); return Views.financeiro.detalhe(id); }
+      }
+      S.chaveConta = null; closeModal(); toast("Conta salva"); await Views.financeiro.render();
     });
   },
-  async pagar(id, btn) { await busy(btn, async () => { await rpc("pagar_lancamento", { p_id: id }); toast("Marcado como pago"); await Views.financeiro.render(); }); },
+
+  /* ---- detalhe da conta ---- */
+  async detalhe(id) {
+    const d = await rpc("conta_detalhe", { p_id: id }), c = d.conta; S.conta = d;
+    const podePagar = !["paga", "cancelada"].includes(c.situacao) && !c.legado && !c.venda_id && c.categoria !== "venda" && c.categoria !== "estorno";
+    openModal(`<h3>${esc(c.descricao || c.categoria)}</h3>
+      <div class="row" style="margin-bottom:6px"><span class="tag ${SIT_CLS[c.situacao]}">${SIT_TXT[c.situacao]}</span>${c.vencida ? '<span class="tag atrasado">saldo vencido</span>' : ""}${c.legado ? '<span class="tag neutro">lançamento antigo (quitado)</span>' : ""}
+        <small style="color:var(--muted)">${esc(c.categoria)}${c.vencimento ? " · vence " + esc(fmtD(c.vencimento)) : ""} · criada por ${esc(c.criado_por_nome || "—")}</small></div>
+      <div class="kpi-grid"><div class="kpi"><div class="v">${esc(fmt(c.valor))}</div><div class="l">Valor original</div></div><div class="kpi good"><div class="v">${esc(fmt(c.total_pago))}</div><div class="l">Total pago</div></div>
+        <div class="kpi ${Number(c.saldo) ? "warn" : ""}"><div class="v">${esc(fmt(c.saldo))}</div><div class="l">Saldo pendente</div></div></div>
+      ${c.situacao === "cancelada" ? `<div class="banner">Cancelada em ${esc(fmtDT(c.cancelada_em))} — ${esc(c.motivo_cancelamento || "")}</div>` : ""}
+      ${c.legado && c.exige_comprovante ? `<div class="banner">Lançamento antigo: a marcação de envio é a antiga (${c.marcacao_antiga_comprovante ? "marcado em " + esc(fmtDT(c.marcacao_antiga_comprovante)) : "não marcado"}) e <b>não</b> indica arquivo anexado.
+        ${c.marcacao_antiga_comprovante ? "" : `<button class="abtn soft sm" data-a="finMarcaAntiga" data-id="${esc(c.id)}">Marcar envio (antigo)</button>`}</div>` : ""}
+      <label>Pagamentos</label>
+      ${d.pagamentos.length ? d.pagamentos.map(p => Views.financeiro.pagHtml(p, c)).join("") : `<div class="empty">${c.legado ? "Quitado antes do controle de pagamentos." : "Nenhum pagamento registrado."}</div>`}
+      <div class="row" style="margin-top:10px">${podePagar ? `<button class="abtn green" data-a="finPagForm" data-id="${esc(c.id)}">+ Registrar pagamento</button>` : ""}
+        ${isGerente() && !d.pagamentos.length && !c.legado && c.situacao === "pendente" && !c.venda_id ? `<button class="abtn soft" data-a="finCancelarForm" data-id="${esc(c.id)}">Cancelar conta</button>` : ""}</div>
+      <small style="color:var(--muted);display:block;margin-top:8px">Pagamento aqui só registra uma operação já realizada: não transfere dinheiro e não altera o caixa.</small>
+      <label>Histórico (auditoria)</label>${d.auditoria.map(a => `<div class="list-row"><div class="grow">${esc({ conta_criada: "Conta criada", pagamento: "Pagamento registrado", estorno_pagamento: "Pagamento estornado", comprovante_anexado: "Comprovante anexado", envio_confirmado: "Envio confirmado", conta_cancelada: "Conta cancelada" }[a.acao] || a.acao)}${a.motivo ? " — " + esc(a.motivo) : ""}<small>${esc(fmtDT(a.em))} · ${esc(a.por || "—")}</small></div></div>`).join("")}
+      <div class="modal-actions"><button class="btn btn-soft" data-a="fechar">Fechar</button></div>`);
+  },
+  pagHtml(p, c) {
+    const eEstorno = p.tipo === "estorno", pend = S.upPend && S.upPend[p.id];
+    return `<div class="card" style="padding:10px;margin-bottom:8px${eEstorno ? ";background:var(--soft)" : ""}">
+      <div class="row"><b class="${eEstorno ? "pos" : "neg"}">${eEstorno ? "Estorno" : "Pagamento"} ${esc(fmt(p.valor))}</b><span class="tag ${p.estornado ? "cancelada" : "pago"}">${eEstorno ? "estorno registrado" : p.estornado ? "estornado" : "confirmado"}</span>
+        <small style="color:var(--muted)">${esc(fmtD(p.data_pagamento))} · ${esc(p.forma_pagamento)} · ${esc(p.criado_por_nome || "—")}</small></div>
+      ${p.observacao ? `<small style="color:var(--muted)">Obs: ${esc(p.observacao)}</small><br>` : ""}${p.motivo ? `<small style="color:var(--muted)">Motivo: ${esc(p.motivo)}</small><br>` : ""}
+      ${eEstorno ? "" : `<div style="margin-top:6px;font-size:.78rem">
+        <div>📎 <b>Arquivo anexado:</b> ${p.comprovantes.length ? p.comprovantes.map(a => `<button class="abtn soft sm" data-a="finBaixar" data-id="${esc(a.path)}" title="${esc(a.nome || "")}">${esc((a.nome || "arquivo").slice(0, 24))} (${esc(String(Math.ceil(a.tamanho / 1024)))} KB)</button>`).join(" ") : "nenhum"}</div>
+        <div>✉️ <b>Envio manual:</b> ${p.envio ? `confirmado por ${esc(p.envio.confirmado_por_nome || "—")} em ${esc(fmtDT(p.envio.confirmado_em))}${p.envio.observacao ? " — " + esc(p.envio.observacao) : ""}` : (c.exige_comprovante ? '<span class="neg">pendente</span>' : "não confirmado")}</div></div>
+        ${p.estornado ? "" : `<div class="row" style="margin-top:6px">
+          <input type="file" class="arqInput hidden" id="arq-${esc(p.id)}" data-pag="${esc(p.id)}" accept="application/pdf,image/jpeg,image/png,image/webp">
+          <button class="abtn dark sm" data-a="finAnexar" data-id="${esc(p.id)}">📎 Anexar comprovante</button>
+          ${pend ? `<button class="abtn red sm" data-a="finTentar" data-id="${esc(p.id)}">Tentar registrar de novo (${esc(pend.nome)})</button>` : ""}
+          ${p.envio ? "" : `<button class="abtn soft sm" data-a="finEnvio" data-id="${esc(p.id)}">Confirmar envio</button>`}
+          ${isGerente() ? `<button class="abtn soft sm" data-a="finEstornarForm" data-id="${esc(p.id)}">Estornar</button>` : ""}</div>`}`}</div>`;
+  },
+
+  /* ---- pagamento ---- */
+  pagForm(id) {
+    const c = S.conta.conta;
+    openModal(`<h3>Registrar pagamento</h3><small style="color:var(--muted)">Saldo pendente: <b>${esc(fmt(c.saldo))}</b>. Isto apenas registra uma operação já realizada.</small>
+      <label>Valor pago (R$)</label><input class="field" id="pgValor" inputmode="decimal" value="${esc(String(c.saldo).replace(".", ","))}">
+      <div class="grid2"><div><label>Data do pagamento</label><input class="field" id="pgData" type="date" value="${hojeISO()}" max="${hojeISO()}"></div>
+      <div><label>Forma</label><select class="field" id="pgForma">${FORMAS_PAG.map(f => `<option>${f}</option>`).join("")}</select></div></div>
+      <label>Observação (opcional)</label><input class="field" id="pgObs">
+      <div class="modal-actions"><button class="btn btn-soft" data-a="finVoltar" data-id="${esc(id)}">Voltar</button><button class="btn btn-red" data-a="finPagSalvar" data-id="${esc(id)}">Confirmar pagamento</button></div>`);
+  },
+  async pagSalvar(id, btn) {
+    const c = S.conta.conta, v = num($("pgValor").value), data = $("pgData").value || hojeISO();
+    if (!centavosOk(v)) return toast("Informe um valor maior que zero, com até 2 casas decimais", true);
+    if (v > Number(c.saldo) + 1e-9) return toast(`O pagamento passa do saldo (${fmt(c.saldo)})`, true);
+    if (data > hojeISO()) return toast("A data do pagamento não pode ser futura", true);
+    const args = { p_lancamento_id: id, p_valor: v, p_data: data, p_forma: $("pgForma").value, p_observacao: $("pgObs").value.trim() || null };
+    const sig = JSON.stringify(args);
+    if (!S.pagChave || S.pagSig !== sig) { S.pagChave = uuid(); S.pagSig = sig; }     // mesma chave só para reenvio idêntico (evita duplicar)
+    await busy(btn, async () => {
+      await rpc("registrar_pagamento", { ...args, p_chave: S.pagChave });
+      S.pagChave = null; S.pagSig = ""; toast("Pagamento registrado");
+      await Views.financeiro.detalhe(id); Views.financeiro.render().catch(() => {});
+    });
+  },
+  estornarForm(id) {
+    openModal(`<h3>Estornar pagamento</h3><div class="banner">O pagamento original continua no histórico; um estorno é registrado ao lado dele, com seu nome e o motivo.</div>
+      <label>Motivo (mín. 5 letras)</label><input class="field" id="esPgMotivo">
+      <div class="modal-actions"><button class="btn btn-soft" data-a="finVoltar" data-id="${esc(S.conta.conta.id)}">Voltar</button><button class="btn btn-red" data-a="finEstornarOk" data-id="${esc(id)}">Estornar</button></div>`);
+  },
+  async estornarOk(id, btn) {
+    const m = $("esPgMotivo").value.trim(); if (m.length < 5) return toast("Informe o motivo (mín. 5 letras)", true);
+    await busy(btn, async () => { await rpc("estornar_pagamento", { p_pagamento_id: id, p_motivo: m }); toast("Estorno registrado"); await Views.financeiro.detalhe(S.conta.conta.id); Views.financeiro.render().catch(() => {}); });
+  },
+  cancelarForm(id) {
+    openModal(`<h3>Cancelar conta</h3><label>Motivo (mín. 5 letras)</label><input class="field" id="caMotivo">
+      <div class="modal-actions"><button class="btn btn-soft" data-a="finVoltar" data-id="${esc(id)}">Voltar</button><button class="btn btn-red" data-a="finCancelarOk" data-id="${esc(id)}">Cancelar conta</button></div>`);
+  },
+  async cancelarOk(id, btn) {
+    const m = $("caMotivo").value.trim(); if (m.length < 5) return toast("Informe o motivo (mín. 5 letras)", true);
+    await busy(btn, async () => { await rpc("cancelar_conta", { p_id: id, p_motivo: m }); toast("Conta cancelada"); await Views.financeiro.detalhe(id); Views.financeiro.render().catch(() => {}); });
+  },
+
+  /* ---- comprovantes ---- */
+  escolherArquivo(pagId) { const i = $("arq-" + pagId); if (i) i.click(); },
+  async anexar(pagId, file, btn) {
+    if (!file) return;
+    const ext = TIPOS_ARQ[file.type];
+    if (!ext) return toast("Tipo não permitido. Use PDF, JPG, PNG ou WEBP.", true);
+    if (file.size < 1 || file.size > MAX_ARQ) return toast("O arquivo precisa ter entre 1 byte e 5 MB.", true);
+    const c = S.conta.conta, path = `${c.loja_id}/${pagId}/${uuid()}.${ext}`;
+    const st = { path, nome: file.name, mime: file.type, tamanho: file.size };
+    toast("Enviando comprovante…");
+    // 1) envia o arquivo (se falhar, nada foi registrado e o pagamento segue intacto; é só escolher o arquivo de novo)
+    const { error } = await sb.storage.from("comprovantes").upload(path, file, { contentType: file.type, upsert: false });
+    if (error) return toast("Falha no envio do arquivo: " + msgErro(error) + " — o pagamento não foi afetado; tente de novo.", true);
+    S.upPend = S.upPend || {}; S.upPend[pagId] = st;      // arquivo já está no bucket: se o registro falhar, só ele é repetido
+    await Views.financeiro.registrarArq(pagId, btn);
+  },
+  async registrarArq(pagId, btn) {
+    const st = (S.upPend || {})[pagId]; if (!st) return;
+    await busy(btn, async () => {
+      try { await rpc("registrar_comprovante", { p_pagamento_id: pagId, p_path: st.path, p_nome: st.nome, p_mime: st.mime, p_tamanho: st.tamanho }); }
+      catch (e) {   // o arquivo já está no bucket: mostra o botão para repetir só o registro (sem reenviar nem duplicar o pagamento)
+        toast("Arquivo enviado, mas o registro falhou: " + msgErro(e) + " — use \"Tentar registrar de novo\".", true);
+        return Views.financeiro.detalhe(S.conta.conta.id);
+      }
+      delete S.upPend[pagId]; toast("Comprovante anexado"); await Views.financeiro.detalhe(S.conta.conta.id); Views.financeiro.render().catch(() => {});
+    });
+  },
+  async baixar(path) {
+    const { data, error } = await sb.storage.from("comprovantes").createSignedUrl(path, 60);
+    if (error || !data) return toast("Não foi possível abrir o arquivo: " + msgErro(error || { message: "sem permissão" }), true);
+    window.open(data.signedUrl, "_blank", "noopener");
+  },
+  async confirmarEnvio(pagId, btn) {
+    const obs = prompt("Observação (opcional) — ex: enviado por WhatsApp ao fornecedor:", "");
+    if (obs === null) return;
+    await busy(btn, async () => { await rpc("confirmar_envio_comprovante", { p_pagamento_id: pagId, p_observacao: obs || null }); toast("Envio confirmado"); await Views.financeiro.detalhe(S.conta.conta.id); Views.financeiro.render().catch(() => {}); });
+  },
   csv() {
     const ls = S.finLista || []; if (!ls.length) return toast("Nada para exportar", true);
     const cel = v => '"' + String(v ?? "").replace(/"/g, '""') + '"';
-    // proteção contra fórmulas em planilhas (=,+,-,@)
-    const seguro = v => { const s = String(v ?? ""); return /^[=+\-@]/.test(s) ? "'" + s : s; };
-    const linhas = [["Data", "Tipo", "Categoria", "Descrição", "Valor", "Situação", "Vencimento", "Forma"]].concat(ls.map(l => [fmtDT(l.data_ref), l.tipo, l.categoria, seguro(l.descricao), String(l.valor).replace(".", ","), l.status, l.vencimento || "", l.forma_pagamento || ""]));
+    const seguro = v => { const s = String(v ?? ""); return /^[=+\-@]/.test(s) ? "'" + s : s; };   // evita fórmulas em planilhas
+    const m = v => String(v).replace(".", ",");
+    const linhas = [["Data", "Tipo", "Categoria", "Descrição", "Valor original", "Total pago", "Saldo", "Situação", "Vencimento", "Comprovante: envio pendente"]].concat(ls.map(l =>
+      [fmtD(String(l.data_ref).slice(0, 10)), l.tipo, l.categoria, seguro(l.descricao), m(l.valor), m(l.total_pago), m(l.saldo), SIT_TXT[l.situacao] + (l.vencida ? " (saldo vencido)" : ""), l.vencimento || "", l.envios_pendentes || 0]));
     const blob = new Blob(["﻿" + linhas.map(r => r.map(cel).join(";")).join("\r\n")], { type: "text/csv;charset=utf-8" });
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `financeiro-${hojeISO()}.csv`; document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 2000);
@@ -1082,7 +1212,7 @@ Views.historico = {
       const x = await rpc("detalhe_dia_financeiro", { p_loja_id: d.loja_id, p_dia: d.dia });
       box.innerHTML = `${x.caixas.map(c => `<div class="list-row click" data-a="cxDetalhe" data-id="${esc(c.id)}"><div class="grow"><b>Caixa ${esc(c.status)}</b><small>${esc(c.aberto_por_nome || "—")} · abriu ${esc(fmtDT(c.aberto_em))} com ${esc(fmt(c.saldo_inicial))}${c.status === "fechado" ? ` · contou ${esc(fmt(c.valor_conferido))} (esperado ${esc(fmt(c.esperado_dinheiro))}, diferença ${esc(fmt(c.diferenca))})` : ""}</small></div><span style="color:var(--muted)">›</span></div>`).join("")}
         <label>Movimentações do caixa</label>${x.movimentos.length ? x.movimentos.map(m => `<div class="list-row"><span class="tag ${m.sentido > 0 ? "entrada" : "saida"}">${esc(TIPOS_MOV[m.tipo] || m.tipo)}</span><div class="grow">${esc(m.categoria)} · ${esc(MEIOS[m.meio] || m.meio)}<small>${esc(fmtDT(m.criado_em))} · ${esc(m.criado_por_nome || "—")}${m.observacao ? " · " + esc(m.observacao) : ""}</small></div><b>${m.sentido > 0 ? "+" : "−"}${esc(fmt(m.valor))}</b></div>`).join("") : `<div class="empty">Nenhuma.</div>`}
-        <label>Financeiro (vendas, despesas, estornos)</label>${x.lancamentos.length ? x.lancamentos.map(l => `<div class="list-row"><span class="tag ${l.tipo}">${l.tipo === "entrada" ? "ENTRADA" : "SAÍDA"}</span><div class="grow">${esc(l.descricao || l.categoria)}<small>${esc(l.categoria)}${l.forma_pagamento ? " · " + esc(l.forma_pagamento) : ""} · ${esc(fmtDT(l.data_ref))}</small></div><b>${l.tipo === "entrada" ? "+" : "−"}${esc(fmt(l.valor))}</b></div>`).join("") : `<div class="empty">Nenhum.</div>`}`;
+        <label>Financeiro (vendas, despesas, estornos)</label>${x.lancamentos.length ? x.lancamentos.map(l => { const pos = Number(l.efeito) > 0, orig = { venda: "venda", estorno_venda: "estorno de venda", pagamento: "pagamento de conta", estorno_pagamento: "estorno de pagamento", conta: "conta (lançamento antigo)" }[l.origem] || l.origem; return `<div class="list-row"><span class="tag ${pos ? "entrada" : "saida"}">${pos ? "ENTRADA" : "SAÍDA"}</span><div class="grow">${esc(l.descricao || l.categoria)}<small>Origem: ${esc(orig)} · ${esc(l.categoria)}${l.forma_pagamento ? " · " + esc(l.forma_pagamento) : ""} · ${esc(fmtDT(l.data_ref))}</small></div><b>${pos ? "+" : "−"}${esc(fmt(l.valor))}</b></div>`; }).join("") : `<div class="empty">Nenhum.</div>`}`;
     } catch (e) { box.innerHTML = `<div class="empty">${esc(msgErro(e))}</div>`; }
   },
 };
@@ -1107,8 +1237,15 @@ const Act = {
   vendaDetalhe: (id) => Views.vendas.detalhe(id),
   vendaCancelar: (id, b) => Views.vendas.cancelar(id, b, ($("cancMotivo") || {}).value),
   cliForm: (id) => Views.clientes.form(id), cliDetalhe: (id) => Views.clientes.detalhe(id).catch(e => toast(msgErro(e), true)), cliSalvar: (id, b) => Views.clientes.salvar(id, b),
-  finForm: () => Views.financeiro.form(), finSalvar: (id, b) => Views.financeiro.salvar(b), finPagar: (id, b) => Views.financeiro.pagar(id, b), finCsv: () => Views.financeiro.csv(),
+  finForm: () => Views.financeiro.form(), finSalvar: (id, b) => Views.financeiro.salvar(b), finCsv: () => Views.financeiro.csv(),
   finPeriodo: (id) => { S.f.finPeriodo = id; Views.financeiro.render().catch(e => toast(msgErro(e), true)); },
+  finDetalhe: (id) => Views.financeiro.detalhe(id).catch(e => toast(msgErro(e), true)), finVoltar: (id) => Views.financeiro.detalhe(id).catch(e => toast(msgErro(e), true)),
+  finPagForm: (id) => Views.financeiro.pagForm(id), finPagSalvar: (id, b) => Views.financeiro.pagSalvar(id, b),
+  finEstornarForm: (id) => Views.financeiro.estornarForm(id), finEstornarOk: (id, b) => Views.financeiro.estornarOk(id, b),
+  finCancelarForm: (id) => Views.financeiro.cancelarForm(id), finCancelarOk: (id, b) => Views.financeiro.cancelarOk(id, b),
+  finAnexar: (id) => Views.financeiro.escolherArquivo(id), finTentar: (id, b) => Views.financeiro.registrarArq(id, b), finBaixar: (id) => Views.financeiro.baixar(id),
+  finEnvio: (id, b) => Views.financeiro.confirmarEnvio(id, b),
+  finMarcaAntiga: (id, b) => busy(b, async () => { await rpc("marcar_comprovante_enviado", { p_id: id }); toast("Marcação antiga registrada"); await Views.financeiro.detalhe(id); }),
   finStatus: (id) => { S.f.finStatus = id; Views.financeiro.render().catch(e => toast(msgErro(e), true)); },
   avisoForm: (id) => Avisos.form(id), avisoSalvar: (id, b) => Avisos.salvar(id, b), avisoLido: (id, b) => Avisos.lido(id, b), avisoArquivar: (id, b) => Avisos.arquivar(id, b),
   avisoIr: (id) => App.goTab(id),
@@ -1116,7 +1253,6 @@ const Act = {
   cxEstornar: (id) => Views.caixa.estornar(id), cxEstornarOk: (id, b) => Views.caixa.estornarOk(id, b),
   cxFechar: () => Views.caixa.fechar(), cxFecharOk: (id, b) => Views.caixa.fecharOk(b), cxReabrir: (id) => Views.caixa.reabrir(id), cxReabrirOk: (id, b) => Views.caixa.reabrirOk(id, b),
   cxDetalhe: (id) => Views.caixa.detalhe(id).catch(e => toast(msgErro(e), true)), hDia: (id, el) => Views.historico.dia(id, el),
-  finComprovante: (id, b) => busy(b, async () => { await rpc("marcar_comprovante_enviado", { p_id: id }); toast("Comprovante confirmado"); await Views.financeiro.render(); }),
   waCopiar: () => Views.whats.copiar(), waEnviar: () => Views.whats.enviar(),
   catGrupo: (id, b) => Views.catalogo.grupo(id, b), catItem: (id, b) => Views.catalogo.item(b), catEditar: (id) => Views.catalogo.editar(id),
   catSalvar: (id, b) => Views.catalogo.salvar(id, b), catSabor: (id, b) => Views.catalogo.sabor(id, b), catWpp: (id, b) => Views.catalogo.wpp(b),
@@ -1141,6 +1277,8 @@ document.addEventListener("input", ev => {
 });
 document.addEventListener("change", ev => {
   const id = ev.target.id;
+  if (ev.target.classList && ev.target.classList.contains("arqInput")) { const f = ev.target.files[0]; ev.target.value = ""; Views.financeiro.anexar(ev.target.dataset.pag, f).catch(e => toast(msgErro(e), true)); return; }
+  if (id === "lJaPaga") { $("lPagBox").classList.toggle("hidden", !ev.target.checked); return; }
   if (id === "waPreco" || id === "waQtd" || id === "waSabores") { S.f[id] = ev.target.checked; Views.whats.render(); }
   else if (["hLoja", "hPeriodo", "hResp", "hSit"].includes(id)) { S.f[id] = ev.target.value; Views.historico.update().catch(e => toast(msgErro(e), true)); }
 });

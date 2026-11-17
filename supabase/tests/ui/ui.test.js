@@ -4,7 +4,7 @@ const fs = require("fs"), path = require("path");
 const root = path.resolve(__dirname, "../../..");
 const html = fs.readFileSync(path.join(root, "dashboard.html"), "utf8");
 const fake = fs.readFileSync(path.join(__dirname, "fake-supabase.js"), "utf8");
-const sql = ["002_melhorias.sql", "003_caixa_avisos.sql"].map(f => fs.readFileSync(path.join(root, "supabase", f), "utf8")).join("\n");
+const sql = ["002_melhorias.sql", "003_caixa_avisos.sql", "004_entradas_sem_caixa.sql", "005_pagamentos_comprovantes.sql"].map(f => fs.readFileSync(path.join(root, "supabase", f), "utf8")).join("\n");
 
 // contrato: nomes de parâmetros reais das funções (obrigatório = sem "default")
 const CONTRACT = {};
@@ -131,21 +131,83 @@ const toastTxt = page => page.textContent("#toast");
   await page.click("#tab-vendas"); await page.waitForSelector("#vendasLista .list-row");
   check("histórico mostra venda cancelada", await page.locator("#vendasLista .tag.cancelada").count() === 1);
 
-  /* FINANCEIRO */
+  /* FINANCEIRO: contas, pagamentos parciais, comprovantes */
   await page.click("#tab-financeiro"); await page.waitForSelector(".kpi");
   await page.click("[data-a=finForm]");
   await page.selectOption("#lTipo", "saida"); await page.fill("#lDesc", "Compra pods"); await page.fill("#lValor", "300,50");
-  await page.selectOption("#lStatus", "pendente"); await page.click("[data-a=finSalvar]");
-  check("pendente sem vencimento é barrado", /vencimento/.test(await toastTxt(page)));
-  await page.fill("#lVenc", "2020-01-01"); await page.click("[data-a=finSalvar]");
+  await page.check("#lComp"); await page.click("[data-a=finSalvar]");
+  check("conta em aberto sem vencimento é barrada", /vencimento/.test(await toastTxt(page)));
+  await page.fill("#lValor", "1,005"); await page.click("[data-a=finSalvar]");
+  check("valor com 3 casas é barrado", /casas/.test(await toastTxt(page)));
+  await page.fill("#lValor", "300,50"); await page.fill("#lVenc", "2020-01-01"); await page.click("[data-a=finSalvar]");
   await page.waitForSelector(".list-row:has-text('Compra pods')");
-  check("conta vencida aparece como atrasada", await page.locator(".list-row:has-text('Compra pods') .tag.atrasado").count() === 1);
-  await page.click(".list-row:has-text('Compra pods') [data-a=finPagar]");
-  await page.waitForSelector(".list-row:has-text('Compra pods') .tag.pago");
-  check("pagar vai pela RPC (não update direto)", await page.evaluate(() => window.__rpcLog.some(l => l.name === "pagar_lancamento")));
+  check("conta nova: pendente, com alerta de saldo vencido", await page.locator(".list-row:has-text('Compra pods') .tag.pendente").count() === 1 && await page.locator(".list-row:has-text('Compra pods') .tag.atrasado").count() === 1);
+  await page.click(".list-row:has-text('Compra pods')"); await page.waitForSelector("[data-a=finPagForm]");
+  check("detalhe mostra valor original, total pago e saldo", /300,50/.test(await page.textContent(".modal-box")) && (await page.locator(".modal-box .kpi").count()) === 3);
+  await page.click("[data-a=finPagForm]"); await page.fill("#pgValor", "400"); await page.click("[data-a=finPagSalvar]");
+  check("pagamento acima do saldo é barrado na tela", /passa do saldo/.test(await toastTxt(page)));
+  await page.fill("#pgValor", "100,10"); await page.selectOption("#pgForma", "Pix"); await page.fill("#pgObs", "sinal"); await page.click("[data-a=finPagSalvar]");
+  await page.waitForSelector(".tag.parcial");
+  check("1º pagamento: parcialmente paga, pago 100,10 e saldo 200,40", /100,10/.test(await page.textContent(".modal-box .kpi.good")) && /200,40/.test(await page.textContent(".modal-box .kpi.warn")));
+  // clique duplo
+  await page.click("[data-a=finPagForm]"); await page.fill("#pgValor", "50"); await page.dblclick("[data-a=finPagSalvar]"); await page.waitForFunction(() => window.__db.pagamentos.length >= 2); await page.waitForTimeout(300);
+  check("clique duplo NÃO duplica o pagamento", await page.evaluate(() => window.__db.pagamentos.length === 2 && window.__db.pagamentos.filter(p => p.valor === 50).length === 1));
+  // falha do servidor e repetição com a MESMA chave
+  await page.click("[data-a=finPagForm]"); await page.fill("#pgValor", "25"); await page.evaluate(() => { window.__failPay = "Erro temporário do servidor"; });
+  await page.click("[data-a=finPagSalvar]"); await page.waitForFunction(() => /temporário/.test(document.getElementById("toast").textContent));
+  check("erro no pagamento: botão reabilita e o formulário continua", await page.isEnabled("[data-a=finPagSalvar]") && await page.locator("#pgValor").count() === 1);
+  await page.click("[data-a=finPagSalvar]"); await page.waitForFunction(() => window.__db.pagamentos.length === 3);
+  const chamadas2 = await page.evaluate(() => window.__rpcLog.filter(l => l.name === "registrar_pagamento" && l.args.p_valor === 25));
+  check("reenvio idêntico usa a mesma chave de repetição e grava 1 pagamento", chamadas2.length === 2 && chamadas2[0].args.p_chave === chamadas2[1].args.p_chave && /^[0-9a-f-]{36}$/.test(chamadas2[0].args.p_chave));
+  const pag1 = await page.evaluate(() => window.__db.pagamentos[0].id);
+  // comprovantes
+  await page.evaluate(() => { window.__opened = []; window.open = u => { window.__opened.push(u); }; });
+  await page.setInputFiles(`#arq-${pag1}`, { name: "virus.exe", mimeType: "application/x-msdownload", buffer: Buffer.from("MZ") });
+  check("tipo de arquivo não permitido é barrado antes do envio", /Tipo não permitido/.test(await toastTxt(page)) && (await page.evaluate(() => window.__uploads || 0)) === 0);
+  await page.setInputFiles(`#arq-${pag1}`, { name: "grande.pdf", mimeType: "application/pdf", buffer: Buffer.alloc(5 * 1024 * 1024 + 1) });
+  check("arquivo acima de 5 MB é barrado antes do envio", /5 MB/.test(await toastTxt(page)) && (await page.evaluate(() => window.__uploads || 0)) === 0);
+  await page.evaluate(() => { window.__failUpload = "rede caiu"; });
+  await page.setInputFiles(`#arq-${pag1}`, { name: "nota.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.4 teste") });
+  await page.waitForFunction(() => /Falha no envio/.test(document.getElementById("toast").textContent));
+  check("falha no upload: pagamento intacto, nada registrado, dá para tentar de novo", await page.evaluate(() => window.__db.pagamentos.length === 3 && window.__db.comprovantes.length === 0));
+  await page.evaluate(() => { window.__failReg = "falha ao registrar"; });
+  await page.setInputFiles(`#arq-${pag1}`, { name: "nota.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.4 teste") });
+  await page.waitForSelector("[data-a=finTentar]");
+  check("arquivo enviado mas registro falhou: oferece repetir só o registro", await page.evaluate(() => window.__uploads === 1 && window.__db.comprovantes.length === 0));
+  await page.click("[data-a=finTentar]"); await page.waitForSelector("[data-a=finBaixar]");
+  check("nova tentativa registra o comprovante SEM reenviar o arquivo nem duplicar o pagamento", await page.evaluate(() => window.__uploads === 1 && window.__db.comprovantes.length === 1 && window.__db.pagamentos.length === 3));
+  check("pagamento, arquivo e envio aparecem separados (envio ainda pendente)", /Arquivo anexado/.test(await page.textContent(".modal-box")) && /Envio manual:\s*pendente/.test(await page.textContent(".modal-box")));
+  await page.click("[data-a=finBaixar]"); await page.waitForFunction(() => window.__opened.length === 1);
+  check("download usa link assinado temporário (bucket privado)", await page.evaluate(() => /signed/.test(window.__opened[0]) && /\.pdf/.test(window.__opened[0])));
+  await page.click("[data-a=fechar]"); await page.click("#tab-painel"); await page.waitForSelector(".aviso");
+  check("alertas DISTINTOS: saldo vencido (urgente) e comprovante com envio pendente (atenção)", await page.locator(".aviso.urgente:has-text('vencida')").count() === 1 && await page.locator(".aviso.atencao:has-text('comprovante')").count() === 1);
+  await page.click("#tab-financeiro"); await page.click(".list-row:has-text('Compra pods')"); await page.waitForSelector("[data-a=finEnvio]");
+  while (await page.locator("[data-a=finEnvio]").count()) { await page.locator("[data-a=finEnvio]").first().click(); await page.waitForFunction(n => window.__db.envios.length >= n, 1); await page.waitForTimeout(150); }
+  check("confirmar envio é uma informação separada do arquivo e fica registrada", await page.evaluate(() => window.__db.envios.length === 3 && window.__db.comprovantes.length === 1) && /confirmado por/.test(await page.textContent(".modal-box")));
+  // estorno
+  await page.click(".card:has-text('100,10') [data-a=finEstornarForm]"); await page.fill("#esPgMotivo", "abc"); await page.click("[data-a=finEstornarOk]");
+  check("estorno sem motivo suficiente é barrado", /motivo/.test(await toastTxt(page)));
+  await page.fill("#esPgMotivo", "valor lançado errado"); await page.click("[data-a=finEstornarOk]"); await page.waitForSelector(".tag:has-text('estornado')");
+  check("estorno: original preservado + estorno registrado; total pago 75,00", await page.evaluate(() => window.__db.pagamentos.length === 4 && window.__db.pagamentos.filter(p => p.valor === 100.1).length === 2) && /75,00/.test(await page.textContent(".modal-box .kpi.good")));
+  check("pagamento estornado não oferece novo estorno", await page.locator(".card:has-text('estornado') [data-a=finEstornarForm]").count() === 0);
+  await page.click("[data-a=finPagForm]"); await page.fill("#pgValor", "225,50"); await page.click("[data-a=finPagSalvar]"); await page.waitForSelector(".tag.pago");
+  check("quitação: conta paga, sem botão de novo pagamento", await page.locator("[data-a=finPagForm]").count() === 0 && /0,00/.test(await page.textContent(".modal-box .kpi:nth-child(3)")));
+  await page.click("[data-a=fechar]");
+  // cancelar conta (sem pagamentos)
+  await page.click("[data-a=finForm]"); await page.fill("#lDesc", "Conta a cancelar"); await page.fill("#lValor", "20"); await page.fill("#lVenc", "2030-01-01"); await page.click("[data-a=finSalvar]");
+  await page.waitForSelector(".list-row:has-text('Conta a cancelar')"); await page.click(".list-row:has-text('Conta a cancelar')"); await page.click("[data-a=finCancelarForm]"); await page.fill("#caMotivo", "duplicada"); await page.click("[data-a=finCancelarOk]");
+  await page.waitForSelector(".modal-box .tag.cancelada"); check("conta cancelada não aceita pagamentos", await page.locator("[data-a=finPagForm]").count() === 0 && /cancelada/.test(await page.textContent(".modal-box")));
+  await page.click("[data-a=fechar]");
+  // já paga: falha no pagamento depois de criar a conta
+  await page.click("[data-a=finForm]"); await page.fill("#lDesc", "Conta ja paga"); await page.fill("#lValor", "40"); await page.check("#lJaPaga"); await page.evaluate(() => { window.__failPay = "indisponível"; });
+  await page.click("[data-a=finSalvar]"); await page.waitForFunction(() => /Conta criada, mas o pagamento não foi registrado/.test(document.getElementById("toast").textContent));
+  check("já paga + falha no pagamento: conta criada UMA vez, pendente, detalhe aberto para tentar de novo", await page.evaluate(() => window.__db.financeiro_lancamentos.filter(l => l.descricao === "Conta ja paga").length === 1) && await page.locator("[data-a=finPagForm]").count() === 1);
+  await page.click("[data-a=finPagForm]"); await page.click("[data-a=finPagSalvar]"); await page.waitForSelector(".tag.pago"); await page.click("[data-a=fechar]");
+  await page.evaluate(() => { window.__db.pagamentos.filter(p => p.tipo === "pagamento").forEach(p => { if (!window.__db.envios.some(e => e.pagamento_id === p.id)) window.__db.envios.push({ pagamento_id: p.id, confirmado_em: new Date().toISOString() }); }); });
+  await page.click("#tab-financeiro"); await page.waitForSelector(".kpi");
   const dl = page.waitForEvent("download"); await page.click("[data-a=finCsv]"); const d = await dl;
   const csv = fs.readFileSync(await d.path(), "utf8");
-  check("CSV exportado com BOM e ;", csv.startsWith("﻿") && csv.includes(";") && csv.includes("300,5"));
+  check("CSV com BOM, ; e colunas de valor original, pago e saldo", csv.startsWith("﻿") && csv.includes(";") && /Valor original;"?/.test(csv.replace(/"/g, "")) && csv.includes("Saldo") && csv.includes("300,5"));
 
   /* WHATSAPP */
   await page.click("#tab-whats");
@@ -257,6 +319,11 @@ const toastTxt = page => page.textContent("#toast");
   check("operador abre caixa mas não vê Ajuste", await page.locator("[data-a=cxMov][data-id=ajuste]").count() === 0 && await page.locator("[data-a=cxMov][data-id=entrada]").count() === 1);
   await page.click("[data-a=cxMov][data-id=entrada]"); await page.fill("#mvValor", "5"); await page.fill("#mvCat", "gorjeta"); await page.click("[data-a=cxMovSalvar]"); await page.waitForSelector(".list-row:has-text('gorjeta')");
   check("operador não vê Estornar", await page.locator("[data-a=cxEstornar]").count() === 0);
+  await page.click("#tab-financeiro"); await page.click("[data-a=finForm]"); await page.fill("#lDesc", "Conta op"); await page.fill("#lValor", "10"); await page.fill("#lVenc", "2030-01-01"); await page.click("[data-a=finSalvar]");
+  await page.waitForSelector(".list-row:has-text('Conta op')"); await page.click(".list-row:has-text('Conta op')"); await page.click("[data-a=finPagForm]"); await page.fill("#pgValor", "4"); await page.click("[data-a=finPagSalvar]"); await page.waitForSelector(".tag.parcial");
+  check("operador registra pagamento, mas não vê Estornar nem Cancelar conta", await page.locator("[data-a=finEstornarForm]").count() === 0 && await page.locator("[data-a=finCancelarForm]").count() === 0);
+  const acesso = await page.evaluate(async () => { const c = window.supabase.createClient(); const r = await c.rpc("conta_detalhe", { p_id: "conta-inexistente" }); const dl = await c.storage.from("comprovantes").createSignedUrl("loja-2/x/y.pdf", 60); return [r.error && r.error.message, dl.error && dl.error.message]; });
+  check("acesso indevido a conta/anexo de outra loja é negado", /não encontrada|permissão/i.test(acesso[0] || "") && /not found/i.test(acesso[1] || ""), JSON.stringify(acesso));
 
   check("nenhum erro de JavaScript em toda a sessão", erros.length === 0, erros.join(" | "));
   await browser.close();

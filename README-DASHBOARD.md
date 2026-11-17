@@ -17,7 +17,7 @@ compartilhado. Fica separado do site público (`index (23).html`).
 No SQL Editor do Supabase, nesta ordem:
 1. `supabase/schema.sql`
 2. `supabase/002_melhorias.sql`
-3. `supabase/003_caixa_avisos.sql` e depois 4. `supabase/004_entradas_sem_caixa.sql` (caixa, histórico financeiro e avisos — sem ela as abas Caixa/Histórico e a seção de avisos mostram "falta aplicar a migração")
+3. `supabase/003_caixa_avisos.sql`, depois 4. `supabase/004_entradas_sem_caixa.sql` e 5. `supabase/005_pagamentos_comprovantes.sql` (caixa, histórico financeiro e avisos — sem ela as abas Caixa/Histórico e a seção de avisos mostram "falta aplicar a migração")
 
 Crie os usuários (Authentication → Users, e-mail `user@painel.local`, auto-confirm),
 depois vincule:
@@ -55,12 +55,42 @@ Em `dashboard.html`, ajuste `SUPABASE_URL` e `SUPABASE_ANON_KEY` (só a chave an
 - **Valores sem caixa (004):** o Histórico tem uma seção com as vendas em dinheiro feitas sem caixa aberto (total, datas, responsável), respeitando as permissões. É só consulta: nada é vinculado automaticamente a um caixa nem alterado.
 - "Comprovante": coluna opcional `exige_comprovante` no lançamento + botão "Comprovante enviado" (não há upload de arquivo).
 
+## Pagamentos parciais e comprovantes (migração 005)
+
+**Ordem de aplicação no Supabase (nenhuma foi aplicada ainda no projeto remoto):** `schema.sql` → `002` → `003` → `004` → `005`.
+A 005 depende da 003 (permissões e caixa). Rode uma por vez no SQL Editor e confira que terminou sem erro antes da próxima.
+
+- **Contas:** cada conta tem valor original, total pago e saldo pendente. Situações: pendente, parcialmente paga, paga e cancelada
+  ("saldo vencido" é calculado pela data de vencimento). Vários pagamentos até quitar; valor/data/forma/observação/responsável em cada um.
+- **Segurança do pagamento:** pagamento acima do saldo é recusado no banco, inclusive com várias pessoas pagando ao mesmo tempo
+  (a conta é travada). Cada requisição leva uma chave de repetição: clique duplo ou reenvio não grava duas vezes.
+- **Estorno:** pagamento confirmado não se edita nem apaga; corrige-se com estorno (gerente/dono, com motivo), que fica ao lado do original.
+  Tudo vai para a auditoria (`financeiro_auditoria`).
+- **Registrar pagamento só anota uma operação já realizada.** Não transfere dinheiro e **não mexe no caixa** (não há integração, logo não há dupla contagem;
+  despesa paga com dinheiro da gaveta continua sendo lançada no Caixa). Nos detalhes do dia do Histórico, cada linha mostra a origem
+  (venda, pagamento de conta, estorno de pagamento, conta antiga).
+- **Comprovantes:** PDF/JPG/PNG/WEBP até 5 MB, em bucket **privado** `comprovantes` (caminho `loja/pagamento/arquivo`). Só quem tem acesso à loja envia e lê
+  (o administrador geral lê tudo); download por link assinado de 60 s. Três informações separadas: **pagamento confirmado**, **arquivo anexado**
+  e **envio manual confirmado** (quem confirmou e quando). Se o upload falhar, o pagamento não é afetado e dá para tentar de novo; se o arquivo subiu
+  mas o registro falhou, repete-se só o registro. Nada é enviado automaticamente a ninguém.
+- **Alertas distintos** no Painel: "saldo vencido" (urgente) e "comprovante com envio pendente" (atenção).
+
+**Como ficam os registros que já existiam (nada é reescrito):**
+- Lançamento antigo `pago` sem pagamentos novos = **lançamento antigo quitado**: conta como pago o valor inteiro na data em que já constava; não ganha pagamento retroativo,
+  não aceita novo pagamento nem estorno por aqui.
+- Lançamento antigo `pendente`/`atrasado`: saldo = valor inteiro; aceita pagamentos normalmente.
+- Entradas e estornos de venda continuam como estavam e não recebem pagamentos.
+- A marcação antiga "comprovante enviado" vale **só** para lançamentos antigos e **não** vira arquivo anexado nem envio confirmado de pagamento novo.
+- `pagar_lancamento` continua existindo e agora paga o saldo restante pelo mesmo fluxo (mesmas regras e auditoria).
+- Saldo, a pagar/receber, vencidas, histórico por dia e alertas passam a usar os pagamentos; para contas antigas os números não mudam.
+
 ## Testes
 
 - `supabase/tests/banco_testes.sql` — 128 verificações do banco (rodam e desfazem tudo).
 - `supabase/tests/caixa_testes.sql` — 115 verificações de caixa/histórico/avisos (permissões, isolamento entre lojas, estorno, fechamento, reabertura).
 - `supabase/tests/sem_caixa_testes.sql` — 17 verificações dos valores sem caixa (janelas, permissões, somente leitura); tela: `ui/ui_sem_caixa.test.js`.
-- `supabase/tests/lab/` — banco local + concorrência (`concorrencia.sh` vendas; `concorrencia_caixa.sh` abertura/estorno/fechamento simultâneos).
+- `supabase/tests/pagamentos_testes.sql` — 71 verificações de pagamentos parciais, estornos, comprovantes (políticas do bucket), envio confirmado e acesso indevido; tela: `ui/ui.test.js` (104).
+- `supabase/tests/lab/` — banco local + concorrência (`concorrencia.sh` vendas; `concorrencia_caixa.sh` abertura/estorno/fechamento simultâneos; `concorrencia_pagamentos.sh` pagamentos/estornos/repetições simultâneos). O Storage é simulado só nas **políticas**; a API HTTP real (limite de 5 MB, tipo MIME, upload) só pode ser conferida no Supabase.
 - `supabase/tests/ui/` — a tela no Chromium com Supabase simulado e checagem dos
   nomes de parâmetros das funções contra o SQL:
   `NODE_PATH=/opt/node22/lib/node_modules node supabase/tests/ui/ui.test.js`

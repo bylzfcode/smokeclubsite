@@ -1,9 +1,9 @@
 #!/bin/bash
-# Recria o banco local "lab" do zero: stub do Supabase + schema.sql + 002_melhorias.sql + 003 + 004_entradas_sem_caixa.sql + usuários.
+# Recria o banco local "lab" do zero: stub do Supabase + schema.sql + 002_melhorias.sql + 003 + 004 + 005_pagamentos_comprovantes.sql (com stub de Storage) + usuários.
 set -e
 HERE="$(cd "$(dirname "$0")" && pwd)"; REPO="$(cd "$HERE/../../.." && pwd)"
 W=/tmp/painel-lab/sql; mkdir -p $W
-cp "$HERE"/*.sql $W/ && cp "$REPO/supabase/schema.sql" $W/schema.sql && cp "$REPO/supabase/002_melhorias.sql" $W/002.sql && cp "$REPO/supabase/003_caixa_avisos.sql" $W/003.sql && cp "$REPO/supabase/004_entradas_sem_caixa.sql" $W/004.sql
+cp "$HERE"/*.sql $W/ && cp "$REPO/supabase/schema.sql" $W/schema.sql && cp "$REPO/supabase/002_melhorias.sql" $W/002.sql && cp "$REPO/supabase/003_caixa_avisos.sql" $W/003.sql && cp "$REPO/supabase/004_entradas_sem_caixa.sql" $W/004.sql && cp "$REPO/supabase/005_pagamentos_comprovantes.sql" $W/005.sql
 [ -f "$REPO/supabase/tests/banco_testes.sql" ] && cp "$REPO/supabase/tests/banco_testes.sql" $W/banco_testes.sql
 chmod -R a+rX /tmp/painel-lab
 service postgresql start >/dev/null 2>&1 || true
@@ -16,5 +16,7 @@ sudo -u postgres psql -q -v ON_ERROR_STOP=1 -d lab -f $W/schema.sql >/dev/null 2
 sudo -u postgres psql -q -v ON_ERROR_STOP=1 -d lab -f $W/002.sql >/dev/null 2>&1
 sudo -u postgres psql -q -v ON_ERROR_STOP=1 -d lab -f $W/003.sql >/dev/null
 sudo -u postgres psql -q -v ON_ERROR_STOP=1 -d lab -f $W/004.sql >/dev/null
+sudo -u postgres psql -q -v ON_ERROR_STOP=1 -d lab -f $W/05_storage_stub.sql >/dev/null
+sudo -u postgres psql -q -v ON_ERROR_STOP=1 -d lab -f $W/005.sql >/dev/null
 sudo -u postgres psql -q -v ON_ERROR_STOP=1 -d lab -f $W/10_seed_users.sql >/dev/null
 echo "banco lab pronto"

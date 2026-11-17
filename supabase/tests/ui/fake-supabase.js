@@ -23,14 +23,14 @@
     precos_loja: [{ loja_id: L1, item_id: "i1", preco: 100, ativo: true }, { loja_id: L1, item_id: "i2", preco: 12.5, ativo: true }, { loja_id: L1, item_id: "i3", preco: 5, ativo: true }, { loja_id: L2, item_id: "i1", preco: 90, ativo: true }],
     clientes: [{ id: "c-ana", loja_id: L1, nome: "Ana", telefone: "11999990000", endereco: "Rua A" }],
     vendas: [], venda_itens: [], financeiro_lancamentos: [], estoque_movimentos: [],
-    caixas: [], caixa_movs: [], avisos: [{ id: 'av1', origem: 'aviso', tipo: 'sistema', titulo: 'Novo: caixa <b onmouseover="window.__xss=2">e avisos</b>', descricao: 'Texto', prioridade: 'info', destaque: false, global: true, lojas: [], lido: false, atualizado: false, criado_em: new Date().toISOString(), atualizado_em: new Date().toISOString() }], alertasLidos: {},
+    caixas: [], caixa_movs: [], pagamentos: [], comprovantes: [], envios: [], avisos: [{ id: 'av1', origem: 'aviso', tipo: 'sistema', titulo: 'Novo: caixa <b onmouseover="window.__xss=2">e avisos</b>', descricao: 'Texto', prioridade: 'info', destaque: false, global: true, lojas: [], lido: false, atualizado: false, criado_em: new Date().toISOString(), atualizado_em: new Date().toISOString() }], alertasLidos: {},
   };
   const log = window.__rpcLog = [];
   const users = { luiz: { id: "u-luiz", pw: "1234" }, enzo: { id: "u-enzo", pw: "1234" } };
   let session = null;
   const listeners = [];
   window.__emit = (table, payload) => listeners.forEach(l => l.table === table && l.cb(payload || { eventType: "UPDATE", new: {} }));
-  window.__failNext = null; window.__netDown = false;
+  window.__failNext = null; window.__netDown = false; window.__storage = {};
 
   const err = m => ({ data: null, error: { message: m } });
   const uid = () => session && session.user.id;
@@ -194,8 +194,10 @@
     detalhe_dia_financeiro(a) { return { caixas: db.caixas.filter(c => c.loja_id === a.p_loja_id).map(c => this._res(c)), movimentos: db.caixa_movs.map(m => ({ ...m, criado_por_nome: "Luiz" })), lancamentos: [] }; },
     listar_avisos(a) {
       const hoje = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" }), out = db.avisos.filter(x => !x.arquivado).map(x => ({ ...x, pode_editar: gerente() && x.tipo !== "sistema" }));
-      const venc = db.financeiro_lancamentos.filter(l => l.loja_id === a.p_loja_id && l.status !== "pago" && l.vencimento && l.vencimento < hoje);
+      const venc = db.financeiro_lancamentos.filter(l => l.loja_id === a.p_loja_id && !["pago", "cancelada"].includes(l.status) && l.vencimento && l.vencimento < hoje);
       if (venc.length) out.unshift({ origem: "alerta", chave: "contas_vencidas", tipo: "alerta", titulo: venc.length + " conta(s) vencida(s)", descricao: "Total em atraso", prioridade: "urgente", destaque: true, acao: "financeiro", lojas: [], lido: db.alertasLidos.contas_vencidas === venc.length, atualizado: false, criado_em: new Date().toISOString(), atualizado_em: new Date().toISOString() });
+      const pend = db.pagamentos.filter(p => p.loja_id === a.p_loja_id && p.tipo === "pagamento" && (db.financeiro_lancamentos.find(l => l.id === p.lancamento_id) || {}).exige_comprovante && !db.pagamentos.some(e => e.estorno_de === p.id) && !db.envios.some(v => v.pagamento_id === p.id));
+      if (pend.length) out.push({ origem: "alerta", chave: "comprovantes_pendentes", tipo: "alerta", titulo: pend.length + " comprovante(s) com envio pendente", descricao: "Envio ainda não confirmado", prioridade: "atencao", destaque: false, acao: "financeiro", lojas: [], lido: false, atualizado: false, criado_em: new Date().toISOString(), atualizado_em: new Date().toISOString() });
       return out;
     },
     publicar_aviso(a) { if (!gerente()) throw new Error("Só gerente ou dono publica avisos"); if (a.p_global && meuPerfil().papel !== "dono") throw new Error("Só o administrador geral publica avisos globais");
@@ -204,6 +206,64 @@
     marcar_alerta_lido(a) { db.alertasLidos[a.p_chave] = db.financeiro_lancamentos.filter(l => l.loja_id === a.p_loja_id && l.status !== "pago" && l.vencimento && l.vencimento < new Date().toLocaleDateString("en-CA")).length; },
     arquivar_aviso(a) { db.avisos.find(x => x.id === a.p_id).arquivado = true; },
     marcar_comprovante_enviado(a) { db.financeiro_lancamentos.find(l => l.id === a.p_id).comprovante_enviado_em = new Date().toISOString(); },
+
+    /* ---- contas, pagamentos parciais e comprovantes (regras principais; o servidor real é testado no SQL) ---- */
+    _conta(id) { const l = db.financeiro_lancamentos.find(x => x.id === id); if (!l) throw new Error("Conta não encontrada"); if (!minhas().includes(l.loja_id)) throw new Error("Você não tem permissão para esta conta"); return l; },
+    _liq(id) { return money(db.pagamentos.filter(p => p.lancamento_id === id).reduce((s, p) => s + (p.tipo === "pagamento" ? p.valor : -p.valor), 0)); },
+    _sit(l) { return l.status === "cancelada" ? "cancelada" : l.status === "pago" ? "paga" : l.status === "parcial" ? "parcial" : "pendente"; },
+    _calc(l) { const tem = db.pagamentos.some(p => p.lancamento_id === l.id), pago = tem ? this._liq(l.id) : (l.status === "pago" ? l.valor : 0), hoje = new Date().toLocaleDateString("en-CA");
+      const sit = this._sit(l), saldo = l.status === "cancelada" ? 0 : money(l.valor - pago);
+      const envPend = l.exige_comprovante ? db.pagamentos.filter(p => p.lancamento_id === l.id && p.tipo === "pagamento" && !db.pagamentos.some(e => e.estorno_de === p.id) && !db.envios.some(v => v.pagamento_id === p.id)).length : 0;
+      return { tem, pago, sit, saldo, vencida: ["pendente", "parcial"].includes(sit) && !!l.vencimento && l.vencimento < hoje, envPend, legado: !tem && l.status === "pago" }; },
+    criar_conta(a) {
+      if (!minhas().includes(a.p_loja_id)) throw new Error("Você não tem permissão para esta loja");
+      const dup = db.financeiro_lancamentos.find(l => l.loja_id === a.p_loja_id && l.chave_criacao === a.p_chave); if (dup) return dup.id;
+      if (!(a.p_valor > 0) || Math.round(a.p_valor * 100) !== a.p_valor * 100) throw new Error("O valor deve ter no máximo 2 casas decimais (centavos)");
+      const now = new Date().toISOString(), l = { id: ids("conta"), loja_id: a.p_loja_id, tipo: a.p_tipo, categoria: a.p_categoria, descricao: a.p_descricao, valor: a.p_valor, status: "pendente", vencimento: a.p_vencimento, exige_comprovante: a.p_exige_comprovante, chave_criacao: a.p_chave, criado_em: now, data_ref: now };
+      db.financeiro_lancamentos.push(l); return l.id;
+    },
+    registrar_pagamento(a) {
+      if (window.__failPay) { const m = window.__failPay; window.__failPay = null; throw new Error(m); }
+      const l = this._conta(a.p_lancamento_id), dup = db.pagamentos.find(p => p.loja_id === l.loja_id && p.chave === a.p_chave);
+      if (dup) { const c = this._calc(l); return { pagamento_id: dup.id, total_pago: c.pago, saldo: c.saldo, situacao: l.status, repetida: true }; }
+      if (l.status === "cancelada") throw new Error("Conta cancelada não recebe pagamentos"); if (l.status === "pago") throw new Error("Esta conta já está quitada");
+      if (!(a.p_valor > 0) || Math.round(a.p_valor * 100) !== a.p_valor * 100) throw new Error("O valor deve ter no máximo 2 casas decimais (centavos)");
+      const saldo = money(l.valor - this._liq(l.id)); if (a.p_valor > saldo) throw new Error("Pagamento (R$ " + a.p_valor + ") maior que o saldo da conta (R$ " + saldo + ")");
+      const p = { id: ids("pag"), lancamento_id: l.id, loja_id: l.loja_id, tipo: "pagamento", valor: a.p_valor, data_pagamento: a.p_data || new Date().toLocaleDateString("en-CA"), forma_pagamento: a.p_forma, observacao: a.p_observacao, chave: a.p_chave, criado_em: new Date().toISOString() };
+      db.pagamentos.push(p); const liq = this._liq(l.id); l.status = liq >= l.valor ? "pago" : liq > 0 ? "parcial" : "pendente";
+      return { pagamento_id: p.id, total_pago: liq, saldo: money(l.valor - liq), situacao: l.status, repetida: false };
+    },
+    estornar_pagamento(a) {
+      if (!gerente()) throw new Error("Só gerente ou dono pode estornar pagamentos"); const p = db.pagamentos.find(x => x.id === a.p_pagamento_id); if (db.pagamentos.some(e => e.estorno_de === p.id)) throw new Error("Este pagamento já foi estornado");
+      if (String(a.p_motivo || "").trim().length < 5) throw new Error("Informe o motivo do estorno (mínimo 5 letras)");
+      db.pagamentos.push({ ...p, id: ids("pag"), tipo: "estorno", estorno_de: p.id, motivo: a.p_motivo, chave: ids("k"), criado_em: new Date().toISOString() });
+      const l = db.financeiro_lancamentos.find(x => x.id === p.lancamento_id), liq = this._liq(l.id); l.status = liq >= l.valor ? "pago" : liq > 0 ? "parcial" : "pendente"; return { situacao: l.status };
+    },
+    cancelar_conta(a) { if (!gerente()) throw new Error("Só gerente ou dono cancela contas"); const l = this._conta(a.p_id); if (db.pagamentos.some(p => p.lancamento_id === l.id)) throw new Error("A conta tem pagamentos — estorne-os antes de cancelar"); l.status = "cancelada"; l.motivo_cancelamento = a.p_motivo; l.cancelada_em = new Date().toISOString(); },
+    registrar_comprovante(a) {
+      const p = db.pagamentos.find(x => x.id === a.p_pagamento_id); if (!p || !minhas().includes(p.loja_id)) throw new Error("Você não tem permissão para esta loja");
+      if (window.__failReg) { const m = window.__failReg; window.__failReg = null; throw new Error(m); }
+      if (!(a.p_path in window.__storage)) throw new Error("Arquivo ainda não está no armazenamento — envie de novo");
+      if (!["application/pdf", "image/jpeg", "image/png", "image/webp"].includes(a.p_mime)) throw new Error("Tipo de arquivo não permitido (use PDF, JPG, PNG ou WEBP)");
+      const dup = db.comprovantes.find(c => c.storage_path === a.p_path); if (dup) return dup.id;
+      const c = { id: ids("comp"), pagamento_id: p.id, lancamento_id: p.lancamento_id, loja_id: p.loja_id, storage_path: a.p_path, nome_original: a.p_nome, mime: a.p_mime, tamanho: a.p_tamanho, enviado_em: new Date().toISOString() }; db.comprovantes.push(c); return c.id;
+    },
+    confirmar_envio_comprovante(a) { const p = db.pagamentos.find(x => x.id === a.p_pagamento_id); if (!p || !minhas().includes(p.loja_id)) throw new Error("Você não tem permissão para esta loja");
+      if (db.envios.some(e => e.pagamento_id === p.id)) return { repetido: true }; db.envios.push({ pagamento_id: p.id, confirmado_em: new Date().toISOString(), observacao: a.p_observacao }); return { repetido: false }; },
+    listar_contas(a) {
+      if (!minhas().includes(a.p_loja_id)) throw new Error("Você não tem permissão para esta loja");
+      return db.financeiro_lancamentos.filter(l => l.loja_id === a.p_loja_id).map(l => ({ l, c: this._calc(l) })).filter(({ l, c }) => !a.p_situacao || (a.p_situacao === "vencida" ? c.vencida : a.p_situacao === "comprovante_pendente" ? c.envPend > 0 : c.sit === a.p_situacao))
+        .map(({ l, c }) => ({ id: l.id, tipo: l.tipo, categoria: l.categoria, descricao: l.descricao, valor: l.valor, total_pago: c.pago, saldo: c.saldo, situacao: c.sit, vencida: c.vencida, vencimento: l.vencimento, data_ref: l.data_ref || l.criado_em,
+          exige_comprovante: !!l.exige_comprovante, qtd_pagamentos: db.pagamentos.filter(p => p.lancamento_id === l.id).length, qtd_comprovantes: db.comprovantes.filter(x => x.lancamento_id === l.id).length, envios_pendentes: c.envPend, legado: c.legado }));
+    },
+    conta_detalhe(a) {
+      const l = this._conta(a.p_id), c = this._calc(l);
+      return { conta: { id: l.id, loja_id: l.loja_id, tipo: l.tipo, categoria: l.categoria, descricao: l.descricao, valor: l.valor, vencimento: l.vencimento, situacao: c.sit, vencida: c.vencida, total_pago: c.pago, saldo: c.saldo, exige_comprovante: !!l.exige_comprovante, legado: c.legado, venda_id: null, marcacao_antiga_comprovante: l.comprovante_enviado_em || null, criado_em: l.criado_em, criado_por_nome: "Luiz", cancelada_em: l.cancelada_em, motivo_cancelamento: l.motivo_cancelamento },
+        pagamentos: db.pagamentos.filter(p => p.lancamento_id === l.id).map(p => ({ id: p.id, tipo: p.tipo, valor: p.valor, data_pagamento: p.data_pagamento, forma_pagamento: p.forma_pagamento, observacao: p.observacao, motivo: p.motivo, estorno_de: p.estorno_de || null, criado_em: p.criado_em, criado_por_nome: "Luiz",
+          estornado: db.pagamentos.some(e => e.estorno_de === p.id), comprovantes: db.comprovantes.filter(x => x.pagamento_id === p.id).map(x => ({ id: x.id, nome: x.nome_original, mime: x.mime, tamanho: x.tamanho, path: x.storage_path, enviado_em: x.enviado_em, enviado_por_nome: "Luiz" })),
+          envio: (e => e ? { confirmado_em: e.confirmado_em, confirmado_por_nome: "Luiz", observacao: e.observacao } : null)(db.envios.find(v => v.pagamento_id === p.id)) })),
+        auditoria: [{ acao: "conta_criada", em: l.criado_em, por: "Luiz", motivo: null }] };
+    },
     entradas_sem_caixa(a) {
       const lojas = minhas(); if (a.p_loja_id && !lojas.includes(a.p_loja_id)) throw new Error("Você não tem permissão para esta loja");
       const sem = db.vendas.filter(v => lojas.includes(v.loja_id) && (!a.p_loja_id || v.loja_id === a.p_loja_id) && v.status === "concluida" && v.forma_pagamento === "Dinheiro"
@@ -236,6 +296,11 @@
       try { checkParams(name, args || {}); const d = R[name].call(R, args || {}); return { data: d === undefined ? null : d, error: null }; }
       catch (e) { return err(e.message); }
     },
+    storage: { from(bucket) { return {
+      async upload(path, file, opts) { if (window.__failUpload) { const m = window.__failUpload; window.__failUpload = null; return { data: null, error: { message: m } }; }
+        if (opts && opts.upsert) return { data: null, error: { message: "upsert não permitido" } };
+        if (path in window.__storage) return { data: null, error: { message: "The resource already exists" } }; window.__storage[path] = { size: file.size, type: file.type, opts }; window.__uploads = (window.__uploads || 0) + 1; return { data: { path }, error: null }; },
+      async createSignedUrl(path, seg) { const c = db.comprovantes.find(x => x.storage_path === path); if (!c || !minhas().includes(c.loja_id)) return { data: null, error: { message: "Object not found" } }; return { data: { signedUrl: "http://storage.test/signed/" + path + "?t=" + seg }, error: null }; } }; } },
     channel(name) { const ch = { on(_t, f, cb) { listeners.push({ table: f.table, cb }); return ch; }, subscribe(cb) { setTimeout(() => cb && cb("SUBSCRIBED"), 5); return ch; } }; return ch; },
     async removeChannel() { listeners.length = 0; },
   };

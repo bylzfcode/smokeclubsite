@@ -53,7 +53,7 @@ T=$(largada); for i in $(seq 1 12); do sessao $T "registrar_movimento_caixa('$CX
 sessao $T "fechar_caixa('$CXE', 100, 'corrida')" > /tmp/cx6_f.txt & wait
 $P -c "select 1" >/dev/null
 ESP=$($P -c "select esperado_dinheiro from caixas where id='$CXE'"); STATUS=$($P -c "select status from caixas where id='$CXE'")
-SOMA=$($P -c "select 100 + coalesce(sum(sentido*valor),0) from caixa_movimentos where caixa_id='$CXE' and meio='dinheiro'")
+SOMA=$($P -c "select (100 + coalesce(sum(sentido*valor),0))::numeric(12,2) from caixa_movimentos where caixa_id='$CXE' and meio='dinheiro'")
 conferir "caixa terminou fechado (fechamento aceito ou recusado por diferença)" "$STATUS" "$([ "$(cat /tmp/cx6_f.txt)" = "RESULTADO_OK" ] && echo fechado || echo aberto)"
 if [ "$STATUS" = "fechado" ]; then conferir "esperado gravado = saldo + todos os movimentos (nenhum entrou depois)" "$ESP" "$SOMA"; fi
 echo

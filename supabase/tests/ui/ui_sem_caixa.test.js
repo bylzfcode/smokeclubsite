@@ -2,7 +2,7 @@
 const { chromium } = require("playwright"); const fs = require("fs"), path = require("path");
 const root = path.resolve(__dirname, "../../..");
 const html = fs.readFileSync(path.join(root, "dashboard.html"), "utf8"), fake = fs.readFileSync(path.join(__dirname, "fake-supabase.js"), "utf8");
-const sql = ["002_melhorias.sql", "003_caixa_avisos.sql", "004_entradas_sem_caixa.sql"].map(f => fs.readFileSync(path.join(root, "supabase", f), "utf8")).join("\n");
+const sql = ["002_melhorias.sql", "003_caixa_avisos.sql", "004_entradas_sem_caixa.sql", "005_pagamentos_comprovantes.sql"].map(f => fs.readFileSync(path.join(root, "supabase", f), "utf8")).join("\n");
 const CONTRACT = {}; for (const m of sql.matchAll(/create or replace function (\w+)\(([^)]*)\)\s*returns/gi)) { const ps = m[2].split(",").map(s => s.trim()).filter(Boolean).map(s => ({ n: s.split(/\s+/)[0], d: /\bdefault\b/i.test(s) })); CONTRACT[m[1]] = { all: ps.map(p => p.n), required: ps.filter(p => !p.d).map(p => p.n) }; }
 let pass = 0, fail = 0; const falhas = []; const check = (n, c, x) => { if (c) pass++; else { fail++; falhas.push(n + (x ? " → " + x : "")); } };
 async function abrir(browser, user) {
