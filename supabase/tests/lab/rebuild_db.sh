@@ -1,0 +1,18 @@
+#!/bin/bash
+# Recria o banco local "lab" do zero: stub do Supabase + schema.sql + 002_melhorias.sql + usuários.
+set -e
+HERE="$(cd "$(dirname "$0")" && pwd)"; REPO="$(cd "$HERE/../../.." && pwd)"
+W=/tmp/painel-lab/sql; mkdir -p $W
+cp "$HERE"/*.sql $W/ && cp "$REPO/supabase/schema.sql" $W/schema.sql && cp "$REPO/supabase/002_melhorias.sql" $W/002.sql
+[ -f "$REPO/supabase/tests/banco_testes.sql" ] && cp "$REPO/supabase/tests/banco_testes.sql" $W/banco_testes.sql
+chmod -R a+rX /tmp/painel-lab
+service postgresql start >/dev/null 2>&1 || true
+for i in 1 2 3 4 5 6 7 8; do sudo -u postgres psql -qAt -c "select 1" >/dev/null 2>&1 && break; sleep 1; done
+sudo -u postgres psql -q -c "drop database if exists lab with (force);" >/dev/null
+sudo -u postgres psql -q -d postgres -c "drop role if exists authenticator;" -c "drop role if exists anon;" -c "drop role if exists authenticated;" -c "drop role if exists service_role;" >/dev/null 2>&1 || true
+sudo -u postgres psql -q -c "create database lab;" >/dev/null
+sudo -u postgres psql -q -v ON_ERROR_STOP=1 -d lab -f $W/00_supabase_stub.sql >/dev/null
+sudo -u postgres psql -q -v ON_ERROR_STOP=1 -d lab -f $W/schema.sql >/dev/null 2>&1
+sudo -u postgres psql -q -v ON_ERROR_STOP=1 -d lab -f $W/002.sql >/dev/null 2>&1
+sudo -u postgres psql -q -v ON_ERROR_STOP=1 -d lab -f $W/10_seed_users.sql >/dev/null
+echo "banco lab pronto"
