@@ -57,9 +57,9 @@ Em `dashboard.html`, ajuste `SUPABASE_URL` e `SUPABASE_ANON_KEY` (só a chave an
 
 ## Pagamentos parciais e comprovantes (migração 005)
 
-**Ordem de aplicação no Supabase (nenhuma foi aplicada ainda no projeto remoto):** `schema.sql` → `002` → `003` → `004` → `005` → `006`.
-A 005 depende da 003 (permissões e caixa) e a 006 da 005. Rode uma por vez no SQL Editor e confira que terminou sem erro antes da próxima.
-A ordem foi conferida instalando do zero numa pilha Supabase local real (veja "Validação contra a pilha real").
+**Ordem de aplicação no Supabase (nenhuma foi aplicada ainda no projeto remoto):** `schema.sql` → `002` → `003` → `004` → `005` → `006` → `007`.
+A 005 depende da 003 (permissões e caixa), a 006 da 005 e a 007 da 005/006 (comprovantes e limpeza). Rode uma por vez no SQL Editor e confira que terminou sem erro antes da próxima.
+A ordem foi conferida instalando do zero (schema → 007) numa pilha Supabase local real (veja "Validação contra a pilha real").
 
 - **Contas:** cada conta tem valor original, total pago e saldo pendente. Situações: pendente, parcialmente paga, paga e cancelada
   ("saldo vencido" é calculado pela data de vencimento). Vários pagamentos até quitar; valor/data/forma/observação/responsável em cada um.
@@ -99,10 +99,29 @@ A ordem foi conferida instalando do zero numa pilha Supabase local real (veja "V
 - **Limites conhecidos do Storage:** o tipo do arquivo é o que o navegador informa (o Storage confere a lista de tipos e a extensão, mas **não lê o conteúdo**): um arquivo com extensão e tipo de PDF mas conteúdo diferente seria aceito.
   Por isso os downloads saem como anexo. Não há antivírus. Se um upload for interrompido no meio da rede, nada é registrado e o pagamento fica intacto.
 
+## Rateio de despesas e reembolsos entre lojas (migração 007)
+
+- **Conta exclusiva continua sendo o padrão.** Rateio só existe se um gerente/dono criar uma "conta compartilhada" com 2+ lojas (Financeiro → "+ Conta compartilhada").
+- **Divisão:** igual, por percentual ou por valores. A soma fecha **exatamente em centavos** e a tela mostra a **prévia calculada pelo servidor** antes de criar.
+  Arredondamento determinístico: os centavos que sobram vão, um a um, às primeiras lojas por **ordem alfabética do nome** (no percentual, pelo **maior resto**, desempate pela mesma ordem).
+  R$ 100 entre 3 lojas = 33,34 (EZ Store) + 33,33 + 33,33.
+- **Três coisas separadas:** a **parcela** de cada loja (responsabilidade), o **pagamento externo** (quem pagou o fornecedor; parcial, uma loja pode pagar tudo) e o **reembolso interno** (origem → destino, parcial).
+  Posição da loja = pago ao externo + reembolsos pagos − reembolsos recebidos − parcela (+ = a recuperar, − = deve).
+  Exemplo: R$ 900 entre A, B, C → A paga tudo e tem R$ 600 a recuperar; B reembolsa R$ 100 e deve R$ 200; C deve R$ 300; a despesa consolidada segue R$ 900.
+- **Limites no servidor** (inclusive sob concorrência e requisição repetida): pagamento externo ≤ saldo externo; reembolso ≤ o que a origem deve e ≤ o que o destino tem a recuperar; cada requisição tem chave de repetição (registrada uma vez só);
+  o rateio é travado a cada operação e uma verificação final impede deixar reembolsos sem lastro (ex.: não dá para estornar o pagamento externo enquanto houver reembolso que depende dele).
+- **Reembolso não quita de novo a conta externa e não é receita nem despesa:** o consolidado (fluxo/histórico) mostra o pagamento externo **uma vez**, na loja que pagou; reembolsos aparecem só na tela do rateio.
+- **Não movimenta o caixa automaticamente** (aviso visível em todas as telas do rateio). Se saiu dinheiro da gaveta, lance também uma saída/retirada no Caixa.
+- **Estornos, motivo e auditoria** preservados (original intacto; estorno ao lado). Rateio com movimentação **não é alterado nem cancelado**: estorne antes os reembolsos e pagamentos;
+  a **revisão** cria uma nova versão das parcelas e guarda a anterior (com motivo).
+- **Comprovantes** (bucket privado já existente): obrigatório só se o rateio exigir nos pagamentos externos; **opcional no reembolso**. Caminho `rateio/<rateio>/<movimento>/<arquivo>`. As lojas do rateio conferem os comprovantes umas das outras; quem não participa não lê. A limpeza de órfãos **não toca** em arquivos de rateio.
+- **Acessos:** dono administra todas as lojas; gerente só cria/revisa rateios com lojas em que tem autorização; cada loja vê sua parcela e os pagamentos/reembolsos **do rateio de que participa** (para conferir), sem ganhar acesso ao financeiro completo das demais.
+- **Alerta:** "despesa compartilhada com saldo externo vencido" no painel. Limitações: rateios não entram em "a pagar/receber" dos resumos antigos (têm tela própria) e **recorrência não foi implementada**.
+
 ## Validação contra a pilha real (Docker)
 
 `supabase/tests/stack/` sobe **Postgres do Supabase + Auth (GoTrue) + PostgREST + Storage API** reais em contêineres, instala `schema.sql → 002 → 003 → 004 → 005 → 006` do zero como o papel `postgres`
-(o mesmo do SQL Editor), cria usuários por SQL direto (como no projeto remoto) e roda: `real_api.test.js` (login, isolamento entre lojas, pagamentos, Storage, limpeza) e `real_ui.test.js` (o `dashboard.html` no Chromium).
+(o mesmo do SQL Editor), cria usuários por SQL direto (como no projeto remoto) e roda: `real_api.test.js` (login, isolamento entre lojas, pagamentos, Storage, limpeza), `real_api_rateios.test.js` (rateios/reembolsos) e `real_ui.test.js` + `real_ui_rateios.test.js` (o `dashboard.html` no Chromium).
 Requisitos: Docker com daemon ativo, Node 18+, Playwright. Uso: `supabase/tests/stack/run_all.sh` (`--keep` deixa a pilha de pé). Os segredos são gerados na hora (`.env`, não versionado).
 Não valida: o **Kong** (gateway do Supabase hospedado, inclusive CORS) — aqui um mini-gateway (`gateway.js`) o substitui —, Realtime, e e-mails/recuperação de senha. Nada é enviado ao projeto remoto.
 
@@ -112,6 +131,7 @@ Não valida: o **Kong** (gateway do Supabase hospedado, inclusive CORS) — aqui
 - `supabase/tests/caixa_testes.sql` — 115 verificações de caixa/histórico/avisos (permissões, isolamento entre lojas, estorno, fechamento, reabertura).
 - `supabase/tests/sem_caixa_testes.sql` — 17 verificações dos valores sem caixa (janelas, permissões, somente leitura); tela: `ui/ui_sem_caixa.test.js`.
 - `supabase/tests/pagamentos_testes.sql` — 71 verificações de pagamentos parciais, estornos, comprovantes (políticas do bucket), envio confirmado e acesso indevido; tela: `ui/ui.test.js` (104).
+- `supabase/tests/rateios_testes.sql` — 83 verificações de rateio/reembolso (arredondamento, exemplo de R$ 900, parcial, estornos após reembolso, permissões, comprovantes); `lab/concorrencia_rateios.sh` — concorrência.
 - `supabase/tests/lab/` — banco local + concorrência (`concorrencia.sh` vendas; `concorrencia_caixa.sh` abertura/estorno/fechamento simultâneos; `concorrencia_pagamentos.sh` pagamentos/estornos/repetições simultâneos). As suítes locais acima usam um Storage simulado só nas **políticas**; a API real (limite de 5 MB, tipo MIME, upload, links assinados) é validada em `supabase/tests/stack/`.
 - `supabase/tests/ui/` — a tela no Chromium com Supabase simulado e checagem dos
   nomes de parâmetros das funções contra o SQL:

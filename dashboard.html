@@ -142,6 +142,7 @@ label{display:block;font-size:.74rem;font-weight:700;color:var(--muted);margin:8
 .modal-ov.show{display:flex}
 .modal-box{background:var(--card);border-radius:16px;padding:22px;max-width:460px;width:100%;max-height:88vh;overflow-y:auto;box-shadow:var(--shadow-lg)}
 .modal-box h3{margin-bottom:12px}
+.modal-box.wide{max-width:680px}
 .modal-actions{display:flex;gap:8px;margin-top:14px}.modal-actions button{flex:1}
 .aviso{border:1px solid var(--line);border-left:5px solid #7A8AA0;border-radius:10px;padding:10px 12px;margin-bottom:8px;background:#fff;display:flex;gap:10px;align-items:flex-start}
 .aviso.atencao{border-left-color:#D9A400;background:#FFFBEC}.aviso.urgente{border-left-color:var(--red);background:#FFF5F6}
@@ -224,8 +225,8 @@ function toast(msg, erro) {
   const t = $("toast"); t.textContent = msg; t.className = "show" + (erro ? " err" : "");
   clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), erro ? 5000 : 3000);
 }
-function openModal(html) { $("modalBox").innerHTML = html; $("modalOv").classList.add("show"); const f = $("modalBox").querySelector("input,select,textarea"); if (f) f.focus(); }
-function closeModal() { $("modalOv").classList.remove("show"); $("modalBox").innerHTML = ""; }
+function openModal(html) { $("modalBox").classList.remove("wide"); $("modalBox").innerHTML = html; $("modalOv").classList.add("show"); const f = $("modalBox").querySelector("input,select,textarea"); if (f) f.focus(); }
+function closeModal() { $("modalOv").classList.remove("show"); $("modalBox").innerHTML = ""; $("modalBox").classList.remove("wide"); }
 const modalOpen = () => $("modalOv").classList.contains("show");
 
 /* roda ação com botão travado; SEMPRE destrava no fim (inclusive em erro) */
@@ -691,10 +692,12 @@ Views.financeiro = {
     const f = S.f, [ini, fim] = Views.financeiro.periodo();
     $("viewRoot").innerHTML = `<div class="page-h"><h2>💰 Financeiro · ${esc(S.loja.nome)}</h2><button class="abtn red" data-a="finForm">+ Conta / lançamento</button><button class="abtn soft" data-a="finCsv">⬇ CSV</button></div>
       <div class="chips">${[["hoje", "Hoje"], ["7d", "7 dias"], ["mes", "Este mês"], ["tudo", "Tudo"]].map(([k, l]) => `<button class="chip ${f.finPeriodo === k ? "sel" : ""}" data-a="finPeriodo" data-id="${k}">${l}</button>`).join("")}</div>
+      <div id="finRateios"></div>
       <div id="finResumo"></div>
       <div class="chips">${FIN_FILTROS.map(([k, l]) => `<button class="chip ${f.finStatus === k ? "sel" : ""}" data-a="finStatus" data-id="${k}">${l}</button>`).join("")}</div>
       <small style="color:var(--muted);display:block;margin-bottom:8px">O período filtra pela data do lançamento/pagamento; Pendentes, Parciais, Vencidas e Comprovante pendente mostram tudo que está em aberto.</small>
       <div class="card" id="finLista"><div class="empty">Carregando…</div></div>`;
+    Views.rateios.carregar().catch(() => {});
     const sit = (FIN_FILTROS.find(x => x[0] === f.finStatus) || [])[2] || null;
     const [r, ls] = await Promise.all([rpc("financeiro_resumo", { p_loja_id: S.loja.id, p_inicio: ini, p_fim: fim }),
       rpc("listar_contas", { p_loja_id: S.loja.id, p_inicio: ini, p_fim: fim, p_situacao: sit })]);
@@ -871,6 +874,225 @@ Views.financeiro = {
     const blob = new Blob(["﻿" + linhas.map(r => r.map(cel).join(";")).join("\r\n")], { type: "text/csv;charset=utf-8" });
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `financeiro-${hojeISO()}.csv`; document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  },
+};
+
+/* CONTAS COMPARTILHADAS (RATEIO) E REEMBOLSOS ENTRE LOJAS */
+const AVISO_CAIXA = 'Registrar aqui apenas <b>anota uma operação já realizada</b>: não transfere dinheiro e <b>não movimenta o caixa automaticamente</b>.';
+const METODOS = { igual: "Dividir igualmente", percentual: "Por percentual", valores: "Por valores" };
+const RAT_SIT = { pendente: ["pendente", "pendente"], parcial: ["parcial", "parcialmente paga"], paga: ["pago", "paga ao externo"], cancelado: ["cancelada", "cancelada"] };
+const posHtml = p => { p = Number(p); return p > 0 ? `<b class="pos">a recuperar ${esc(fmt(p))}</b>` : p < 0 ? `<b class="neg">deve ${esc(fmt(-p))}</b>` : `<b>quitada</b>`; };
+Views.rateios = {
+  async carregar() {
+    const el = $("finRateios"); if (!el) return;
+    let ls;
+    try { ls = await rpc("listar_rateios", { p_loja_id: S.loja.id, p_situacao: null }); }
+    catch (e) { if ($("finRateios")) $("finRateios").innerHTML = `<div class="banner">Contas compartilhadas indisponíveis: ${esc(/Could not find the function|schema cache|inexistente/i.test(e.message) ? "falta aplicar a migração 007_rateios_reembolsos.sql" : msgErro(e))}</div>`; return; }
+    if (S.tab !== "financeiro" || !$("finRateios")) return;
+    S.ratLista = ls;
+    $("finRateios").innerHTML = `<div class="card" id="ratCard"><div class="page-h" style="margin-bottom:6px"><h3 style="flex:1;margin:0">🤝 Contas compartilhadas (rateio entre lojas)</h3>${isGerente() ? `<button class="abtn dark sm" data-a="ratNovo">+ Conta compartilhada</button>` : ""}</div>
+      ${ls.length ? ls.map(r => `<div class="list-row click" data-a="ratDetalhe" data-id="${esc(r.id)}"><div class="grow"><b>${esc(r.descricao)}</b>
+        <small>${esc(r.categoria)} · total ${esc(fmt(r.valor_total))} · ${r.lojas} lojas${r.vencimento ? " · vence " + esc(fmtD(r.vencimento)) : ""}</small>
+        <span class="tag ${RAT_SIT[r.situacao][0]}">${RAT_SIT[r.situacao][1]}</span>${r.vencida ? ' <span class="tag atrasado">saldo externo vencido</span>' : ""}
+        <small>pago ao externo ${esc(fmt(r.pago_externo))} · saldo externo ${esc(fmt(r.saldo_externo))}</small>
+        ${(r.minhas || []).map(m => `<small>${esc(m.loja_nome)}: parcela ${esc(fmt(m.parcela))} · pagou ao externo ${esc(fmt(m.pago_externo))} · ${posHtml(m.posicao)}</small>`).join("")}</div><span style="color:var(--muted)">›</span></div>`).join("") : `<div class="empty">Nenhuma conta compartilhada. A conta exclusiva continua sendo o padrão.</div>`}</div>`;
+  },
+
+  /* ---- assistente (criar / revisar) ---- */
+  async lojasDisponiveis() {
+    if (S.perfil.papel === "dono") { try { return ok(await sb.from("lojas").select("id,nome,ativo").order("nome")).filter(l => l.ativo !== false); } catch (e) { /* usa as minhas */ } }
+    return S.minhasLojas;
+  },
+  async novo(rev) {
+    const lojas = await Views.rateios.lojasDisponiveis(); S.ratLojas = lojas;
+    const r = rev ? S.ratDet.rateio : null, marcadas = rev ? new Set(S.ratDet.posicoes.map(p => p.loja_id)) : new Set([S.loja.id]);
+    S.ratCtx = { rev: rev ? r.id : null, chave: uuid(), sig: null };
+    openModal(`<h3>${rev ? "Revisar rateio (nova versão)" : "Nova conta compartilhada"}</h3>
+      <div id="ratForm">
+      <label>Descrição</label><input class="field" id="rtDesc" value="${esc(r ? r.descricao : "")}" placeholder="Ex: Reforma da fachada">
+      <div class="grid2"><div><label>Categoria</label><select class="field" id="rtCat">${["manutenção", "compra de mercadoria", "aluguel", "serviços", "energia", "marketing", "impostos", "outro"].map(c => `<option ${r && r.categoria === c ? "selected" : ""}>${c}</option>`).join("")}</select></div>
+        <div><label>Valor total (R$)</label><input class="field" id="rtValor" inputmode="decimal" value="${r ? esc(String(r.valor_total).replace(".", ",")) : ""}" placeholder="0,00"></div></div>
+      <div class="grid2"><div><label>Vencimento (opcional)</label><input class="field" id="rtVenc" type="date" value="${r && r.vencimento ? esc(r.vencimento) : ""}"></div>
+        <div><label>Divisão</label><select class="field" id="rtMetodo">${Object.entries(METODOS).map(([k, v]) => `<option value="${k}" ${r && r.metodo === k ? "selected" : ""}>${v}</option>`).join("")}</select></div></div>
+      <div class="check"><input type="checkbox" id="rtComp" ${r && r.exige_comprovante ? "checked" : ""}><label for="rtComp" style="margin:0;font-size:.84rem;color:var(--text)">Exige comprovante nos pagamentos externos</label></div>
+      <label>Lojas que dividem a despesa (mínimo 2)</label>
+      ${lojas.map(l => `<div class="row" style="margin-bottom:4px"><div class="check grow" style="margin:0"><input type="checkbox" class="rtLoja" id="rtl-${esc(l.id)}" value="${esc(l.id)}" ${marcadas.has(l.id) ? "checked" : ""}><label for="rtl-${esc(l.id)}" style="margin:0;font-size:.84rem;color:var(--text)">${esc(l.nome)}</label></div>
+        <input class="field rtEntrada hidden" data-loja="${esc(l.id)}" inputmode="decimal" style="width:110px;margin:0" placeholder="—"></div>`).join("")}
+      ${rev ? `<label>Motivo da revisão (mín. 5 letras)</label><input class="field" id="rtMotivo" placeholder="Ex: divisão combinada com o contador">` : ""}
+      </div>
+      <div class="banner" style="margin-top:8px">A conta <b>exclusiva</b> continua sendo o padrão. ${AVISO_CAIXA}</div>
+      <div id="rtPrevia"></div>
+      <div class="modal-actions"><button class="btn btn-soft" data-a="${rev ? "ratVoltar" : "fechar"}" data-id="${rev ? esc(r.id) : ""}">Cancelar</button><button class="btn btn-soft" data-a="ratPrevia">Calcular prévia</button><button class="btn btn-red" data-a="ratCriar" id="rtCriar" disabled>${rev ? "Salvar revisão" : "Criar rateio"}</button></div>`);
+    Views.rateios.ajustaEntradas();
+  },
+  ajustaEntradas() {
+    const m = $("rtMetodo").value;
+    document.querySelectorAll(".rtEntrada").forEach(i => { const marcada = $("rtl-" + i.dataset.loja).checked; i.classList.toggle("hidden", m === "igual" || !marcada); i.placeholder = m === "percentual" ? "% (ex 50)" : "R$"; });
+  },
+  args() {
+    const metodo = $("rtMetodo").value, itens = [...document.querySelectorAll(".rtLoja:checked")].map(c => {
+      const o = { loja_id: c.value }, v = document.querySelector(`.rtEntrada[data-loja="${c.value}"]`).value.trim();
+      if (metodo === "percentual") o.percentual = num(v); else if (metodo === "valores") o.valor = num(v);
+      return o; });
+    const total = num($("rtValor").value);
+    return { total, metodo, itens };
+  },
+  invalida() { const b = $("rtCriar"); if (!b || !S.ratCtx) return; const a = Views.rateios.args(); if (S.ratCtx.sig !== JSON.stringify(a)) { b.disabled = true; if ($("rtPrevia")) $("rtPrevia").innerHTML = ""; } },
+  async previa(btn) {
+    const a = Views.rateios.args();
+    if (!centavosOk(a.total)) return toast("Informe o valor total (até 2 casas decimais)", true);
+    if (a.itens.length < 2) return toast("Escolha pelo menos 2 lojas (para uma loja só, use conta exclusiva)", true);
+    if (a.itens.some(i => (a.metodo === "percentual" && !(i.percentual > 0)) || (a.metodo === "valores" && !(i.valor > 0)))) return toast("Preencha o percentual/valor de cada loja marcada", true);
+    await busy(btn, async () => {
+      const p = await rpc("rateio_previa", { p_valor_total: a.total, p_metodo: a.metodo, p_itens: a.itens });
+      S.ratCtx.sig = JSON.stringify(a);
+      $("rtPrevia").innerHTML = `<div class="card" style="padding:10px;margin-top:8px"><b>Prévia (calculada pelo servidor)</b>
+        ${p.parcelas.map(x => `<div class="list-row"><div class="grow">${esc(x.loja_nome)}<small>${esc(String(x.percentual))}%${x.ajuste_centavos ? " · inclui +R$ 0,01 de arredondamento" : ""}</small></div><b>${esc(fmt(x.valor))}</b></div>`).join("")}
+        <div class="tt-row big"><span>Soma das parcelas</span><span>${esc(fmt(p.soma))}</span></div>
+        ${Number(p.ajustes) ? `<small style="color:var(--muted)">${p.ajustes} centavo(s) de arredondamento distribuído(s) de forma determinística: um a um, seguindo a ordem alfabética das lojas (no percentual, pelo maior resto).</small>` : `<small style="color:var(--muted)">Divisão exata, sem arredondamento.</small>`}</div>`;
+      $("rtCriar").disabled = false;
+    });
+  },
+  async criar(btn) {
+    const a = Views.rateios.args(), c = S.ratCtx;
+    if (!c || c.sig !== JSON.stringify(a)) return toast("Calcule a prévia antes de confirmar", true);
+    const desc = $("rtDesc").value.trim(), venc = $("rtVenc").value || null;
+    if (desc.length < 3) return toast("Informe a descrição", true);
+    if (c.rev && ($("rtMotivo").value.trim().length < 5)) return toast("Informe o motivo da revisão (mín. 5 letras)", true);
+    if (!confirm(c.rev ? "Salvar a revisão? Uma nova versão das parcelas será criada e a anterior fica no histórico." : `Criar a conta compartilhada de ${fmt(a.total)} entre ${a.itens.length} lojas?`)) return;
+    await busy(btn, async () => {
+      if (c.rev) { await rpc("revisar_rateio", { p_id: c.rev, p_descricao: desc, p_valor_total: a.total, p_vencimento: venc, p_metodo: a.metodo, p_itens: a.itens, p_motivo: $("rtMotivo").value.trim() }); toast("Rateio revisado (nova versão)"); S.ratCtx = null; await Views.rateios.detalhe(c.rev); }
+      else { const id = await rpc("criar_rateio", { p_descricao: desc, p_categoria: $("rtCat").value, p_valor_total: a.total, p_vencimento: venc, p_exige_comprovante: $("rtComp").checked, p_metodo: a.metodo, p_itens: a.itens, p_chave: c.chave }); toast("Conta compartilhada criada"); S.ratCtx = null; await Views.rateios.detalhe(id); }
+      Views.rateios.carregar().catch(() => {});
+    });
+  },
+
+  /* ---- detalhe ---- */
+  async detalhe(id) {
+    const d = await rpc("rateio_detalhe", { p_id: id }), r = d.rateio; S.ratDet = d;
+    const sit = RAT_SIT[r.situacao], pagLojas = d.pode_pagar_lojas.length > 0;
+    const temDev = d.posicoes.some(p => Number(p.posicao) < 0), temCred = d.posicoes.some(p => Number(p.posicao) > 0);
+    openModal(`<h3>${esc(r.descricao)}</h3>
+      <div class="row" style="margin-bottom:6px"><span class="tag ${sit[0]}">${sit[1]}</span>${r.situacao !== "cancelado" && r.vencimento && r.vencimento < hojeISO() && Number(r.saldo_externo) > 0 ? '<span class="tag atrasado">saldo externo vencido</span>' : ""}<span class="tag neutro">versão ${r.versao}</span>
+        <small style="color:var(--muted)">${esc(r.categoria)} · ${esc(METODOS[r.metodo])}${r.vencimento ? " · vence " + esc(fmtD(r.vencimento)) : ""} · criado por ${esc(r.criado_por_nome || "—")}</small></div>
+      <div class="banner" id="ratAviso">Pagamentos externos e reembolsos aqui <b>apenas registram operações já realizadas</b>: não transferem dinheiro e <b>não movimentam o caixa automaticamente</b>. Reembolso entre lojas <b>não quita de novo</b> a conta externa e <b>não é receita nem despesa</b>.</div>
+      ${r.status === "cancelado" ? `<div class="banner">Cancelada em ${esc(fmtDT(r.cancelado_em))} — ${esc(r.motivo_cancelamento || "")}</div>` : ""}
+      <div class="kpi-grid"><div class="kpi"><div class="v">${esc(fmt(r.valor_total))}</div><div class="l">Valor total da despesa</div></div><div class="kpi good"><div class="v">${esc(fmt(r.despesa_consolidada))}</div><div class="l">Pago ao externo (despesa consolidada)</div></div>
+        <div class="kpi ${Number(r.saldo_externo) ? "warn" : ""}"><div class="v">${esc(fmt(r.saldo_externo))}</div><div class="l">Saldo externo a pagar</div></div></div>
+      <label>Parcelas por loja — responsabilidade × quem pagou</label>
+      ${d.posicoes.map(p => `<div class="card" style="padding:10px;margin-bottom:6px${p.minha ? ";border-color:var(--red)" : ""}"><div class="row"><b>${esc(p.loja_nome)}</b>${p.minha ? '<span class="tag neutro">sua loja</span>' : ""}<span style="flex:1"></span>${posHtml(p.posicao)}</div>
+        <div class="grid2" style="font-size:.76rem;color:var(--muted)"><span>Parcela (responsabilidade): <b>${esc(fmt(p.parcela))}</b></span><span>Pagou ao externo: <b>${esc(fmt(p.pago_externo))}</b></span><span>Reembolsou a outras: <b>${esc(fmt(p.reembolso_pago))}</b></span><span>Recebeu de outras: <b>${esc(fmt(p.reembolso_recebido))}</b></span></div></div>`).join("")}
+      <label>Pagamentos externos (quem pagou o fornecedor)</label>
+      ${d.pagamentos.length ? d.pagamentos.map(x => Views.rateios.movHtml(x, "pag")).join("") : `<div class="empty">Nenhum pagamento externo.</div>`}
+      ${r.status === "ativo" && pagLojas && Number(r.saldo_externo) > 0 ? `<button class="abtn green" data-a="ratPagForm" data-id="${esc(r.id)}">+ Pagamento externo</button>` : ""}
+      <label>Reembolsos entre lojas (internos)</label>
+      ${d.reembolsos.length ? d.reembolsos.map(x => Views.rateios.movHtml(x, "reemb")).join("") : `<div class="empty">Nenhum reembolso.</div>`}
+      ${r.status === "ativo" && (pagLojas) && temDev && temCred ? `<button class="abtn green" data-a="ratReembForm" data-id="${esc(r.id)}">+ Reembolso entre lojas</button>` : ""}
+      <div class="row" style="margin-top:12px">${r.pode_revisar ? `<button class="abtn soft" data-a="ratRevisar" data-id="${esc(r.id)}">Revisar parcelas</button><button class="abtn soft" data-a="ratCancelarForm" data-id="${esc(r.id)}">Cancelar rateio</button>` : ""}</div>
+      ${r.status === "ativo" && r.tem_movimento && isGerente() ? `<small style="color:var(--muted);display:block;margin-top:6px">Rateio com movimentação não pode ser alterado nem cancelado. Para corrigir, estorne os reembolsos e os pagamentos (o histórico é preservado) e depois revise.</small>` : ""}
+      <label>Histórico (auditoria)</label>${d.auditoria.map(a => `<div class="list-row"><div class="grow">${esc({ criado: "Rateio criado", revisado: "Rateio revisado", cancelado: "Rateio cancelado", pagamento_externo: "Pagamento externo registrado", estorno_pagamento: "Pagamento externo estornado", reembolso: "Reembolso registrado", estorno_reembolso: "Reembolso estornado", comprovante_anexado: "Comprovante anexado" }[a.acao] || a.acao)}${a.motivo ? " — " + esc(a.motivo) : ""}<small>${esc(fmtDT(a.em))} · ${esc(a.por || "—")}</small></div></div>`).join("")}
+      <div class="modal-actions"><button class="btn btn-soft" data-a="fechar">Fechar</button></div>`);
+    $("modalBox").classList.add("wide");
+  },
+  movHtml(x, tipo) {
+    const est = x.tipo === "estorno", pend = S.upPend && S.upPend[x.id], titulo = tipo === "pag" ? esc(x.loja_nome) : `${esc(x.origem_nome)} → ${esc(x.destino_nome)}`;
+    return `<div class="card" style="padding:10px;margin-bottom:6px${est ? ";background:var(--soft)" : ""}"><div class="row"><b class="${est ? "pos" : "neg"}">${est ? "Estorno" : tipo === "pag" ? "Pagou" : "Reembolso"} ${esc(fmt(x.valor))}</b><span>${titulo}</span>
+        <span class="tag ${x.estornado ? "cancelada" : est ? "neutro" : "pago"}">${est ? "estorno registrado" : x.estornado ? "estornado" : "confirmado"}</span>
+        <small style="color:var(--muted)">${esc(fmtD(x.data))}${tipo === "pag" ? " · " + esc(x.forma_pagamento) : ""} · ${esc(x.criado_por_nome || "—")}</small></div>
+      ${x.observacao ? `<small style="color:var(--muted)">Obs: ${esc(x.observacao)}</small><br>` : ""}${x.motivo ? `<small style="color:var(--muted)">Motivo: ${esc(x.motivo)}</small><br>` : ""}
+      ${est ? "" : `<div style="margin-top:6px;font-size:.78rem">📎 <b>Comprovante${tipo === "reemb" ? " (opcional)" : ""}:</b> ${x.comprovantes.length ? x.comprovantes.map(a => `<button class="abtn soft sm" data-a="finBaixar" data-id="${esc(a.path)}">${esc((a.nome || "arquivo").slice(0, 24))} (${esc(String(Math.ceil(a.tamanho / 1024)))} KB)</button>`).join(" ") : "nenhum"}</div>
+        <div class="row" style="margin-top:6px">${x.pode_anexar ? `<input type="file" class="arqRat hidden" id="arqr-${esc(x.id)}" data-kind="${tipo}" data-mov="${esc(x.id)}" accept="application/pdf,image/jpeg,image/png,image/webp"><button class="abtn dark sm" data-a="ratAnexar" data-id="${esc(x.id)}">📎 Anexar comprovante</button>` : ""}
+          ${pend ? `<button class="abtn red sm" data-a="ratTentar" data-id="${esc(x.id)}" data-kind="${tipo}">Tentar registrar de novo (${esc(pend.nome)})</button>` : ""}
+          ${x.pode_estornar ? `<button class="abtn soft sm" data-a="${tipo === "pag" ? "ratEstPagForm" : "ratEstReembForm"}" data-id="${esc(x.id)}">Estornar</button>` : ""}</div>`}</div>`;
+  },
+
+  /* ---- pagamento externo ---- */
+  pagForm(id) {
+    const d = S.ratDet, r = d.rateio;
+    openModal(`<h3>Pagamento externo</h3><small style="color:var(--muted)">Saldo externo a pagar: <b>${esc(fmt(r.saldo_externo))}</b>. Quem pagou o fornecedor é quem registra — mesmo que pague mais que a própria parcela.</small>
+      <div class="banner" style="margin-top:8px" id="ratPagAviso">${AVISO_CAIXA} Se saiu dinheiro da gaveta, lance também uma saída/retirada na aba Caixa.</div>
+      <label>Loja que pagou</label><select class="field" id="rpLoja">${d.pode_pagar_lojas.map(l => `<option value="${esc(l.loja_id)}" ${l.loja_id === S.loja.id ? "selected" : ""}>${esc(l.loja_nome)}</option>`).join("")}</select>
+      <label>Valor pago (R$)</label><input class="field" id="rpValor" inputmode="decimal" value="${esc(String(r.saldo_externo).replace(".", ","))}">
+      <div class="grid2"><div><label>Data</label><input class="field" id="rpData" type="date" value="${hojeISO()}" max="${hojeISO()}"></div><div><label>Forma</label><select class="field" id="rpForma">${FORMAS_PAG.map(f => `<option>${f}</option>`).join("")}</select></div></div>
+      <label>Observação (opcional)</label><input class="field" id="rpObs">
+      <div class="modal-actions"><button class="btn btn-soft" data-a="ratVoltar" data-id="${esc(id)}">Voltar</button><button class="btn btn-red" data-a="ratPagSalvar" data-id="${esc(id)}">Confirmar pagamento</button></div>`);
+  },
+  async pagSalvar(id, btn) {
+    const r = S.ratDet.rateio, v = num($("rpValor").value), data = $("rpData").value || hojeISO();
+    if (!centavosOk(v)) return toast("Informe um valor maior que zero, com até 2 casas decimais", true);
+    if (v > Number(r.saldo_externo) + 1e-9) return toast(`O pagamento passa do saldo externo (${fmt(r.saldo_externo)})`, true);
+    if (data > hojeISO()) return toast("A data do pagamento não pode ser futura", true);
+    const args = { p_rateio_id: id, p_loja_id: $("rpLoja").value, p_valor: v, p_data: data, p_forma: $("rpForma").value, p_observacao: $("rpObs").value.trim() || null }, sig = JSON.stringify(args);
+    if (!S.ratPagChave || S.ratPagSig !== sig) { S.ratPagChave = uuid(); S.ratPagSig = sig; }        // mesma chave só para reenvio idêntico
+    await busy(btn, async () => { await rpc("registrar_pagamento_rateio", { ...args, p_chave: S.ratPagChave }); S.ratPagChave = null; S.ratPagSig = ""; toast("Pagamento externo registrado"); await Views.rateios.detalhe(id); Views.rateios.carregar().catch(() => {}); });
+  },
+
+  /* ---- reembolso ---- */
+  reembForm(id) {
+    const d = S.ratDet, dev = d.posicoes.filter(p => Number(p.posicao) < 0), cred = d.posicoes.filter(p => Number(p.posicao) > 0);
+    openModal(`<h3>Reembolso entre lojas</h3><small style="color:var(--muted)">A loja que <b>deve</b> devolve dinheiro à loja que <b>pagou a mais</b>. Isto não quita de novo a conta externa.</small>
+      <div class="banner" style="margin-top:8px" id="ratReembAviso">${AVISO_CAIXA} Não é receita nem despesa no consolidado.</div>
+      <label>Loja de origem (quem devolve)</label><select class="field" id="rbOrigem">${dev.map(p => `<option value="${esc(p.loja_id)}">${esc(p.loja_nome)} — deve ${esc(fmt(-p.posicao))}</option>`).join("")}</select>
+      <label>Loja de destino (quem recebe)</label><select class="field" id="rbDestino">${cred.map(p => `<option value="${esc(p.loja_id)}">${esc(p.loja_nome)} — a recuperar ${esc(fmt(p.posicao))}</option>`).join("")}</select>
+      <label>Valor (R$)</label><input class="field" id="rbValor" inputmode="decimal">
+      <div class="grid2"><div><label>Data</label><input class="field" id="rbData" type="date" value="${hojeISO()}" max="${hojeISO()}"></div><div><label>Observação (opcional)</label><input class="field" id="rbObs"></div></div>
+      <small style="color:var(--muted)">Pode ser parcial. O valor não pode passar do que a origem deve nem do que o destino tem a recuperar. Comprovante é opcional (anexe depois, no detalhe).</small>
+      <div class="modal-actions"><button class="btn btn-soft" data-a="ratVoltar" data-id="${esc(id)}">Voltar</button><button class="btn btn-red" data-a="ratReembSalvar" data-id="${esc(id)}">Registrar reembolso</button></div>`);
+    const o = S.ratDet.posicoes.find(p => p.loja_id === $("rbOrigem").value), c = S.ratDet.posicoes.find(p => p.loja_id === $("rbDestino").value);
+    if (o && c) $("rbValor").value = String(Math.min(-o.posicao, c.posicao)).replace(".", ",");
+  },
+  async reembSalvar(id, btn) {
+    const v = num($("rbValor").value), data = $("rbData").value || hojeISO();
+    if (!centavosOk(v)) return toast("Informe um valor maior que zero, com até 2 casas decimais", true);
+    const o = S.ratDet.posicoes.find(p => p.loja_id === $("rbOrigem").value), c = S.ratDet.posicoes.find(p => p.loja_id === $("rbDestino").value);
+    if (!o || !c) return toast("Escolha a origem e o destino", true);
+    if (v > -Number(o.posicao) + 1e-9) return toast(`O reembolso passa do que ${o.loja_nome} deve (${fmt(-o.posicao)})`, true);
+    if (v > Number(c.posicao) + 1e-9) return toast(`O reembolso passa do que ${c.loja_nome} tem a recuperar (${fmt(c.posicao)})`, true);
+    const args = { p_rateio_id: id, p_loja_origem: o.loja_id, p_loja_destino: c.loja_id, p_valor: v, p_data: data, p_observacao: $("rbObs").value.trim() || null }, sig = JSON.stringify(args);
+    if (!S.ratReembChave || S.ratReembSig !== sig) { S.ratReembChave = uuid(); S.ratReembSig = sig; }
+    await busy(btn, async () => { await rpc("registrar_reembolso", { ...args, p_chave: S.ratReembChave }); S.ratReembChave = null; S.ratReembSig = ""; toast("Reembolso registrado"); await Views.rateios.detalhe(id); Views.rateios.carregar().catch(() => {}); });
+  },
+
+  /* ---- estornos, revisão, cancelamento ---- */
+  estForm(id, tipo) {
+    openModal(`<h3>Estornar ${tipo === "pag" ? "pagamento externo" : "reembolso"}</h3><div class="banner">O registro original continua no histórico; o estorno é gravado ao lado dele, com seu nome e o motivo.</div>
+      <label>Motivo (mín. 5 letras)</label><input class="field" id="reMotivo">
+      <div class="modal-actions"><button class="btn btn-soft" data-a="ratVoltar" data-id="${esc(S.ratDet.rateio.id)}">Voltar</button><button class="btn btn-red" data-a="${tipo === "pag" ? "ratEstPagOk" : "ratEstReembOk"}" data-id="${esc(id)}">Estornar</button></div>`);
+  },
+  async estOk(id, tipo, btn) {
+    const m = $("reMotivo").value.trim(); if (m.length < 5) return toast("Informe o motivo (mín. 5 letras)", true);
+    await busy(btn, async () => { await rpc(tipo === "pag" ? "estornar_pagamento_rateio" : "estornar_reembolso", tipo === "pag" ? { p_pagamento_id: id, p_motivo: m } : { p_reembolso_id: id, p_motivo: m }); toast("Estorno registrado"); await Views.rateios.detalhe(S.ratDet.rateio.id); Views.rateios.carregar().catch(() => {}); });
+  },
+  cancelarForm(id) {
+    openModal(`<h3>Cancelar rateio</h3><div class="banner">Só é possível sem movimentação (ou depois de estornar tudo). O cancelamento fica na auditoria.</div><label>Motivo (mín. 5 letras)</label><input class="field" id="rcMotivo">
+      <div class="modal-actions"><button class="btn btn-soft" data-a="ratVoltar" data-id="${esc(id)}">Voltar</button><button class="btn btn-red" data-a="ratCancelarOk" data-id="${esc(id)}">Cancelar rateio</button></div>`);
+  },
+  async cancelarOk(id, btn) {
+    const m = $("rcMotivo").value.trim(); if (m.length < 5) return toast("Informe o motivo (mín. 5 letras)", true);
+    await busy(btn, async () => { await rpc("cancelar_rateio", { p_id: id, p_motivo: m }); toast("Rateio cancelado"); await Views.rateios.detalhe(id); Views.rateios.carregar().catch(() => {}); });
+  },
+
+  /* ---- comprovantes (mesma lógica de nova tentativa dos pagamentos de conta) ---- */
+  async anexar(movId, kind, file) {
+    if (!file) return;
+    const ext = TIPOS_ARQ[file.type];
+    if (!ext) return toast("Tipo não permitido. Use PDF, JPG, PNG ou WEBP.", true);
+    if (file.size < 1 || file.size > MAX_ARQ) return toast("O arquivo precisa ter entre 1 byte e 5 MB.", true);
+    const path = `rateio/${S.ratDet.rateio.id}/${movId}/${uuid()}.${ext}`, st = { path, nome: file.name, mime: file.type, tamanho: file.size, kind };
+    toast("Enviando comprovante…");
+    let error = null;
+    try { ({ error } = await sb.storage.from("comprovantes").upload(path, file, { contentType: file.type, upsert: false })); } catch (e) { error = e; }
+    if (error) return toast("Falha no envio do arquivo: " + msgErro(error) + " — o registro financeiro não foi afetado; tente de novo.", true);
+    S.upPend = S.upPend || {}; S.upPend[movId] = st;
+    await Views.rateios.registrarArq(movId);
+  },
+  async registrarArq(movId, btn) {
+    const st = (S.upPend || {})[movId]; if (!st) return;
+    await busy(btn, async () => {
+      try { await rpc("registrar_comprovante_rateio", { p_pagamento_id: st.kind === "pag" ? movId : null, p_reembolso_id: st.kind === "reemb" ? movId : null, p_path: st.path, p_nome: st.nome, p_mime: st.mime, p_tamanho: st.tamanho }); }
+      catch (e) { toast("Arquivo enviado, mas o registro falhou: " + msgErro(e) + " — use \"Tentar registrar de novo\".", true); return Views.rateios.detalhe(S.ratDet.rateio.id); }
+      delete S.upPend[movId]; toast("Comprovante anexado"); await Views.rateios.detalhe(S.ratDet.rateio.id);
+    });
   },
 };
 
@@ -1216,7 +1438,7 @@ Views.historico = {
       const x = await rpc("detalhe_dia_financeiro", { p_loja_id: d.loja_id, p_dia: d.dia });
       box.innerHTML = `${x.caixas.map(c => `<div class="list-row click" data-a="cxDetalhe" data-id="${esc(c.id)}"><div class="grow"><b>Caixa ${esc(c.status)}</b><small>${esc(c.aberto_por_nome || "—")} · abriu ${esc(fmtDT(c.aberto_em))} com ${esc(fmt(c.saldo_inicial))}${c.status === "fechado" ? ` · contou ${esc(fmt(c.valor_conferido))} (esperado ${esc(fmt(c.esperado_dinheiro))}, diferença ${esc(fmt(c.diferenca))})` : ""}</small></div><span style="color:var(--muted)">›</span></div>`).join("")}
         <label>Movimentações do caixa</label>${x.movimentos.length ? x.movimentos.map(m => `<div class="list-row"><span class="tag ${m.sentido > 0 ? "entrada" : "saida"}">${esc(TIPOS_MOV[m.tipo] || m.tipo)}</span><div class="grow">${esc(m.categoria)} · ${esc(MEIOS[m.meio] || m.meio)}<small>${esc(fmtDT(m.criado_em))} · ${esc(m.criado_por_nome || "—")}${m.observacao ? " · " + esc(m.observacao) : ""}</small></div><b>${m.sentido > 0 ? "+" : "−"}${esc(fmt(m.valor))}</b></div>`).join("") : `<div class="empty">Nenhuma.</div>`}
-        <label>Financeiro (vendas, despesas, estornos)</label>${x.lancamentos.length ? x.lancamentos.map(l => { const pos = Number(l.efeito) > 0, orig = { venda: "venda", estorno_venda: "estorno de venda", pagamento: "pagamento de conta", estorno_pagamento: "estorno de pagamento", conta: "conta (lançamento antigo)" }[l.origem] || l.origem; return `<div class="list-row"><span class="tag ${pos ? "entrada" : "saida"}">${pos ? "ENTRADA" : "SAÍDA"}</span><div class="grow">${esc(l.descricao || l.categoria)}<small>Origem: ${esc(orig)} · ${esc(l.categoria)}${l.forma_pagamento ? " · " + esc(l.forma_pagamento) : ""} · ${esc(fmtDT(l.data_ref))}</small></div><b>${pos ? "+" : "−"}${esc(fmt(l.valor))}</b></div>`; }).join("") : `<div class="empty">Nenhum.</div>`}`;
+        <label>Financeiro (vendas, despesas, estornos)</label>${x.lancamentos.length ? x.lancamentos.map(l => { const pos = Number(l.efeito) > 0, orig = { venda: "venda", estorno_venda: "estorno de venda", pagamento: "pagamento de conta", estorno_pagamento: "estorno de pagamento", conta: "conta (lançamento antigo)", rateio_pagamento: "pagamento externo de conta compartilhada", rateio_estorno: "estorno de pagamento de conta compartilhada" }[l.origem] || l.origem; return `<div class="list-row"><span class="tag ${pos ? "entrada" : "saida"}">${pos ? "ENTRADA" : "SAÍDA"}</span><div class="grow">${esc(l.descricao || l.categoria)}<small>Origem: ${esc(orig)} · ${esc(l.categoria)}${l.forma_pagamento ? " · " + esc(l.forma_pagamento) : ""} · ${esc(fmtDT(l.data_ref))}</small></div><b>${pos ? "+" : "−"}${esc(fmt(l.valor))}</b></div>`; }).join("") : `<div class="empty">Nenhum.</div>`}`;
     } catch (e) { box.innerHTML = `<div class="empty">${esc(msgErro(e))}</div>`; }
   },
 };
@@ -1249,6 +1471,15 @@ const Act = {
   finCancelarForm: (id) => Views.financeiro.cancelarForm(id), finCancelarOk: (id, b) => Views.financeiro.cancelarOk(id, b),
   finAnexar: (id) => Views.financeiro.escolherArquivo(id), finTentar: (id, b) => Views.financeiro.registrarArq(id, b), finBaixar: (id) => Views.financeiro.baixar(id),
   finEnvio: (id, b) => Views.financeiro.confirmarEnvio(id, b),
+  ratNovo: () => Views.rateios.novo(false).catch(e => toast(msgErro(e), true)), ratRevisar: () => Views.rateios.novo(true).catch(e => toast(msgErro(e), true)),
+  ratPrevia: (id, b) => Views.rateios.previa(b), ratCriar: (id, b) => Views.rateios.criar(b),
+  ratDetalhe: (id) => Views.rateios.detalhe(id).catch(e => toast(msgErro(e), true)), ratVoltar: (id) => Views.rateios.detalhe(id).catch(e => toast(msgErro(e), true)),
+  ratPagForm: (id) => Views.rateios.pagForm(id), ratPagSalvar: (id, b) => Views.rateios.pagSalvar(id, b),
+  ratReembForm: (id) => Views.rateios.reembForm(id), ratReembSalvar: (id, b) => Views.rateios.reembSalvar(id, b),
+  ratEstPagForm: (id) => Views.rateios.estForm(id, "pag"), ratEstPagOk: (id, b) => Views.rateios.estOk(id, "pag", b),
+  ratEstReembForm: (id) => Views.rateios.estForm(id, "reemb"), ratEstReembOk: (id, b) => Views.rateios.estOk(id, "reemb", b),
+  ratCancelarForm: (id) => Views.rateios.cancelarForm(id), ratCancelarOk: (id, b) => Views.rateios.cancelarOk(id, b),
+  ratAnexar: (id) => { const i = $("arqr-" + id); if (i) i.click(); }, ratTentar: (id, b) => Views.rateios.registrarArq(id, b),
   finMarcaAntiga: (id, b) => busy(b, async () => { await rpc("marcar_comprovante_enviado", { p_id: id }); toast("Marcação antiga registrada"); await Views.financeiro.detalhe(id); }),
   finStatus: (id) => { S.f.finStatus = id; Views.financeiro.render().catch(e => toast(msgErro(e), true)); },
   avisoForm: (id) => Avisos.form(id), avisoSalvar: (id, b) => Avisos.salvar(id, b), avisoLido: (id, b) => Avisos.lido(id, b), avisoArquivar: (id, b) => Avisos.arquivar(id, b),
@@ -1268,6 +1499,7 @@ document.addEventListener("click", ev => {
 });
 document.addEventListener("input", ev => {
   const id = ev.target.id;
+  if (ev.target.closest && ev.target.closest("#ratForm")) { Views.rateios.invalida(); return; }
   if (id === "estBusca") { S.f.estBusca = ev.target.value; Views.estoque.update(); }
   else if (id === "vBusca") { S.f.vendaBusca = ev.target.value; Views.venda.resultados(); }       // só a lista muda — o campo nunca é recriado
   else if (id === "cliBusca") { S.f.cliBusca = ev.target.value; Views.clientes.update(); }
@@ -1281,6 +1513,8 @@ document.addEventListener("input", ev => {
 });
 document.addEventListener("change", ev => {
   const id = ev.target.id;
+  if (ev.target.classList && ev.target.classList.contains("arqRat")) { const f = ev.target.files[0]; ev.target.value = ""; Views.rateios.anexar(ev.target.dataset.mov, ev.target.dataset.kind, f).catch(e => toast(msgErro(e), true)); return; }
+  if (ev.target.closest && ev.target.closest("#ratForm")) { if (id === "rtMetodo" || (ev.target.classList && ev.target.classList.contains("rtLoja"))) Views.rateios.ajustaEntradas(); Views.rateios.invalida(); return; }
   if (ev.target.classList && ev.target.classList.contains("arqInput")) { const f = ev.target.files[0]; ev.target.value = ""; Views.financeiro.anexar(ev.target.dataset.pag, f).catch(e => toast(msgErro(e), true)); return; }
   if (id === "lJaPaga") { $("lPagBox").classList.toggle("hidden", !ev.target.checked); return; }
   if (id === "waPreco" || id === "waQtd" || id === "waSabores") { S.f[id] = ev.target.checked; Views.whats.render(); }
