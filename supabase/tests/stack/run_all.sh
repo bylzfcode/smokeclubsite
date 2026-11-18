@@ -22,8 +22,10 @@ RC=0
 echo ">> validação de API (pilha real)"; node real_api.test.js || RC=1
 echo ">> validação de rateios e reembolsos (pilha real)"; node real_api_rateios.test.js || RC=1
 echo ">> validação dos resumos de rateios (pilha real)"; node real_api_resumos.test.js || RC=1
+echo ">> validação de comunicados (pilha real)"; node real_api_comunicados.test.js || RC=1
 if [ -f real_ui.test.js ]; then echo ">> validação no navegador (pilha real)"; NODE_PATH=/opt/node22/lib/node_modules node real_ui.test.js || RC=1; fi
 if [ -f real_ui_resumos.test.js ]; then echo ">> validação dos resumos de rateios no navegador (pilha real)"; NODE_PATH=/opt/node22/lib/node_modules node real_ui_resumos.test.js || RC=1; fi
 if [ -f real_ui_rateios.test.js ]; then echo ">> validação de rateios no navegador (pilha real)"; NODE_PATH=/opt/node22/lib/node_modules node real_ui_rateios.test.js || RC=1; fi
+if [ -f real_ui_comunicados.test.js ]; then echo ">> validação de comunicados no navegador (pilha real)"; NODE_PATH=/opt/node22/lib/node_modules node real_ui_comunicados.test.js || RC=1; fi
 [ "$1" = "--keep" ] || { pkill -f "node gateway.js" || true; $DC down >/dev/null 2>&1; }
 exit $RC

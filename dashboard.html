@@ -131,6 +131,12 @@ label{display:block;font-size:.74rem;font-weight:700;color:var(--muted);margin:8
 .abtn.sm{padding:6px 10px;font-size:.74rem}
 .empty{text-align:center;color:var(--muted);padding:28px 0;font-size:.88rem}
 .neg{color:var(--red)}.pos{color:var(--green)}
+/* comunicados: texto puro, quebras preservadas; formatação só por tags fixas depois do escape */
+.aviso .tx .msg{display:block;white-space:pre-wrap}
+.cm-prev{white-space:pre-wrap;overflow-wrap:anywhere;font-size:.86rem;line-height:1.55;background:#E7FFDB;border:1px solid #cfe9c3;border-radius:10px;padding:10px 12px;margin:6px 0;max-height:420px;overflow-y:auto}
+.cm-prev .wa-mono,.cm-ver{font-family:ui-monospace,Menlo,Consolas,monospace}
+.cm-ver{white-space:pre-wrap;overflow-wrap:anywhere;font-size:.74rem;background:var(--soft);border-radius:8px;padding:6px 8px;margin-top:4px;max-height:110px;overflow:auto}
+#cmForm textarea.field{resize:vertical;min-height:44px}
 #waPreview{white-space:pre-wrap;font-size:.83rem;line-height:1.6;background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:14px;max-height:440px;overflow-y:auto}
 .check{display:flex;align-items:center;gap:8px;font-size:.84rem;font-weight:600;margin:6px 0}
 .check input{width:18px;height:18px}
@@ -326,7 +332,7 @@ const Auth = {
     } catch (e) { err.textContent = msgErro(e); }
     finally { btn.disabled = false; btn.textContent = "Entrar"; }
   },
-  async logout() { try { if (S.channel) await sb.removeChannel(S.channel); await sb.auth.signOut(); } finally { location.reload(); } },
+  async logout() { if (!Views.comunicados.podeSair()) return; try { if (S.channel) await sb.removeChannel(S.channel); await sb.auth.signOut(); } finally { location.reload(); } },
 };
 
 /* ───────── app ───────── */
@@ -358,13 +364,14 @@ const App = {
     $("app").classList.add("show");
     App.tabs(); App.goTab("painel"); App.iniciarRealtime();
   },
-  async trocarLoja() { await App.pararRealtime(); App.seletor(); },
+  async trocarLoja() { if (!Views.comunicados.podeSair()) return; await App.pararRealtime(); App.seletor(); },
   tabs() {
-    const t = [["painel", "📊 Painel"], ["venda", "🛒 Nova venda"], ["vendas", "🧾 Vendas"], ["estoque", "📦 Estoque"], ["clientes", "👥 Clientes"], ["financeiro", "💰 Financeiro"], ["caixa", "💵 Caixa"], ["historico", "📅 Histórico"], ["whats", "📋 Lista WhatsApp"]];
+    const t = [["painel", "📊 Painel"], ["venda", "🛒 Nova venda"], ["vendas", "🧾 Vendas"], ["estoque", "📦 Estoque"], ["clientes", "👥 Clientes"], ["financeiro", "💰 Financeiro"], ["caixa", "💵 Caixa"], ["historico", "📅 Histórico"], ["comunicados", "📣 Comunicados"], ["whats", "📋 Lista WhatsApp"]];
     if (isGerente()) t.push(["catalogo", "🏷️ Catálogo"]);
     $("tabsNav").innerHTML = t.map(([id, l]) => `<button class="tabbtn" id="tab-${id}" data-a="tab" data-id="${id}">${l}</button>`).join("");
   },
   goTab(id) {
+    if (S.tab === "comunicados" && !Views.comunicados.podeSair()) return;
     S.tab = id;
     document.querySelectorAll(".tabbtn").forEach(b => b.classList.toggle("active", b.id === "tab-" + id));
     const v = Views[id] || Views.painel;
@@ -1175,6 +1182,153 @@ Views.whats = {
   enviar() { const { t } = Views.whats.texto(); window.open("https://wa.me/?text=" + encodeURIComponent(t), "_blank", "noopener"); },
 };
 
+/* COMUNICADOS — editor de comunicados ADMINISTRATIVOS (texto puro). Não toca em catálogo, produtos, preços, estoque, pedidos nem listas comerciais.
+   Publicar = aviso interno (mesma tabela/regras dos avisos). O conteúdo é sempre escapado antes de qualquer formatação. */
+const WA = {
+  /* texto cru -> HTML seguro: escapa TUDO primeiro; só depois troca *negrito* _itálico_ ~tachado~ ```mono``` por tags fixas */
+  html(txt) {
+    return esc(txt).split(/(```[\s\S]+?```)/).map((p, i) => i % 2 ? `<span class="wa-mono">${p.slice(3, -3)}</span>` : WA.inline(p)).join("");
+  },
+  inline(p) {
+    for (const [m, tag] of [["*", "b"], ["_", "i"], ["~", "s"]]) {
+      const M = "\\" + m, O = "_*~".replace(m, "");   // marcador de abertura só depois de espaço/início/outro marcador (nunca do mesmo, ex.: __x__)
+      p = p.replace(new RegExp(`(^|[\\s>(\\[${O}])${M}([^${M}\\n\\s](?:[^${M}\\n]*?[^${M}\\n\\s])?)${M}(?=$|[\\s<.,;:!?)\\]${O}])`, "gm"), (x, a, b) => `${a}<${tag}>${b}</${tag}>`);
+    }
+    return p;
+  },
+};
+Views.comunicados = {
+  bloco(t) { t = String(t ?? "").replace(/\r\n?/g, "\n"); return t.replace(/[ \n\t]/g, "") === "" ? "" : t; },
+  compor(c, o, r) { return [c, o, r].map(Views.comunicados.bloco).filter(b => b !== "").join("\n\n"); },   // idêntico ao comunicado_compor() do servidor
+  valores() { return { t: $("cmTitulo").value, c: $("cmCab").value, o: $("cmCor").value, r: $("cmRod").value }; },
+  texto() { const v = Views.comunicados.valores(); return Views.comunicados.compor(v.c, v.o, v.r); },
+  sujo() { const cm = S.cm; return !!(cm && cm.aberto && $("cmTitulo") && JSON.stringify(Views.comunicados.valores()) !== JSON.stringify(cm.orig)); },
+  podeSair() {
+    if (!Views.comunicados.sujo()) return true;
+    if (!confirm("Há alterações não salvas neste comunicado. Sair e descartar?")) return false;
+    S.cm = null; return true;
+  },
+  async render() {
+    if (S.cm && S.cm.aberto && $("cmTitulo")) return;
+    S.cm = null;
+    $("viewRoot").innerHTML = `<div class="empty">Carregando…</div>`;
+    let lista;
+    try { lista = await rpc("listar_comunicados", { p_loja_id: S.loja.id }); }
+    catch (e) {
+      $("viewRoot").innerHTML = `<div class="page-h"><h2>📣 Comunicados</h2></div><div class="banner">Comunicados indisponíveis: ${esc(/Could not find the function|schema cache/i.test(e.message) ? "falta aplicar a migração 009_comunicados.sql no Supabase (veja o README)." : msgErro(e))}</div>`; return;
+    }
+    S.cm = { lista, aberto: false };
+    Views.comunicados.lista();
+  },
+  update() { if (S.cm && S.cm.aberto) return; return Views.comunicados.render(); },
+  lista() {
+    const l = S.cm.lista;
+    $("viewRoot").innerHTML = `<div class="page-h"><h2 style="flex:1">📣 Comunicados</h2><button class="abtn dark" data-a="cmNovo">+ Novo comunicado</button></div>
+      <div class="banner">Rascunhos de <b>${esc(S.loja.nome)}</b>. Escreva, veja a prévia, copie o texto ou publique como aviso interno${isGerente() ? "" : " (a publicação é feita por gerente ou dono)"}. Só comunicados administrativos — nada aqui mexe em produtos, preços ou estoque.</div>
+      ${l.length ? l.map(x => `<div class="list-row click" data-a="cmAbrir" data-id="${esc(x.id)}"><div class="grow"><b>${esc(x.titulo)}</b>
+        <small>${esc(x.previa || "sem texto")}</small><small>Atualizado por ${esc(x.atualizado_por_nome || "—")} em ${esc(fmtDT(x.atualizado_em))} · versão ${x.versao}</small></div>
+        <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end"><span class="tag ${x.status === "publicado" ? "entrada" : "neutro"}">${x.status === "publicado" ? "publicado" : "rascunho"}</span>${x.alteracoes_nao_publicadas ? `<span class="tag pendente">alterações não publicadas</span>` : ""}</div></div>`).join("") : `<div class="empty">Nenhum comunicado nesta loja. Use "+ Novo comunicado".</div>`}`;
+  },
+  novo() { S.cm = { lista: S.cm ? S.cm.lista : [], aberto: true, det: null, chave: uuid(), orig: { t: "", c: "", o: "", r: "" } }; Views.comunicados.editor(); },
+  async abrir(id) {
+    const det = await rpc("comunicado_detalhe", { p_id: id }); const c = det.comunicado;
+    S.cm = { lista: S.cm ? S.cm.lista : [], aberto: true, det, chave: null, orig: { t: c.titulo, c: c.cabecalho, o: c.corpo, r: c.rodape } };
+    Views.comunicados.editor();
+  },
+  voltar() { if (!Views.comunicados.podeSair()) return; S.cm = null; Views.comunicados.render().catch(e => toast(msgErro(e), true)); },
+  editor() {
+    const cm = S.cm, d = cm.det && cm.det.comunicado, ed = !d || d.pode_editar, o = cm.orig, dis = ed ? "" : "disabled";
+    const tags = d ? `<span class="tag ${d.status === "publicado" ? "entrada" : "neutro"}">${d.status === "publicado" ? "publicado" : "rascunho"}</span>${d.alteracoes_nao_publicadas ? ` <span class="tag pendente">alterações não publicadas</span>` : ""}` : `<span class="tag neutro">novo (não salvo)</span>`;
+    $("viewRoot").innerHTML = `<div class="page-h"><button class="abtn soft sm" data-a="cmVoltar">← Comunicados</button><h2 style="flex:1;min-width:0">${d ? "Editar comunicado" : "Novo comunicado"} ${tags}</h2></div>
+      ${d ? `<div class="banner">Versão ${d.versao} · criado por ${esc(d.criado_por_nome || "—")} em ${esc(fmtDT(d.criado_em))} · última alteração por ${esc(d.atualizado_por_nome || "—")} em ${esc(fmtDT(d.atualizado_em))}${d.status === "publicado" ? ` · publicado por ${esc(d.publicado_por_nome || "—")} em ${esc(fmtDT(d.publicado_em))} (versão ${d.publicado_versao})` : ""}</div>` : ""}
+      ${ed ? "" : `<div class="banner">Você pode ver este comunicado, mas não editar.</div>`}
+      <div id="cmForm" class="two-col"><div class="card">
+        <label>Título (nome do rascunho e do aviso)</label><input class="field" id="cmTitulo" maxlength="120" value="${esc(o.t)}" ${dis} autocomplete="off">
+        <label>Cabeçalho <small id="cmN-c" style="color:var(--muted)"></small></label><textarea class="field" id="cmCab" rows="2" maxlength="400" ${dis}>${esc(o.c)}</textarea>
+        <label>Corpo <small id="cmN-o" style="color:var(--muted)"></small></label><textarea class="field" id="cmCor" rows="9" maxlength="2000" ${dis}>${esc(o.o)}</textarea>
+        <label>Rodapé <small id="cmN-r" style="color:var(--muted)"></small></label><textarea class="field" id="cmRod" rows="2" maxlength="400" ${dis}>${esc(o.r)}</textarea>
+        <small style="display:block;color:var(--muted);margin-top:6px">Formatação do WhatsApp: *negrito* _itálico_ ~tachado~ \`\`\`monoespaçado\`\`\`. Quebras de linha e emojis são mantidos. HTML digitado aparece como texto.</small></div>
+        <div class="card"><h3 style="margin-top:0">Prévia</h3><b id="cmPrevT" style="display:block;overflow-wrap:anywhere"></b><div id="cmPrev" class="cm-prev"></div><small id="cmNT" style="color:var(--muted)"></small>
+          <div class="row" style="margin-top:10px"><button class="abtn dark" data-a="cmCopiar">📋 Copiar texto</button><button class="abtn soft" data-a="cmCopiarT">Copiar com título</button></div></div></div>
+      <div class="row" style="margin-top:10px">${ed ? `<button class="abtn green" data-a="cmSalvar" id="cmBtnSalvar">💾 Salvar rascunho</button>` : ""}
+        ${d && d.pode_publicar ? `<button class="abtn dark" data-a="cmPublicarForm">📣 ${d.status === "publicado" ? "Republicar aviso" : "Publicar como aviso"}</button>` : ""}
+        ${d && d.pode_publicar && d.status === "publicado" ? `<button class="abtn soft" data-a="cmDespublicar">Despublicar</button>` : ""}
+        ${d ? `<button class="abtn soft" data-a="cmHistorico">🕘 Histórico (${d.versoes_n || cm.det.versoes.length})</button>` : ""}<span id="cmSujo" class="tag pendente hidden">alterações não salvas</span></div>`;
+    Views.comunicados.atualiza();
+  },
+  atualiza() {
+    if (!$("cmTitulo")) return;
+    const v = Views.comunicados.valores(), msg = Views.comunicados.compor(v.c, v.o, v.r);
+    $("cmN-c").textContent = `${v.c.length}/400`; $("cmN-o").textContent = `${v.o.length}/2000`; $("cmN-r").textContent = `${v.r.length}/400`;
+    $("cmPrevT").textContent = v.t.trim() || "(sem título)";
+    $("cmPrev").innerHTML = msg ? WA.html(msg) : `<span style="color:var(--muted)">Escreva algo para ver a prévia.</span>`;
+    $("cmNT").textContent = `Mensagem: ${msg.length}/2000 caracteres` + (msg.length > 2000 ? " — passou do limite" : "");
+    $("cmSujo").classList.toggle("hidden", !Views.comunicados.sujo());
+  },
+  async copiar(comTitulo) {
+    const v = Views.comunicados.valores(); let t = Views.comunicados.texto();
+    if (!t) return toast("Nada para copiar", true);
+    if (comTitulo && v.t.trim()) t = `*${v.t.trim()}*\n\n${t}`;
+    try { await navigator.clipboard.writeText(t); toast("Texto copiado"); }
+    catch (e) {
+      const ta = document.createElement("textarea"); ta.value = t; ta.setAttribute("readonly", ""); ta.style.cssText = "position:fixed;top:0;left:0;opacity:0"; document.body.appendChild(ta); ta.select();
+      let okc = false; try { okc = document.execCommand("copy"); } catch (e2) { /* sem permissão */ }
+      ta.remove(); toast(okc ? "Texto copiado" : "Não consegui copiar — selecione o texto da prévia", !okc);
+    }
+  },
+  async salvar(btn) {
+    const cm = S.cm, v = Views.comunicados.valores(), d = cm.det && cm.det.comunicado;
+    if (v.t.trim().length < 3) return toast("O título precisa ter pelo menos 3 caracteres", true);
+    await busy(btn, async () => {
+      const r = await rpc("salvar_comunicado", { p_id: d ? d.id : null, p_loja_id: S.loja.id, p_titulo: v.t, p_cabecalho: v.c, p_corpo: v.o, p_rodape: v.r, p_versao_base: d ? d.versao : null, p_chave: cm.chave || uuid() });
+      await Views.comunicados.abrir(r.id || d.id);
+      toast(r.sem_mudanca ? "Nada mudou — nenhuma versão nova" : `Rascunho salvo (versão ${r.versao})`);
+    });
+  },
+  publicarForm() {
+    const cm = S.cm, d = cm.det && cm.det.comunicado; if (!d) return;
+    if (Views.comunicados.sujo()) return toast("Salve o rascunho antes de publicar — só a versão salva vira aviso", true);
+    const a = d.aviso && d.aviso.ativo ? d.aviso : null;
+    openModal(`<h3>${d.status === "publicado" ? "Republicar aviso" : "Publicar como aviso interno"}</h3>
+      <div class="banner">Publica a versão <b>${d.versao}</b> em <b>${esc(S.loja.nome)}</b>. ${d.status === "publicado" ? "O aviso já publicado é atualizado (quem já leu volta a ver como \"atualizado\")." : "Fica no painel, em Avisos."}</div>
+      <div class="grid2"><div><label>Prioridade</label><select class="field" id="cmPrio">${[["info", "Informação"], ["atencao", "Atenção"], ["urgente", "Urgente"]].map(([k, l]) => `<option value="${k}" ${a && a.prioridade === k ? "selected" : ""}>${l}</option>`).join("")}</select></div>
+      <div><label>Válido até (opcional)</label><input class="field" id="cmValido" type="date" value="${a && a.valido_ate ? esc(String(a.valido_ate).slice(0, 10)) : ""}"></div></div>
+      <div class="check"><input type="checkbox" id="cmDestaque" ${a && a.destaque ? "checked" : ""}><label for="cmDestaque" style="margin:0;font-size:.84rem;color:var(--text)">Destacar no topo</label></div>
+      ${S.perfil.papel === "dono" ? `<div class="check"><input type="checkbox" id="cmGlobal" ${a && a.global ? "checked" : ""}><label for="cmGlobal" style="margin:0;font-size:.84rem;color:var(--text)">Aviso global (todas as lojas)</label></div>` : ""}
+      <div class="modal-actions"><button class="btn btn-soft" data-a="fechar">Cancelar</button><button class="btn btn-red" data-a="cmPublicarOk">Publicar</button></div>`);
+  },
+  async publicarOk(btn) {
+    const d = S.cm.det.comunicado, v = $("cmValido").value;
+    await busy(btn, async () => {
+      await rpc("publicar_comunicado", { p_id: d.id, p_prioridade: $("cmPrio").value, p_valido_ate: v ? `${v}T23:59:59-03:00` : null, p_destaque: $("cmDestaque").checked, p_global: !!($("cmGlobal") && $("cmGlobal").checked) });
+      closeModal(); await Views.comunicados.abrir(d.id); toast("Comunicado publicado como aviso");
+    });
+  },
+  async despublicar(btn) {
+    const d = S.cm.det.comunicado; if (Views.comunicados.sujo()) return toast("Salve ou descarte as alterações antes", true);
+    if (!confirm("Despublicar? O aviso sai do painel das lojas; o comunicado volta a rascunho e o histórico é mantido.")) return;
+    await busy(btn, async () => { await rpc("despublicar_comunicado", { p_id: d.id }); await Views.comunicados.abrir(d.id); toast("Comunicado despublicado"); });
+  },
+  historico() {
+    const cm = S.cm, d = cm.det.comunicado, vs = cm.det.versoes, ac = { criado: "criado", editado: "editado", restaurado: "restaurado", publicado: "publicado", despublicado: "despublicado" };
+    openModal(`<h3>🕘 Histórico de versões</h3><small style="display:block;color:var(--muted);margin-bottom:8px">Restaurar cria uma versão nova com o conteúdo antigo — nada é apagado.</small>
+      ${vs.map((x, i) => `<div class="list-row" style="align-items:flex-start"><div class="grow" style="min-width:0"><b>Versão ${x.versao} · ${esc(ac[x.acao] || x.acao)}${x.restaurado_de ? ` (da versão ${x.restaurado_de})` : ""}${x.versao === d.versao && i === 0 ? ` <span class="tag neutro">atual</span>` : ""}</b>
+        <small>${esc(x.por_nome || "—")} · ${esc(fmtDT(x.em))}</small><div class="cm-ver">${esc(x.titulo)}\n${esc(Views.comunicados.compor(x.cabecalho, x.corpo, x.rodape))}</div></div>
+        ${d.pode_editar && ["criado", "editado", "restaurado"].includes(x.acao) ? `<button class="abtn soft sm" data-a="cmRestaurar" data-id="${i}">Restaurar</button>` : ""}</div>`).join("")}
+      <div class="modal-actions"><button class="btn btn-soft" data-a="fechar">Fechar</button></div>`);
+    $("modalBox").classList.add("wide");
+  },
+  async restaurar(i, btn) {
+    const cm = S.cm, d = cm.det.comunicado, x = cm.det.versoes[i]; if (!x) return;
+    if (Views.comunicados.sujo() && !confirm("As alterações não salvas no editor serão descartadas. Continuar?")) return;
+    if (!confirm(`Restaurar a versão ${x.versao}? Será criada uma versão nova com esse conteúdo.`)) return;
+    await busy(btn, async () => {
+      await rpc("restaurar_comunicado", { p_id: d.id, p_versao: x.versao, p_versao_base: d.versao });
+      closeModal(); S.cm.orig = null; S.cm.aberto = false; await Views.comunicados.abrir(d.id); toast(`Versão ${x.versao} restaurada como nova versão`);
+    });
+  },
+};
+
 /* CATÁLOGO (gerente/dono) */
 Views.catalogo = {
   render() {
@@ -1247,7 +1401,7 @@ const Avisos = {
     const rotulo = { atencao: "Atenção", urgente: "Urgente", info: "Informação" };
     return `<div class="card"><div class="page-h" style="margin-bottom:8px"><h3 style="flex:1;margin:0">🔔 Avisos e atualizações ${naoLidos ? `<span class="tag saida">${naoLidos} novo(s)</span>` : ""}</h3>${isGerente() ? `<button class="abtn dark sm" data-a="avisoForm" data-id="">+ Novo aviso</button>` : ""}</div>
       ${lista.length ? lista.map((x, i) => `<div class="aviso ${esc(x.prioridade)} ${x.destaque ? "destaque" : ""} ${x.lido ? "lido" : ""}">
-        <div class="tx"><b>${x.lido ? "" : '<span class="dot"></span>'}${esc(x.titulo)} ${x.atualizado ? '<span class="tag pendente">atualizado</span>' : ""}</b>${esc(x.descricao)}
+        <div class="tx"><b>${x.lido ? "" : '<span class="dot"></span>'}${esc(x.titulo)} ${x.atualizado ? '<span class="tag pendente">atualizado</span>' : ""}</b><span class="msg">${esc(x.descricao)}</span>
           <small>${x.origem === "alerta" ? "Alerta automático" : x.tipo === "sistema" ? "Mudança no sistema" : "Comunicado"} · ${esc(rotulo[x.prioridade] || x.prioridade)} · ${esc(fmtD(String(x.atualizado_em || x.criado_em).slice(0, 10)))}${x.origem === "aviso" ? " · " + (x.global ? "todas as lojas" : esc((x.lojas || []).join(", "))) : ""}${x.valido_ate ? " · válido até " + esc(fmtD(String(x.valido_ate).slice(0, 10))) : ""}</small></div>
         <div style="display:flex;flex-direction:column;gap:5px">${x.acao ? `<button class="abtn soft sm" data-a="avisoIr" data-id="${esc(x.acao)}">Ver</button>` : ""}
           ${x.lido ? "" : `<button class="abtn dark sm" data-a="avisoLido" data-id="${i}">Lido</button>`}
@@ -1532,6 +1686,10 @@ const Act = {
   cxEstornar: (id) => Views.caixa.estornar(id), cxEstornarOk: (id, b) => Views.caixa.estornarOk(id, b),
   cxFechar: () => Views.caixa.fechar(), cxFecharOk: (id, b) => Views.caixa.fecharOk(b), cxReabrir: (id) => Views.caixa.reabrir(id), cxReabrirOk: (id, b) => Views.caixa.reabrirOk(id, b),
   cxDetalhe: (id) => Views.caixa.detalhe(id).catch(e => toast(msgErro(e), true)), hDia: (id, el) => Views.historico.dia(id, el),
+  cmNovo: () => Views.comunicados.novo(), cmAbrir: (id) => Views.comunicados.abrir(id).catch(e => toast(msgErro(e), true)), cmVoltar: () => Views.comunicados.voltar(),
+  cmSalvar: (id, b) => Views.comunicados.salvar(b), cmCopiar: () => Views.comunicados.copiar(false), cmCopiarT: () => Views.comunicados.copiar(true),
+  cmPublicarForm: () => Views.comunicados.publicarForm(), cmPublicarOk: (id, b) => Views.comunicados.publicarOk(b), cmDespublicar: (id, b) => Views.comunicados.despublicar(b),
+  cmHistorico: () => Views.comunicados.historico(), cmRestaurar: (id, b) => Views.comunicados.restaurar(id, b),
   waCopiar: () => Views.whats.copiar(), waEnviar: () => Views.whats.enviar(),
   catGrupo: (id, b) => Views.catalogo.grupo(id, b), catItem: (id, b) => Views.catalogo.item(b), catEditar: (id) => Views.catalogo.editar(id),
   catSalvar: (id, b) => Views.catalogo.salvar(id, b), catSabor: (id, b) => Views.catalogo.sabor(id, b), catWpp: (id, b) => Views.catalogo.wpp(b),
@@ -1543,6 +1701,7 @@ document.addEventListener("click", ev => {
 });
 document.addEventListener("input", ev => {
   const id = ev.target.id;
+  if (ev.target.closest && ev.target.closest("#cmForm")) { Views.comunicados.atualiza(); return; }
   if (ev.target.closest && ev.target.closest("#ratForm")) { Views.rateios.invalida(); return; }
   if (id === "estBusca") { S.f.estBusca = ev.target.value; Views.estoque.update(); }
   else if (id === "vBusca") { S.f.vendaBusca = ev.target.value; Views.venda.resultados(); }       // só a lista muda — o campo nunca é recriado
@@ -1564,6 +1723,7 @@ document.addEventListener("change", ev => {
   if (id === "waPreco" || id === "waQtd" || id === "waSabores") { S.f[id] = ev.target.checked; Views.whats.render(); }
   else if (["hLoja", "hPeriodo", "hResp", "hSit"].includes(id)) { S.f[id] = ev.target.value; Views.historico.update().catch(e => toast(msgErro(e), true)); }
 });
+window.addEventListener("beforeunload", ev => { if (Views.comunicados.sujo()) { ev.preventDefault(); ev.returnValue = ""; } });
 document.addEventListener("keydown", ev => { if (ev.key === "Escape" && modalOpen()) closeModal(); });
 document.addEventListener("visibilitychange", async () => {
   if (document.visibilityState !== "visible" || !S.loja) return;
