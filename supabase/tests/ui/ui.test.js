@@ -4,7 +4,7 @@ const fs = require("fs"), path = require("path");
 const root = path.resolve(__dirname, "../../..");
 const html = fs.readFileSync(path.join(root, "dashboard.html"), "utf8");
 const fake = fs.readFileSync(path.join(__dirname, "fake-supabase.js"), "utf8");
-const sql = ["002_melhorias.sql", "003_caixa_avisos.sql", "004_entradas_sem_caixa.sql", "005_pagamentos_comprovantes.sql"].map(f => fs.readFileSync(path.join(root, "supabase", f), "utf8")).join("\n");
+const sql = ["002_melhorias.sql", "003_caixa_avisos.sql", "004_entradas_sem_caixa.sql", "005_pagamentos_comprovantes.sql", "006_limpeza_comprovantes.sql"].map(f => fs.readFileSync(path.join(root, "supabase", f), "utf8")).join("\n");
 
 // contrato: nomes de parâmetros reais das funções (obrigatório = sem "default")
 const CONTRACT = {};

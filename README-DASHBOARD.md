@@ -57,8 +57,9 @@ Em `dashboard.html`, ajuste `SUPABASE_URL` e `SUPABASE_ANON_KEY` (só a chave an
 
 ## Pagamentos parciais e comprovantes (migração 005)
 
-**Ordem de aplicação no Supabase (nenhuma foi aplicada ainda no projeto remoto):** `schema.sql` → `002` → `003` → `004` → `005`.
-A 005 depende da 003 (permissões e caixa). Rode uma por vez no SQL Editor e confira que terminou sem erro antes da próxima.
+**Ordem de aplicação no Supabase (nenhuma foi aplicada ainda no projeto remoto):** `schema.sql` → `002` → `003` → `004` → `005` → `006`.
+A 005 depende da 003 (permissões e caixa) e a 006 da 005. Rode uma por vez no SQL Editor e confira que terminou sem erro antes da próxima.
+A ordem foi conferida instalando do zero numa pilha Supabase local real (veja "Validação contra a pilha real").
 
 - **Contas:** cada conta tem valor original, total pago e saldo pendente. Situações: pendente, parcialmente paga, paga e cancelada
   ("saldo vencido" é calculado pela data de vencimento). Vários pagamentos até quitar; valor/data/forma/observação/responsável em cada um.
@@ -84,13 +85,34 @@ A 005 depende da 003 (permissões e caixa). Rode uma por vez no SQL Editor e con
 - `pagar_lancamento` continua existindo e agora paga o saldo restante pelo mesmo fluxo (mesmas regras e auditoria).
 - Saldo, a pagar/receber, vencidas, histórico por dia e alertas passam a usar os pagamentos; para contas antigas os números não mudam.
 
+## Comprovantes: links assinados, limpeza de órfãos e limites (migração 006)
+
+- **Link assinado:** o download usa um link temporário de 60 s (`createSignedUrl`, forçando "baixar"). **Quem já recebeu um link continua conseguindo usá-lo até ele expirar,
+  mesmo que perca o acesso à loja nesse intervalo** (o link é portador do acesso; foi testado). Depois de expirar, deixa de funcionar. Por isso o prazo é curto.
+- **Arquivos órfãos** (enviados mas nunca vinculados a um pagamento, por exemplo quando o registro falha): a limpeza é **só do servidor**.
+  1. `006_limpeza_comprovantes.sql` cria as funções (restritas a `service_role`/dono do banco) e a tabela de registro `storage_limpeza`.
+  2. `supabase/ops/limpar_comprovantes_orfaos.js` roda fora do navegador (agendador/cron), com a chave `service_role` em variável de ambiente (nunca no repositório nem no painel):
+     `SUPABASE_URL=… SUPABASE_SERVICE_KEY=… node supabase/ops/limpar_comprovantes_orfaos.js` (simulação) e `… --apply` (executa).
+  3. Segurança: tolerância padrão de **24 h** (mínimo 1 h) — uploads recentes ou em andamento não são tocados; **arquivos vinculados a pagamentos (inclusive estornados) nunca são tocados**;
+     primeiro **reserva** (a partir daí o arquivo não pode mais ser vinculado, então não há corrida com um registro tardio) e só então apaga pela **API do Storage**
+     (apagar só a linha em `storage.objects` por SQL deixaria o arquivo físico). Uma reserva esquecida há mais de 1 h (script interrompido) é retomada na próxima execução.
+- **Limites conhecidos do Storage:** o tipo do arquivo é o que o navegador informa (o Storage confere a lista de tipos e a extensão, mas **não lê o conteúdo**): um arquivo com extensão e tipo de PDF mas conteúdo diferente seria aceito.
+  Por isso os downloads saem como anexo. Não há antivírus. Se um upload for interrompido no meio da rede, nada é registrado e o pagamento fica intacto.
+
+## Validação contra a pilha real (Docker)
+
+`supabase/tests/stack/` sobe **Postgres do Supabase + Auth (GoTrue) + PostgREST + Storage API** reais em contêineres, instala `schema.sql → 002 → 003 → 004 → 005 → 006` do zero como o papel `postgres`
+(o mesmo do SQL Editor), cria usuários por SQL direto (como no projeto remoto) e roda: `real_api.test.js` (login, isolamento entre lojas, pagamentos, Storage, limpeza) e `real_ui.test.js` (o `dashboard.html` no Chromium).
+Requisitos: Docker com daemon ativo, Node 18+, Playwright. Uso: `supabase/tests/stack/run_all.sh` (`--keep` deixa a pilha de pé). Os segredos são gerados na hora (`.env`, não versionado).
+Não valida: o **Kong** (gateway do Supabase hospedado, inclusive CORS) — aqui um mini-gateway (`gateway.js`) o substitui —, Realtime, e e-mails/recuperação de senha. Nada é enviado ao projeto remoto.
+
 ## Testes
 
 - `supabase/tests/banco_testes.sql` — 128 verificações do banco (rodam e desfazem tudo).
 - `supabase/tests/caixa_testes.sql` — 115 verificações de caixa/histórico/avisos (permissões, isolamento entre lojas, estorno, fechamento, reabertura).
 - `supabase/tests/sem_caixa_testes.sql` — 17 verificações dos valores sem caixa (janelas, permissões, somente leitura); tela: `ui/ui_sem_caixa.test.js`.
 - `supabase/tests/pagamentos_testes.sql` — 71 verificações de pagamentos parciais, estornos, comprovantes (políticas do bucket), envio confirmado e acesso indevido; tela: `ui/ui.test.js` (104).
-- `supabase/tests/lab/` — banco local + concorrência (`concorrencia.sh` vendas; `concorrencia_caixa.sh` abertura/estorno/fechamento simultâneos; `concorrencia_pagamentos.sh` pagamentos/estornos/repetições simultâneos). O Storage é simulado só nas **políticas**; a API HTTP real (limite de 5 MB, tipo MIME, upload) só pode ser conferida no Supabase.
+- `supabase/tests/lab/` — banco local + concorrência (`concorrencia.sh` vendas; `concorrencia_caixa.sh` abertura/estorno/fechamento simultâneos; `concorrencia_pagamentos.sh` pagamentos/estornos/repetições simultâneos). As suítes locais acima usam um Storage simulado só nas **políticas**; a API real (limite de 5 MB, tipo MIME, upload, links assinados) é validada em `supabase/tests/stack/`.
 - `supabase/tests/ui/` — a tela no Chromium com Supabase simulado e checagem dos
   nomes de parâmetros das funções contra o SQL:
   `NODE_PATH=/opt/node22/lib/node_modules node supabase/tests/ui/ui.test.js`

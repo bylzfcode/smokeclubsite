@@ -1,0 +1,61 @@
+# Pilha Supabase LOCAL com os serviços reais: Postgres (imagem oficial do Supabase), Auth (GoTrue), PostgREST e Storage API.
+# O Kong é substituído por gateway.js (mesmas rotas /auth/v1, /rest/v1, /storage/v1). Sem Realtime/Studio (não fazem parte desta validação).
+name: painel-stack
+services:
+  db:
+    image: supabase/postgres:15.8.1.060
+    ports: ["127.0.0.1:54322:5432"]
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: postgres
+      JWT_SECRET: ${JWT_SECRET}
+    healthcheck: { test: ["CMD", "pg_isready", "-U", "postgres", "-h", "localhost"], interval: 3s, timeout: 3s, retries: 40 }
+  auth:
+    image: supabase/gotrue:v2.169.0
+    depends_on: { db: { condition: service_healthy } }
+    ports: ["127.0.0.1:9999:9999"]
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: "9999"
+      API_EXTERNAL_URL: http://localhost:54321
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${POSTGRES_PASSWORD}@db:5432/postgres
+      GOTRUE_SITE_URL: http://localhost:54321
+      GOTRUE_DISABLE_SIGNUP: "true"
+      GOTRUE_JWT_ADMIN_ROLES: service_role
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_JWT_EXP: "3600"
+      GOTRUE_JWT_SECRET: ${JWT_SECRET}
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"
+      GOTRUE_MAILER_AUTOCONFIRM: "true"
+      GOTRUE_SMTP_HOST: localhost
+  rest:
+    image: postgrest/postgrest:v12.2.3
+    depends_on: { db: { condition: service_healthy } }
+    ports: ["127.0.0.1:3000:3000"]
+    environment:
+      PGRST_DB_URI: postgres://authenticator:${POSTGRES_PASSWORD}@db:5432/postgres
+      PGRST_DB_SCHEMAS: public,storage
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${JWT_SECRET}
+      PGRST_DB_USE_LEGACY_GUCS: "false"
+  storage:
+    image: supabase/storage-api:v1.14.6
+    depends_on: { db: { condition: service_healthy }, rest: { condition: service_started } }
+    ports: ["127.0.0.1:5000:5000"]
+    volumes: ["storage-data:/var/lib/storage"]
+    environment:
+      ANON_KEY: ${ANON_KEY}
+      SERVICE_KEY: ${SERVICE_KEY}
+      POSTGREST_URL: http://rest:3000
+      PGRST_JWT_SECRET: ${JWT_SECRET}
+      DATABASE_URL: postgres://supabase_storage_admin:${POSTGRES_PASSWORD}@db:5432/postgres
+      FILE_SIZE_LIMIT: "52428800"
+      STORAGE_BACKEND: file
+      FILE_STORAGE_BACKEND_PATH: /var/lib/storage
+      TENANT_ID: stub
+      REGION: stub
+      GLOBAL_S3_BUCKET: stub
+      ENABLE_IMAGE_TRANSFORMATION: "false"
+volumes: { storage-data: {} }

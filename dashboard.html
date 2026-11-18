@@ -724,7 +724,7 @@ Views.financeiro = {
       <div class="check"><input type="checkbox" id="lComp"><label for="lComp" style="margin:0;font-size:.84rem;color:var(--text)">Exige comprovante</label></div>
       <div class="check"><input type="checkbox" id="lJaPaga"><label for="lJaPaga" style="margin:0;font-size:.84rem;color:var(--text)">Já foi paga (registrar pagamento integral hoje)</label></div>
       <div id="lPagBox" class="hidden"><label>Forma do pagamento</label><select class="field" id="lForma">${FORMAS_PAG.map(f => `<option>${f}</option>`).join("")}</select></div>
-      <small style="color:var(--muted)">Registrar pagamento apenas anota uma operação já realizada; não transfere dinheiro nem mexe no caixa.</small>
+      <small style="color:var(--muted)">Registrar pagamento apenas anota uma operação já realizada: não transfere dinheiro e <b>não movimenta o caixa automaticamente</b>.</small>
       <div class="modal-actions"><button class="btn btn-soft" data-a="fechar">Cancelar</button><button class="btn btn-red" data-a="finSalvar">Salvar</button></div>`);
   },
   async salvar(btn) {
@@ -758,7 +758,7 @@ Views.financeiro = {
       ${d.pagamentos.length ? d.pagamentos.map(p => Views.financeiro.pagHtml(p, c)).join("") : `<div class="empty">${c.legado ? "Quitado antes do controle de pagamentos." : "Nenhum pagamento registrado."}</div>`}
       <div class="row" style="margin-top:10px">${podePagar ? `<button class="abtn green" data-a="finPagForm" data-id="${esc(c.id)}">+ Registrar pagamento</button>` : ""}
         ${isGerente() && !d.pagamentos.length && !c.legado && c.situacao === "pendente" && !c.venda_id ? `<button class="abtn soft" data-a="finCancelarForm" data-id="${esc(c.id)}">Cancelar conta</button>` : ""}</div>
-      <small style="color:var(--muted);display:block;margin-top:8px">Pagamento aqui só registra uma operação já realizada: não transfere dinheiro e não altera o caixa.</small>
+      <small style="color:var(--muted);display:block;margin-top:8px">Pagamento aqui só registra uma operação já realizada: não transfere dinheiro e <b>não movimenta o caixa automaticamente</b>.</small>
       <label>Histórico (auditoria)</label>${d.auditoria.map(a => `<div class="list-row"><div class="grow">${esc({ conta_criada: "Conta criada", pagamento: "Pagamento registrado", estorno_pagamento: "Pagamento estornado", comprovante_anexado: "Comprovante anexado", envio_confirmado: "Envio confirmado", conta_cancelada: "Conta cancelada" }[a.acao] || a.acao)}${a.motivo ? " — " + esc(a.motivo) : ""}<small>${esc(fmtDT(a.em))} · ${esc(a.por || "—")}</small></div></div>`).join("")}
       <div class="modal-actions"><button class="btn btn-soft" data-a="fechar">Fechar</button></div>`);
   },
@@ -782,7 +782,8 @@ Views.financeiro = {
   /* ---- pagamento ---- */
   pagForm(id) {
     const c = S.conta.conta;
-    openModal(`<h3>Registrar pagamento</h3><small style="color:var(--muted)">Saldo pendente: <b>${esc(fmt(c.saldo))}</b>. Isto apenas registra uma operação já realizada.</small>
+    openModal(`<h3>Registrar pagamento</h3><small style="color:var(--muted)">Saldo pendente: <b>${esc(fmt(c.saldo))}</b>.</small>
+      <div class="banner" style="margin-top:8px" id="pgAviso">Isto apenas <b>registra um pagamento já realizado</b>: não transfere dinheiro e <b>não movimenta o caixa automaticamente</b>. Se saiu dinheiro da gaveta, lance também uma saída/retirada na aba Caixa.</div>
       <label>Valor pago (R$)</label><input class="field" id="pgValor" inputmode="decimal" value="${esc(String(c.saldo).replace(".", ","))}">
       <div class="grid2"><div><label>Data do pagamento</label><input class="field" id="pgData" type="date" value="${hojeISO()}" max="${hojeISO()}"></div>
       <div><label>Forma</label><select class="field" id="pgForma">${FORMAS_PAG.map(f => `<option>${f}</option>`).join("")}</select></div></div>
@@ -832,7 +833,9 @@ Views.financeiro = {
     const st = { path, nome: file.name, mime: file.type, tamanho: file.size };
     toast("Enviando comprovante…");
     // 1) envia o arquivo (se falhar, nada foi registrado e o pagamento segue intacto; é só escolher o arquivo de novo)
-    const { error } = await sb.storage.from("comprovantes").upload(path, file, { contentType: file.type, upsert: false });
+    let error = null;
+    try { ({ error } = await sb.storage.from("comprovantes").upload(path, file, { contentType: file.type, upsert: false })); }
+    catch (e) { error = e; }     // queda de rede: o supabase-js lança em vez de devolver "error"
     if (error) return toast("Falha no envio do arquivo: " + msgErro(error) + " — o pagamento não foi afetado; tente de novo.", true);
     S.upPend = S.upPend || {}; S.upPend[pagId] = st;      // arquivo já está no bucket: se o registro falhar, só ele é repetido
     await Views.financeiro.registrarArq(pagId, btn);
@@ -849,7 +852,7 @@ Views.financeiro = {
     });
   },
   async baixar(path) {
-    const { data, error } = await sb.storage.from("comprovantes").createSignedUrl(path, 60);
+    const { data, error } = await sb.storage.from("comprovantes").createSignedUrl(path, 60, { download: true });   // link temporário (60 s) que força "baixar" em vez de abrir no navegador
     if (error || !data) return toast("Não foi possível abrir o arquivo: " + msgErro(error || { message: "sem permissão" }), true);
     window.open(data.signedUrl, "_blank", "noopener");
   },
@@ -1043,6 +1046,7 @@ Views.caixa = {
     const c = d.aberto, ult = d.ultimo_fechado;
     if (!c) {
       $("viewRoot").innerHTML = `<div class="page-h"><h2>💵 Caixa · ${esc(S.loja.nome)}</h2></div>
+        <div class="banner" id="cxAviso">Pagamentos de contas feitos no Financeiro <b>não movimentam o caixa automaticamente</b>. O caixa só soma o que é lançado aqui e as vendas em dinheiro.</div>
         <div class="card"><h3>Nenhum caixa aberto</h3>
           <label>Saldo inicial em dinheiro (R$)</label><input class="field" id="cxSaldo" inputmode="decimal" placeholder="0,00">
           <label>Observação (opcional)</label><input class="field" id="cxObs" placeholder="Ex: troco do dia">
@@ -1061,7 +1065,7 @@ Views.caixa = {
         <div class="kpi"><div class="v">${esc(fmt(c.vendas_pix))}</div><div class="l">Vendas Pix (fora da gaveta)</div></div>
         <div class="kpi"><div class="v">${esc(fmt(c.vendas_cartao))}</div><div class="l">Vendas cartão (fora da gaveta)</div></div>
         <div class="kpi"><div class="v">${esc(fmt(c.mov_outros_meios))}</div><div class="l">Outros meios lançados</div></div></div>
-      <div class="banner">Aberto em ${esc(fmtDT(c.aberto_em))}. Pix e cartão aparecem separados e <b>não</b> entram no dinheiro esperado.</div>
+      <div class="banner" id="cxAviso">Aberto em ${esc(fmtDT(c.aberto_em))}. Pix e cartão aparecem separados e <b>não</b> entram no dinheiro esperado. Pagamentos de contas feitos no Financeiro <b>não movimentam o caixa automaticamente</b>: se saiu dinheiro da gaveta, lance uma saída ou retirada aqui.</div>
       <div class="row" style="margin-bottom:10px">
         <button class="abtn green" data-a="cxMov" data-id="entrada">+ Entrada</button><button class="abtn dark" data-a="cxMov" data-id="saida">− Saída</button>
         <button class="abtn dark" data-a="cxMov" data-id="retirada">Retirada</button>${isGerente() ? `<button class="abtn soft" data-a="cxMov" data-id="ajuste">± Ajuste</button>` : ""}
