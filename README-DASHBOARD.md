@@ -14,10 +14,11 @@ compartilhado. Fica separado do site público (`index (23).html`).
 
 ## Instalar do zero
 
-No SQL Editor do Supabase, nesta ordem:
-1. `supabase/schema.sql`
-2. `supabase/002_melhorias.sql`
-3. `supabase/003_caixa_avisos.sql`, depois 4. `supabase/004_entradas_sem_caixa.sql` e 5. `supabase/005_pagamentos_comprovantes.sql` (caixa, histórico financeiro e avisos — sem ela as abas Caixa/Histórico e a seção de avisos mostram "falta aplicar a migração")
+No SQL Editor do Supabase, **uma por vez, nesta ordem** (confira que terminou sem erro antes da próxima):
+1. `supabase/schema.sql` · 2. `002_melhorias.sql` · 3. `003_caixa_avisos.sql` (caixa, histórico, avisos) · 4. `004_entradas_sem_caixa.sql` · 5. `005_pagamentos_comprovantes.sql` (pagamentos parciais e comprovantes; exige o bucket privado do Storage)
+6. `006_limpeza_comprovantes.sql` · 7. `007_rateios_reembolsos.sql` · 8. `008_rateios_resumos.sql` · 9. `009_comunicados.sql` · 10. `010_acessos.sql` · 11. `011_recorrencia.sql` · 12. `012_calendario.sql`
+
+Sem uma migração, só a parte dela mostra "falta aplicar a migração …" (o resto do painel continua funcionando). **Nada disto foi aplicado no projeto hospedado.**
 
 Crie os usuários (Authentication → Users, e-mail `user@painel.local`, auto-confirm),
 depois vincule:
@@ -57,9 +58,9 @@ Em `dashboard.html`, ajuste `SUPABASE_URL` e `SUPABASE_ANON_KEY` (só a chave an
 
 ## Pagamentos parciais e comprovantes (migração 005)
 
-**Ordem de aplicação no Supabase (nenhuma foi aplicada ainda no projeto remoto):** `schema.sql` → `002` → `003` → `004` → `005` → `006` → `007` → `008` → `009`.
+**Ordem de aplicação no Supabase (nenhuma foi aplicada ainda no projeto remoto):** `schema.sql` → `002` → `003` → `004` → `005` → `006` → `007` → `008` → `009` → `010` → `011` → `012`.
 A 005 depende da 003 (permissões e caixa), a 006 da 005 e a 007 da 005/006 (comprovantes e limpeza). Rode uma por vez no SQL Editor e confira que terminou sem erro antes da próxima.
-A ordem foi conferida instalando do zero (schema → 009) numa pilha Supabase local real (veja "Validação contra a pilha real").
+A ordem foi conferida instalando do zero (schema → 012) numa pilha Supabase local real (veja "Validação contra a pilha real").
 
 - **Contas:** cada conta tem valor original, total pago e saldo pendente. Situações: pendente, parcialmente paga, paga e cancelada
   ("saldo vencido" é calculado pela data de vencimento). Vários pagamentos até quitar; valor/data/forma/observação/responsável em cada um.
@@ -116,7 +117,7 @@ A ordem foi conferida instalando do zero (schema → 009) numa pilha Supabase lo
   a **revisão** cria uma nova versão das parcelas e guarda a anterior (com motivo).
 - **Comprovantes** (bucket privado já existente): obrigatório só se o rateio exigir nos pagamentos externos; **opcional no reembolso**. Caminho `rateio/<rateio>/<movimento>/<arquivo>`. As lojas do rateio conferem os comprovantes umas das outras; quem não participa não lê. A limpeza de órfãos **não toca** em arquivos de rateio.
 - **Acessos:** dono administra todas as lojas; gerente só cria/revisa rateios com lojas em que tem autorização; cada loja vê sua parcela e os pagamentos/reembolsos **do rateio de que participa** (para conferir), sem ganhar acesso ao financeiro completo das demais.
-- **Alerta:** "despesa compartilhada com saldo externo vencido" no painel. Limitações: rateios não entram em "a pagar/receber" dos resumos antigos (têm tela própria) e **recorrência não foi implementada**.
+- **Alerta:** "despesa compartilhada com saldo externo vencido" no painel. Limitações: rateios não entram em "a pagar/receber" dos resumos antigos (têm tela própria) (recorrência: veja a migração 011).
 
 ## Rateios nos resumos financeiros (migração 008)
 
@@ -128,7 +129,7 @@ A ordem foi conferida instalando do zero (schema → 009) numa pilha Supabase lo
 - **Sem duplicar:** o pagamento externo entra em entradas/saídas efetivadas uma vez, na loja que pagou. **Reembolsos internos não são receita nem despesa**: aparecem à parte e não alteram entradas, saídas nem saldo.
 - `financeiro_resumo` agora abate o **estorno de um pagamento** na própria família (despesa ou receita), em vez de contá-lo como "entrada"; sem estornos de pagamento os números são idênticos aos de antes.
 - Telas: cartão "Contas compartilhadas — resumo" no Financeiro (esta loja / todas as minhas lojas; dono: consolidado de todas), cartão no Painel, etiquetas **exclusiva** × **compartilhada**, e os KPIs antigos de a pagar/receber rotulados como "contas exclusivas".
-- Limitações: "Este mês" termina hoje, então uma despesa com vencimento futuro só entra em "previsto" quando o período a alcança (use "Tudo"); rateios não entram nos KPIs antigos de a pagar/receber (têm resumo próprio); recorrência não implementada.
+- Limitações: "Este mês" agora abrange o mês inteiro (veja "Períodos"); "Até hoje" é um filtro separado; rateios não entram nos KPIs antigos de a pagar/receber (têm resumo próprio); recorrência não implementada.
 
 ## Comunicados (migração 009)
 
@@ -141,10 +142,41 @@ Aba **📣 Comunicados**: editor de comunicados **administrativos** (título, ca
 - **Permissões (no servidor):** dono acessa todas as lojas; gerente edita/publica/despublica só nas lojas que administra; operador cria e edita rascunhos das lojas a que tem acesso, mas **não publica**; sem acesso à loja não lista nem abre. Aviso **global** só o dono (e só o dono o despublica — regra dos avisos).
 - Limitações: validade é por data (até 23:59 de Brasília); não há agendamento de publicação nem anexos; editar o texto já publicado só chega às pessoas ao republicar.
 
+## Acessos, períodos, recorrência e calendário (migrações 010, 011 e 012)
+
+**Acessos (010).** `perfis.ativo`: o dono desativa/reativa pessoas (aba **🔐 Acessos**) e altera as lojas de cada uma, sempre com auditoria (`acessos_auditoria`, imutável). Desativar **bloqueia na hora** todas as funções e leituras (inclusive chamadas diretas à API com token ainda válido) e **preserva o histórico** (vendas, caixas, contas, comunicados continuam apontando para a pessoa). Reativar devolve as mesmas lojas. Ninguém desativa a si mesmo nem o último dono ativo; desativar exige motivo. O login continua existindo (é do Supabase Auth), mas a pessoa não vê nada e a tela avisa "Seu acesso foi desativado". Ao trocar de loja a tela e a memória da loja anterior são limpas.
+
+**Períodos.** "**Este mês**" = o mês **inteiro** (dia 1 ao último dia, inclusive datas futuras, que são previsões); "**Até hoje**" é um filtro à parte (do dia 1º até hoje); "Hoje", "7 dias" e "Tudo" como antes. O intervalo aplicado aparece escrito sob os botões, e cada indicador do Financeiro/rateios continua dizendo qual data usa (pagamento, vencimento, foto de hoje). O Histórico tem "Este mês (mês inteiro)" e "Mês até hoje".
+
+**Contas recorrentes (011)** — opcionais, só para **contas exclusivas** de uma loja (conta única é o padrão; rateios não se repetem: crie um novo rateio).
+- Frequência semanal, a cada 15 dias, mensal, anual ou personalizada (a cada N dias/semanas/meses/anos). Término sem prazo, até uma data ou após N ocorrências (1–120). **Prévia** dos vencimentos antes de salvar.
+- Datas sempre calculadas a partir do 1º vencimento: mensal a partir de 31/01 → 28|29/02, 31/03, 30/04… (dia inexistente vira o último dia do mês; a referência original é preservada em `vencimento_ref`).
+- Cada ocorrência é uma conta comum **sempre pendente**, sem pagamentos nem comprovantes copiados, valor exato em centavos. Geração **no servidor**, com **janela futura de 60 dias** (a 1ª ocorrência é sempre criada; no máx. 24 por execução), trava por série e índice único (`serie_id, serie_n`) → sem duplicação com cliques repetidos, abas simultâneas ou agendador + tela. Séries iniciadas no passado geram também as ocorrências já vencidas (aparecem como vencidas).
+- Editar **só esta** ou **esta e as próximas** (descrição, categoria, valor, forma, comprovante; a data só na própria ocorrência). Ocorrências com pagamento, parciais, canceladas ou editadas à mão são **preservadas** (a tela diz quantas).
+- **Pausar / retomar / encerrar** nunca apagam nada. Retomar pula o que venceu durante a pausa (não cria conta no passado). Encerrar pode cancelar as contas futuras ainda sem movimentação.
+- **Agendamento:** as contas novas são criadas (a) quando alguém abre o Financeiro (`gerar_series_loja`, sem configuração externa) e (b) por um agendador diário — **opcional e ainda a configurar no Supabase hospedado**: veja "Configurar o agendador" abaixo. A tela mostra no cartão "Contas recorrentes" se o agendador está configurado.
+
+**Calendário administrativo (012)** — aba **📆 Calendário**: vencimentos de contas exclusivas e compartilhadas (um evento por conta/rateio, que abre o **detalhe financeiro existente**; nada é duplicado) + **compromissos internos** (título, data, responsável, observação; versões e histórico com autor). Visão mensal com pontos por situação e lista dos próximos 30 dias; escopo "esta loja" ou "todas as minhas lojas" (dono: todas). Situações: **pendente, vencido, quitado, cancelado** (compromisso: pendente, vencido = passou sem concluir, concluído, cancelado). Respeita o acesso por loja (rateio só aparece para as lojas participantes). Se o período tiver mais de 800 eventos a tela avisa que a lista está incompleta.
+
+**Configurar o agendador (opcional, uma vez, no Supabase hospedado).** Painel do Supabase → Database → Extensions → habilite `pg_cron`; depois, no SQL Editor:
+```sql
+select cron.schedule('series-diarias', '10 6 * * *', $$ select public.gerar_series_pendentes() $$);
+-- conferir: select jobname, schedule, active from cron.job;      remover: select cron.unschedule('series-diarias');
+```
+(06:10 UTC = 03:10 em Brasília.) Sem isso nada quebra: a geração acontece ao abrir o Financeiro, só não ocorre "sozinha" quando ninguém abre o painel.
+
+## Roteiro rápido para conferir a interface
+1. Entre como gerente (ex.: `luiz`), escolha a Smoke Club → **Financeiro**: confira o texto "Período aplicado" em *Este mês* (mês inteiro) e em *Até hoje*.
+2. **+ Conta / lançamento** → marque "Repetir esta conta" → Mensal, vencimento no dia 31, término "Após 4 ocorrências" → *Ver prévia* (28/02 e 30/04 aparecem como ajustadas) → Salvar. O cartão "Contas recorrentes" lista a série; pause, retome e encerre; abra uma ocorrência → ✏️ *Editar conta* → "esta e as próximas".
+3. **📆 Calendário**: navegue pelos meses, clique num dia, abra uma conta (abre o detalhe financeiro), crie um compromisso, conclua-o. Alterne "Esta loja" / "Todas as minhas lojas".
+4. **Trocar de loja** (botão do topo): a tela anterior desaparece; na Start o calendário não mostra nada da Smoke.
+5. Entre como dono (`chefe`) → **🔐 Acessos**: desative uma operadora (motivo obrigatório); ela não consegue entrar ("acesso foi desativado"); reative.
+6. Reduza a janela para ~375 px (celular): Financeiro, Calendário e os formulários não têm rolagem horizontal da página.
+
 ## Validação contra a pilha real (Docker)
 
-`supabase/tests/stack/` sobe **Postgres do Supabase + Auth (GoTrue) + PostgREST + Storage API** reais em contêineres, instala `schema.sql → 002 → … → 009` do zero como o papel `postgres`
-(o mesmo do SQL Editor), cria usuários por SQL direto (como no projeto remoto) e roda: `real_api.test.js` (login, isolamento entre lojas, pagamentos, Storage, limpeza), `real_api_rateios.test.js` (rateios/reembolsos), `real_api_resumos.test.js` (resumos) `real_api_comunicados.test.js` / `real_ui_comunicados.test.js` (comunicados) e `real_ui.test.js` + `real_ui_rateios.test.js` + `real_ui_resumos.test.js` (o `dashboard.html` no Chromium).
+`supabase/tests/stack/` sobe **Postgres do Supabase + Auth (GoTrue) + PostgREST + Storage API** reais em contêineres, instala `schema.sql → 002 → … → 012` do zero como o papel `postgres`
+(o mesmo do SQL Editor), cria usuários por SQL direto (como no projeto remoto) e roda: `real_api.test.js` (login, isolamento entre lojas, pagamentos, Storage, limpeza), `real_api_rateios.test.js` (rateios/reembolsos), `real_api_resumos.test.js` (resumos) `real_api_comunicados.test.js` / `real_ui_comunicados.test.js` (comunicados), `real_api_admin.test.js` / `real_ui_admin.test.js` (acessos, recorrência, calendário, períodos) e `real_ui.test.js` + `real_ui_rateios.test.js` + `real_ui_resumos.test.js` (o `dashboard.html` no Chromium).
 Requisitos: Docker com daemon ativo, Node 18+, Playwright. Uso: `supabase/tests/stack/run_all.sh` (`--keep` deixa a pilha de pé). Os segredos são gerados na hora (`.env`, não versionado).
 Não valida: o **Kong** (gateway do Supabase hospedado, inclusive CORS) — aqui um mini-gateway (`gateway.js`) o substitui —, Realtime, e e-mails/recuperação de senha. Nada é enviado ao projeto remoto.
 
@@ -157,6 +189,8 @@ Não valida: o **Kong** (gateway do Supabase hospedado, inclusive CORS) — aqui
 - `supabase/tests/rateios_testes.sql` — 83 verificações de rateio/reembolso (arredondamento, exemplo de R$ 900, parcial, estornos após reembolso, permissões, comprovantes); `lab/concorrencia_rateios.sh` — concorrência.
 - `supabase/tests/rateios_resumos_testes.sql` — 40 verificações dos resumos de rateio (exemplo de R$ 900, reembolso, parcial, vencimento, estornos, período, uma loja só, dono).
 - `supabase/tests/comunicados_testes.sql` — 40 verificações dos comunicados (texto exato, versões, restauração, concorrência otimista, permissões por papel/loja, publicação como aviso, republicação, despublicação, global só dono).
+- `supabase/tests/acessos_series_testes.sql` — 47 verificações de acessos (desativar/reativar, API direta, lojas, auditoria) e recorrência (datas, prévia, geração, janela, edição por escopo, pausa/retomada/encerramento, permissões).
+- `supabase/tests/calendario_testes.sql` — 26 verificações do calendário e compromissos (situações, rateio, isolamento por loja, versões, permissões). `lab/concorrencia_series.sh` — criação/geração/edição simultâneas.
 - `supabase/tests/lab/` — banco local + concorrência (`concorrencia.sh` vendas; `concorrencia_caixa.sh` abertura/estorno/fechamento simultâneos; `concorrencia_pagamentos.sh` pagamentos/estornos/repetições simultâneos). As suítes locais acima usam um Storage simulado só nas **políticas**; a API real (limite de 5 MB, tipo MIME, upload, links assinados) é validada em `supabase/tests/stack/`.
 - `supabase/tests/ui/` — a tela no Chromium com Supabase simulado e checagem dos
   nomes de parâmetros das funções contra o SQL:
