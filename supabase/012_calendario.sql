@@ -180,6 +180,20 @@ begin
 end;
 $tag_calendario_admin$;
 
+-- o agendador diário das séries (pg_cron) está configurado? (a tela informa; sem pg_cron a geração acontece ao abrir o Financeiro)
+create or replace function series_agendamento() returns jsonb
+language plpgsql stable security definer set search_path = public as $tag_series_agendamento$
+declare v boolean := false;
+begin
+  if not perfil_ativo() then raise exception 'Sem permissão'; end if;
+  if to_regclass('cron.job') is null then return jsonb_build_object('pg_cron', false, 'configurado', false); end if;
+  begin
+    execute $q$select exists (select 1 from cron.job where active and command ilike '%gerar_series_pendentes%')$q$ into v;
+  exception when others then v := false; end;
+  return jsonb_build_object('pg_cron', true, 'configurado', v);
+end;
+$tag_series_agendamento$;
+
 revoke execute on function public.trg_compromisso_guard(), public.compromisso_pode(uuid) from public, anon, authenticated;
 revoke execute on function public.salvar_compromisso(uuid, uuid, text, date, uuid, text, integer, uuid), public.mudar_status_compromisso(uuid, text, integer), public.compromisso_detalhe(uuid),
-  public.responsaveis_loja(uuid), public.calendario_admin(uuid, date, date) from public, anon;
+  public.responsaveis_loja(uuid), public.calendario_admin(uuid, date, date), public.series_agendamento() from public, anon;

@@ -201,6 +201,7 @@ const toastTxt = page => page.textContent("#toast");
   // já paga: falha no pagamento depois de criar a conta
   await page.click("[data-a=finForm]"); await page.fill("#lDesc", "Conta ja paga"); await page.fill("#lValor", "40"); await page.check("#lJaPaga"); await page.evaluate(() => { window.__failPay = "indisponível"; });
   await page.click("[data-a=finSalvar]"); await page.waitForFunction(() => /Conta criada, mas o pagamento não foi registrado/.test(document.getElementById("toast").textContent));
+  await page.waitForSelector(".modal-box [data-a=finPagForm]");
   check("já paga + falha no pagamento: conta criada UMA vez, pendente, detalhe aberto para tentar de novo", await page.evaluate(() => window.__db.financeiro_lancamentos.filter(l => l.descricao === "Conta ja paga").length === 1) && await page.locator("[data-a=finPagForm]").count() === 1);
   await page.click("[data-a=finPagForm]"); await page.click("[data-a=finPagSalvar]"); await page.waitForSelector(".tag.pago"); await page.click("[data-a=fechar]");
   await page.evaluate(() => { window.__db.pagamentos.filter(p => p.tipo === "pagamento").forEach(p => { if (!window.__db.envios.some(e => e.pagamento_id === p.id)) window.__db.envios.push({ pagamento_id: p.id, confirmado_em: new Date().toISOString() }); }); });

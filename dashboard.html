@@ -137,6 +137,17 @@ label{display:block;font-size:.74rem;font-weight:700;color:var(--muted);margin:8
 .cm-prev .wa-mono,.cm-ver{font-family:ui-monospace,Menlo,Consolas,monospace}
 .cm-ver{white-space:pre-wrap;overflow-wrap:anywhere;font-size:.74rem;background:var(--soft);border-radius:8px;padding:6px 8px;margin-top:4px;max-height:110px;overflow:auto}
 #cmForm textarea.field{resize:vertical;min-height:44px}
+/* etiquetas empilhadas e quebra de etiquetas longas em linhas estreitas (celular) */
+.tags-col{display:flex;flex-direction:column;gap:3px;align-items:flex-start;flex-shrink:0}
+.list-row .grow .tag{white-space:normal}
+/* calendário */
+.cal-g{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px}
+.cal-h{text-align:center;font-size:.7rem;font-weight:800;color:var(--muted);padding:2px 0}
+.cal-c{position:relative;min-height:46px;border:1px solid var(--line);border-radius:8px;background:#fff;padding:4px 2px;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:.78rem;min-width:0}
+.cal-c.vazio{border:none;background:none}.cal-c.hoje{border-color:var(--red);font-weight:800}.cal-c.sel{background:var(--soft);box-shadow:inset 0 0 0 2px var(--red)}
+.cal-c .dots{display:flex;gap:2px;flex-wrap:wrap;justify-content:center}.cal-c .q{font-size:.62rem;color:var(--muted)}
+.cal-dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:3px}.cal-c .cal-dot{margin:0}
+.cal-leg{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:.72rem;color:var(--muted);margin-top:8px}
 #waPreview{white-space:pre-wrap;font-size:.83rem;line-height:1.6;background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:14px;max-height:440px;overflow-y:auto}
 .check{display:flex;align-items:center;gap:8px;font-size:.84rem;font-weight:600;margin:6px 0}
 .check input{width:18px;height:18px}
@@ -341,7 +352,7 @@ const App = {
     let tem;
     try { tem = await DB.perfil(); } catch (e) { $("loginErr").textContent = msgErro(e); return; }
     if (!tem || !S.minhasLojas.length) {
-      $("loginErr").textContent = "Este usuário não tem acesso a nenhuma loja. Fale com o administrador.";
+      $("loginErr").textContent = tem && S.perfil && S.perfil.ativo === false ? "Seu acesso foi desativado. Fale com o administrador." : "Este usuário não tem acesso a nenhuma loja. Fale com o administrador.";
       await sb.auth.signOut(); return;
     }
     $("loginScreen").classList.add("hidden");
@@ -357,6 +368,7 @@ const App = {
     const loja = S.minhasLojas.find(l => l.id === id); if (!loja) return;
     await App.pararRealtime();
     S.loja = loja; S.cart = []; S.chave = null;
+    App.limparLoja();
     try { await DB.tudo(); } catch (e) { toast(msgErro(e), true); return; }
     $("lojaNomeChip").textContent = `${loja.nome} · ${S.perfil.nome || S.perfil.papel}`;
     $("btnTrocarLoja").classList.toggle("hidden", S.minhasLojas.length <= 1);
@@ -364,10 +376,17 @@ const App = {
     $("app").classList.add("show");
     App.tabs(); App.goTab("painel"); App.iniciarRealtime();
   },
-  async trocarLoja() { if (!Views.comunicados.podeSair()) return; await App.pararRealtime(); App.seletor(); },
+  async trocarLoja() { if (!Views.comunicados.podeSair()) return; await App.pararRealtime(); App.limparLoja(); S.loja = null; App.seletor(); },
+  /* nada da loja anterior fica na memória nem na tela depois de trocar */
+  limparLoja() {
+    closeModal(); $("viewRoot").innerHTML = "";
+    for (const k of ["cm", "cal", "calDados", "series", "finLista", "avisos", "hDias", "conta", "ratDet", "ratResumo", "pessoas", "editConta", "comp", "ratCtx"]) S[k] = null;
+    S.f.hLoja = ""; S.f.hResp = ""; S.f.hSit = "";
+  },
   tabs() {
-    const t = [["painel", "📊 Painel"], ["venda", "🛒 Nova venda"], ["vendas", "🧾 Vendas"], ["estoque", "📦 Estoque"], ["clientes", "👥 Clientes"], ["financeiro", "💰 Financeiro"], ["caixa", "💵 Caixa"], ["historico", "📅 Histórico"], ["comunicados", "📣 Comunicados"], ["whats", "📋 Lista WhatsApp"]];
+    const t = [["painel", "📊 Painel"], ["venda", "🛒 Nova venda"], ["vendas", "🧾 Vendas"], ["estoque", "📦 Estoque"], ["clientes", "👥 Clientes"], ["financeiro", "💰 Financeiro"], ["caixa", "💵 Caixa"], ["historico", "📅 Histórico"], ["comunicados", "📣 Comunicados"], ["calendario", "📆 Calendário"], ["whats", "📋 Lista WhatsApp"]];
     if (isGerente()) t.push(["catalogo", "🏷️ Catálogo"]);
+    if (S.perfil.papel === "dono") t.push(["acessos", "🔐 Acessos"]);
     $("tabsNav").innerHTML = t.map(([id, l]) => `<button class="tabbtn" id="tab-${id}" data-a="tab" data-id="${id}">${l}</button>`).join("");
   },
   goTab(id) {
@@ -694,12 +713,21 @@ Views.financeiro = {
   periodo() {
     const hoje = hojeISO(), p = S.f.finPeriodo;
     if (p === "hoje") return [hoje, hoje]; if (p === "7d") return [addDias(hoje, -6), hoje];
-    if (p === "mes") return [hoje.slice(0, 8) + "01", hoje]; return [null, null];
+    if (p === "mes") return [hoje.slice(0, 8) + "01", ultimoDiaMes(hoje)];   // mês INTEIRO (inclui vencimentos futuros do mês)
+    if (p === "ate") return [hoje.slice(0, 8) + "01", hoje];                  // do dia 1º até hoje
+    return [null, null];
+  },
+  periodoTxt() {
+    const [ini, fim] = Views.financeiro.periodo(), p = S.f.finPeriodo;
+    if (!ini) return "Período: <b>tudo</b> (sem filtro de data).";
+    return `Período aplicado: <b>${esc(fmtD(ini))} a ${esc(fmtD(fim))}</b>${p === "mes" ? " — o mês inteiro, inclusive datas que ainda não chegaram; os valores de dias futuros ainda são previsões" : p === "ate" ? " — do primeiro dia do mês até hoje" : ""}.`;
   },
   async render() {
     const f = S.f, [ini, fim] = Views.financeiro.periodo();
     $("viewRoot").innerHTML = `<div class="page-h"><h2>💰 Financeiro · ${esc(S.loja.nome)}</h2><button class="abtn red" data-a="finForm">+ Conta / lançamento</button><button class="abtn soft" data-a="finCsv">⬇ CSV</button></div>
-      <div class="chips">${[["hoje", "Hoje"], ["7d", "7 dias"], ["mes", "Este mês"], ["tudo", "Tudo"]].map(([k, l]) => `<button class="chip ${f.finPeriodo === k ? "sel" : ""}" data-a="finPeriodo" data-id="${k}">${l}</button>`).join("")}</div>
+      <div class="chips">${[["hoje", "Hoje"], ["7d", "7 dias"], ["mes", "Este mês"], ["ate", "Até hoje"], ["tudo", "Tudo"]].map(([k, l]) => `<button class="chip ${f.finPeriodo === k ? "sel" : ""}" data-a="finPeriodo" data-id="${k}">${l}</button>`).join("")}</div>
+      <small id="finPeriodoTxt" style="color:var(--muted);display:block;margin-bottom:8px">${Views.financeiro.periodoTxt()}</small>
+      <div id="finSeries"></div>
       <div id="finRateiosResumo"></div>
       <div id="finRateios"></div>
       <div id="finResumo"></div>
@@ -707,6 +735,8 @@ Views.financeiro = {
       <small style="color:var(--muted);display:block;margin-bottom:8px">O período filtra pela data do lançamento/pagamento; Pendentes, Parciais, Vencidas e Comprovante pendente mostram tudo que está em aberto.</small>
       <div class="card" id="finLista"><div class="empty">Carregando…</div></div>`;
     Views.rateios.carregar().catch(() => {});
+    try { await rpc("gerar_series_loja", { p_loja_id: S.loja.id }); } catch (e) { /* migração 011 ainda não aplicada ou sem séries: segue sem recorrência */ }
+    Views.series.carregar().catch(() => {});
     const sit = (FIN_FILTROS.find(x => x[0] === f.finStatus) || [])[2] || null;
     const [r, ls] = await Promise.all([rpc("financeiro_resumo", { p_loja_id: S.loja.id, p_inicio: ini, p_fim: fim }),
       rpc("listar_contas", { p_loja_id: S.loja.id, p_inicio: ini, p_fim: fim, p_situacao: sit })]);
@@ -721,7 +751,7 @@ Views.financeiro = {
       <div class="kpi"><div class="v">${esc(fmt(r.a_receber.total))}</div><div class="l">Contas exclusivas — a receber (saldo) · ${r.a_receber.qtd}</div></div>
       <div class="kpi ${r.atrasados.qtd ? "warn" : ""}"><div class="v">${esc(fmt(r.a_pagar.total))}</div><div class="l">Contas exclusivas — a pagar (saldo) · ${r.a_pagar.qtd} (${r.atrasados.qtd} vencida)</div></div></div>
       <small style="color:var(--muted);display:block;margin-bottom:8px">Entradas e saídas efetivadas usam a <b>data do pagamento</b> e incluem os pagamentos externos de contas compartilhadas (uma vez só, na loja que pagou); <b>reembolsos entre lojas não entram</b>. "A pagar/receber" e "vencida" são da foto de hoje e valem só para contas exclusivas.</small>`;
-    $("finLista").innerHTML = ls.length ? ls.map(l => `<div class="list-row click" data-a="finDetalhe" data-id="${esc(l.id)}"><span class="tag ${l.tipo}">${l.tipo === "entrada" ? "ENTRADA" : "SAÍDA"}</span><span class="tag neutro">exclusiva</span>
+    $("finLista").innerHTML = ls.length ? ls.map(l => `<div class="list-row click" data-a="finDetalhe" data-id="${esc(l.id)}"><div class="tags-col"><span class="tag ${l.tipo}">${l.tipo === "entrada" ? "ENTRADA" : "SAÍDA"}</span><span class="tag neutro">exclusiva</span>${l.serie_id ? `<span class="tag neutro">↻ ${l.serie_n ? l.serie_n + "ª" : "série"}</span>` : ""}</div>
       <div class="grow"><b>${esc(l.descricao || l.categoria)}</b><small>${esc(l.categoria)} · ${esc(fmtD(String(l.data_ref).slice(0, 10)))}${l.vencimento ? " · vence " + esc(fmtD(l.vencimento)) : ""} · original ${esc(fmt(l.valor))} · pago ${esc(fmt(l.total_pago))}${l.legado ? " · lançamento antigo" : ""}</small>
         <span class="tag ${SIT_CLS[l.situacao]}">${SIT_TXT[l.situacao]}</span>${l.vencida ? ' <span class="tag atrasado">saldo vencido</span>' : ""}${l.envios_pendentes ? ' <span class="tag pendente">comprovante: envio pendente</span>' : ""}${l.qtd_comprovantes ? ` <span class="tag neutro">📎 ${l.qtd_comprovantes}</span>` : ""}</div>
       <div style="text-align:right"><b class="${l.tipo === "entrada" ? "pos" : "neg"}">${esc(fmt(l.saldo))}</b><br><small style="color:var(--muted)">saldo</small></div></div>`).join("") : `<div class="empty">Nenhuma conta no filtro.</div>`;
@@ -736,6 +766,7 @@ Views.financeiro = {
       <label>Descrição</label><input class="field" id="lDesc" placeholder="Ex: Compra de pods — fornecedor X">
       <div class="grid2"><div><label>Valor (R$)</label><input class="field" id="lValor" inputmode="decimal" placeholder="0,00"></div><div><label>Vencimento</label><input class="field" id="lVenc" type="date"></div></div>
       <div class="check"><input type="checkbox" id="lComp"><label for="lComp" style="margin:0;font-size:.84rem;color:var(--text)">Exige comprovante</label></div>
+      ${Views.series.formHtml()}
       <div class="check"><input type="checkbox" id="lJaPaga"><label for="lJaPaga" style="margin:0;font-size:.84rem;color:var(--text)">Já foi paga (registrar pagamento integral hoje)</label></div>
       <div id="lPagBox" class="hidden"><label>Forma do pagamento</label><select class="field" id="lForma">${FORMAS_PAG.map(f => `<option>${f}</option>`).join("")}</select></div>
       <small style="color:var(--muted)">Registrar pagamento apenas anota uma operação já realizada: não transfere dinheiro e <b>não movimenta o caixa automaticamente</b>.</small>
@@ -745,6 +776,14 @@ Views.financeiro = {
     const valor = num($("lValor").value), jaPaga = $("lJaPaga").checked, venc = $("lVenc").value || null;
     if (!centavosOk(valor)) return toast("Informe um valor maior que zero, com até 2 casas decimais", true);
     if (!jaPaga && !venc) return toast("Conta em aberto precisa de vencimento", true);
+    if ($("lRep").checked) {
+      if (!venc) return toast("Informe o vencimento da 1ª conta da série", true);
+      return busy(btn, async () => {
+        const r = await rpc("criar_serie", { p_loja_id: S.loja.id, p_tipo: $("lTipo").value, p_categoria: $("lCat").value, p_descricao: $("lDesc").value.trim() || null, p_valor: valor, p_forma: null,
+          p_exige_comprovante: $("lComp").checked, ...Views.series.args(), p_chave: S.chaveConta });
+        S.chaveConta = null; closeModal(); toast(`Série criada — ${r.geradas} conta(s) gerada(s) agora`); await Views.financeiro.render();
+      });
+    }
     await busy(btn, async () => {
       const id = await rpc("criar_conta", { p_loja_id: S.loja.id, p_tipo: $("lTipo").value, p_categoria: $("lCat").value, p_descricao: $("lDesc").value.trim() || null, p_valor: valor,
         p_vencimento: venc, p_forma: jaPaga ? $("lForma").value : null, p_exige_comprovante: $("lComp").checked, p_chave: S.chaveConta });
@@ -771,7 +810,8 @@ Views.financeiro = {
       <label>Pagamentos</label>
       ${d.pagamentos.length ? d.pagamentos.map(p => Views.financeiro.pagHtml(p, c)).join("") : `<div class="empty">${c.legado ? "Quitado antes do controle de pagamentos." : "Nenhum pagamento registrado."}</div>`}
       <div class="row" style="margin-top:10px">${podePagar ? `<button class="abtn green" data-a="finPagForm" data-id="${esc(c.id)}">+ Registrar pagamento</button>` : ""}
-        ${isGerente() && !d.pagamentos.length && !c.legado && c.situacao === "pendente" && !c.venda_id ? `<button class="abtn soft" data-a="finCancelarForm" data-id="${esc(c.id)}">Cancelar conta</button>` : ""}</div>
+        ${isGerente() && !d.pagamentos.length && !c.legado && c.situacao === "pendente" && !c.venda_id ? `<button class="abtn soft" data-a="finCancelarForm" data-id="${esc(c.id)}">Cancelar conta</button>` : ""}
+        ${isGerente() && c.situacao !== "cancelada" && !c.venda_id && c.categoria !== "venda" && c.categoria !== "estorno" && (S.finLista || []).some(x => x.id === c.id) ? `<button class="abtn soft" data-a="finEditar" data-id="${esc(c.id)}">✏️ Editar conta</button>` : ""}</div>
       <small style="color:var(--muted);display:block;margin-top:8px">Pagamento aqui só registra uma operação já realizada: não transfere dinheiro e <b>não movimenta o caixa automaticamente</b>.</small>
       <label>Histórico (auditoria)</label>${d.auditoria.map(a => `<div class="list-row"><div class="grow">${esc({ conta_criada: "Conta criada", pagamento: "Pagamento registrado", estorno_pagamento: "Pagamento estornado", comprovante_anexado: "Comprovante anexado", envio_confirmado: "Envio confirmado", conta_cancelada: "Conta cancelada" }[a.acao] || a.acao)}${a.motivo ? " — " + esc(a.motivo) : ""}<small>${esc(fmtDT(a.em))} · ${esc(a.por || "—")}</small></div></div>`).join("")}
       <div class="modal-actions"><button class="btn btn-soft" data-a="fechar">Fechar</button></div>`);
@@ -1329,6 +1369,239 @@ Views.comunicados = {
   },
 };
 
+/* ───────── RECORRÊNCIA (contas exclusivas) ───────── */
+const FREQ_TXT = { semanal: "Semanal", quinzenal: "A cada 15 dias", mensal: "Mensal", anual: "Anual" };
+const UNI_TXT = { dia: ["dia", "dias"], semana: ["semana", "semanas"], mes: ["mês", "meses"], ano: ["ano", "anos"] };
+const freqTxt = s => s.frequencia === "personalizada" ? `A cada ${s.intervalo} ${UNI_TXT[s.unidade][s.intervalo === 1 ? 0 : 1]}` : FREQ_TXT[s.frequencia];
+const fimTxt = s => s.fim_tipo === "data" ? `até ${fmtD(s.fim_data)}` : s.fim_tipo === "quantidade" ? `${s.fim_qtd} ocorrência(s)` : "sem prazo";
+Views.series = {
+  /* bloco do formulário de nova conta */
+  formHtml() {
+    return `<div class="check"><input type="checkbox" id="lRep"><label for="lRep" style="margin:0;font-size:.84rem;color:var(--text)">↻ Repetir esta conta (opcional — o padrão é conta única)</label></div>
+      <div id="lRepBox" class="hidden card" style="padding:10px;margin-bottom:8px">
+        <div class="grid2"><div><label>Frequência</label><select class="field" id="lFreq"><option value="semanal">Semanal</option><option value="quinzenal">A cada 15 dias</option><option value="mensal" selected>Mensal</option><option value="anual">Anual</option><option value="personalizada">Personalizada…</option></select></div>
+          <div id="lPersBox" class="hidden"><label>A cada</label><div class="row" style="flex-wrap:nowrap"><input class="field" id="lInt" type="number" min="1" max="365" value="2" style="max-width:80px"><select class="field" id="lUni"><option value="dia">dias</option><option value="semana">semanas</option><option value="mes" selected>meses</option><option value="ano">anos</option></select></div></div></div>
+        <div class="grid2"><div><label>Término</label><select class="field" id="lFim"><option value="sem_prazo">Sem prazo</option><option value="quantidade">Após N ocorrências</option><option value="data">Até uma data</option></select></div>
+          <div><label id="lFimLbl" class="hidden">Quantidade</label><input class="field hidden" id="lFimQtd" type="number" min="1" max="120" value="12"><input class="field hidden" id="lFimData" type="date"></div></div>
+        <small style="color:var(--muted);display:block;margin:6px 0">A 1ª ocorrência vence na data de vencimento acima. Dias que não existem no mês (31, 29/02…) viram o último dia do mês, sem mudar a referência original. As contas novas nascem <b>pendentes</b>, sem pagamentos nem comprovantes.</small>
+        <button class="abtn soft sm" type="button" data-a="serPrevia">Ver prévia dos vencimentos</button><div id="lPrev" style="margin-top:6px"></div></div>`;
+  },
+  mudou() {
+    const rep = $("lRep").checked; $("lRepBox").classList.toggle("hidden", !rep);
+    $("lPersBox").classList.toggle("hidden", $("lFreq").value !== "personalizada");
+    const ft = $("lFim").value; $("lFimQtd").classList.toggle("hidden", ft !== "quantidade"); $("lFimData").classList.toggle("hidden", ft !== "data"); $("lFimLbl").classList.toggle("hidden", ft === "sem_prazo");
+    $("lFimLbl").textContent = ft === "data" ? "Data final" : "Quantidade";
+    if (rep) { $("lJaPaga").checked = false; $("lPagBox").classList.add("hidden"); }
+    $("lJaPaga").disabled = rep; if ($("lPrev")) $("lPrev").innerHTML = "";
+  },
+  args() {
+    const ft = $("lFim").value;
+    return { p_frequencia: $("lFreq").value, p_intervalo: $("lFreq").value === "personalizada" ? parseInt($("lInt").value, 10) || null : null, p_unidade: $("lFreq").value === "personalizada" ? $("lUni").value : null,
+      p_inicio: $("lVenc").value || null, p_fim_tipo: ft, p_fim_data: ft === "data" ? ($("lFimData").value || null) : null, p_fim_qtd: ft === "quantidade" ? (parseInt($("lFimQtd").value, 10) || null) : null };
+  },
+  async previa(btn) {
+    const a = Views.series.args(); if (!a.p_inicio) return toast("Informe o vencimento da 1ª conta", true);
+    await busy(btn, async () => {
+      const r = await rpc("serie_previa", { ...a, p_limite: 12 });
+      $("lPrev").innerHTML = `<div class="list-row"><div class="grow"><b>${r.datas.length} vencimento(s)${r.tem_mais ? " (mostrando os primeiros 12)" : ""}</b></div></div>` +
+        r.datas.map(d => `<div class="list-row"><div class="grow">${d.n}ª · ${esc(fmtD(d.vencimento))}${d.ajustada ? ` <span class="tag pendente">ajustada ao último dia do mês</span>` : ""}</div></div>`).join("");
+    });
+  },
+  async carregar() {
+    const el = $("finSeries"); if (!el) return;
+    let lista;
+    try { lista = await rpc("listar_series", { p_loja_id: S.loja.id }); }
+    catch (e) { if ($("finSeries")) $("finSeries").innerHTML = /Could not find the function|schema cache/i.test(e.message) ? "" : `<div class="banner">Contas recorrentes indisponíveis: ${esc(msgErro(e))}</div>`; return; }
+    if (S.tab !== "financeiro" || !$("finSeries")) return;
+    S.series = lista;
+    if (!lista.length) { $("finSeries").innerHTML = ""; return; }
+    const st = { ativa: ["pago", "ativa"], pausada: ["pendente", "pausada"], encerrada: ["neutro", "encerrada"] };
+    $("finSeries").innerHTML = `<div class="card"><h3 style="margin-top:0">↻ Contas recorrentes</h3>
+      ${lista.map((s, i) => `<div class="list-row"><span class="tag ${s.tipo}">${s.tipo === "entrada" ? "ENTRADA" : "SAÍDA"}</span><div class="grow"><b>${esc(s.descricao || s.categoria)}</b> · ${esc(fmt(s.valor))}
+        <small>${esc(freqTxt(s))} · desde ${esc(fmtD(s.inicio))} · ${esc(fimTxt(s))} · ${s.geradas} conta(s) criada(s)${s.proximo_vencimento ? " · próximo vencimento em aberto " + esc(fmtD(s.proximo_vencimento)) : ""}${s.puladas ? ` · ${s.puladas} pulada(s) na pausa` : ""}</small></div>
+        <span class="tag ${st[s.status][0]}">${st[s.status][1]}</span>
+        ${s.pode_gerir && s.status === "ativa" ? `<button class="abtn soft sm" data-a="serPausar" data-id="${i}">Pausar</button>` : ""}${s.pode_gerir && s.status === "pausada" ? `<button class="abtn soft sm" data-a="serRetomar" data-id="${i}">Retomar</button>` : ""}
+        ${s.pode_gerir && s.status !== "encerrada" ? `<button class="abtn soft sm" data-a="serEncerrarForm" data-id="${i}">Encerrar</button>` : ""}</div>`).join("")}
+      <small id="serAgenda" style="color:var(--muted);display:block;margin-top:6px">As próximas contas são criadas ao abrir o Financeiro (janela de 60 dias).</small></div>`;
+    rpc("series_agendamento", {}).then(a => { const e = $("serAgenda"); if (e) e.innerHTML = a.configurado ? `✅ Agendador diário configurado: as contas são criadas mesmo sem ninguém abrir o painel.` : `⚠️ O agendador automático <b>não está configurado</b>: as próximas contas só são criadas quando alguém abre o Financeiro (instruções no README).`; }).catch(() => {});
+  },
+  async controlar(i, acao, btn, extra) {
+    const s = (S.series || [])[i]; if (!s) return;
+    await busy(btn, async () => { const r = await rpc("serie_controlar", { p_id: s.id, p_acao: acao, p_cancelar_futuras: !!(extra && extra.cancelar), p_motivo: (extra && extra.motivo) || null });
+      closeModal(); toast(acao === "pausar" ? "Série pausada" : acao === "retomar" ? `Série retomada${r.puladas ? ` — ${r.puladas} vencimento(s) do período pausado foram pulados` : ""}` : `Série encerrada${r.canceladas ? ` — ${r.canceladas} conta(s) futura(s) cancelada(s)` : ""}`);
+      await Views.financeiro.render(); });
+  },
+  encerrarForm(i) {
+    const s = (S.series || [])[i]; if (!s) return;
+    openModal(`<h3>Encerrar série</h3><div class="banner">${esc(s.descricao || s.categoria)} · ${esc(freqTxt(s))}. Nada é apagado: as contas já criadas continuam no histórico.</div>
+      <div class="check"><input type="checkbox" id="serCanc"><label for="serCanc" style="margin:0;font-size:.84rem;color:var(--text)">Cancelar também as contas futuras ainda sem movimentação</label></div>
+      <label>Motivo (opcional)</label><input class="field" id="serMotivo" maxlength="200">
+      <div class="modal-actions"><button class="btn btn-soft" data-a="fechar">Voltar</button><button class="btn btn-red" data-a="serEncerrarOk" data-id="${i}">Encerrar série</button></div>`);
+  },
+};
+Views.contaEdit = {
+  form(id) {
+    const l = (S.finLista || []).find(x => x.id === id); if (!l) return toast("Conta não encontrada na lista atual", true);
+    S.editConta = l;
+    openModal(`<h3>Editar conta</h3>
+      ${l.serie_id ? `<div class="banner">Conta recorrente (${l.serie_n}ª). Contas já pagas, parciais, canceladas ou editadas à mão <b>não</b> são alteradas pela opção "esta e as próximas".</div>
+      <div class="check"><input type="radio" name="ceEsc" id="ceEsta" value="esta" checked><label for="ceEsta" style="margin:0;font-size:.84rem;color:var(--text)">Só esta ocorrência</label></div>
+      <div class="check"><input type="radio" name="ceEsc" id="ceProx" value="proximas"><label for="ceProx" style="margin:0;font-size:.84rem;color:var(--text)">Esta e as próximas (altera descrição, categoria, valor e forma — não a data)</label></div>` : ""}
+      <label>Descrição</label><input class="field" id="ceDesc" value="${esc(l.descricao || "")}">
+      <div class="grid2"><div><label>Categoria</label><input class="field" id="ceCat" value="${esc(l.categoria)}"></div><div><label>Valor (R$)</label><input class="field" id="ceValor" inputmode="decimal" value="${esc(String(l.valor).replace(".", ","))}" ${Number(l.total_pago) ? "disabled" : ""}></div></div>
+      <div class="grid2"><div><label>Vencimento</label><input class="field" id="ceVenc" type="date" value="${esc(l.vencimento || "")}"></div><div><label>Forma (opcional)</label><input class="field" id="ceForma" value="${esc(l.forma_pagamento || "")}"></div></div>
+      <div class="check"><input type="checkbox" id="ceComp" ${l.exige_comprovante ? "checked" : ""} ${Number(l.total_pago) ? "disabled" : ""}><label for="ceComp" style="margin:0;font-size:.84rem;color:var(--text)">Exige comprovante</label></div>
+      ${Number(l.total_pago) ? `<small style="color:var(--muted)">Conta com pagamentos: valor e comprovante só mudam depois de estornar os pagamentos.</small>` : ""}
+      <div class="modal-actions"><button class="btn btn-soft" data-a="fechar">Cancelar</button><button class="btn btn-red" data-a="ceSalvar">Salvar</button></div>`);
+  },
+  async salvar(btn) {
+    const l = S.editConta, valor = $("ceValor").disabled ? Number(l.valor) : num($("ceValor").value);
+    if (!centavosOk(valor)) return toast("Informe um valor maior que zero, com até 2 casas decimais", true);
+    const escopo = l.serie_id && $("ceProx") && $("ceProx").checked ? "proximas" : "esta";
+    await busy(btn, async () => {
+      const r = await rpc("editar_conta", { p_id: l.id, p_escopo: escopo, p_descricao: $("ceDesc").value.trim() || null, p_categoria: $("ceCat").value.trim(), p_valor: valor,
+        p_vencimento: $("ceVenc").value || null, p_forma: $("ceForma").value.trim() || null, p_exige_comprovante: $("ceComp").checked });
+      closeModal(); toast(escopo === "proximas" ? `${r.alteradas} conta(s) alterada(s); ${r.preservadas} preservada(s) por já terem movimentação ou edição própria` : "Conta atualizada"); await Views.financeiro.render();
+    });
+  },
+};
+
+/* ───────── CALENDÁRIO ADMINISTRATIVO ───────── */
+const SIT_CAL = { pendente: ["pendente", "pendente"], vencido: ["atrasado", "vencido"], quitado: ["pago", "quitado"], concluido: ["pago", "concluído"], cancelado: ["neutro", "cancelado"] };
+const DOT = { pendente: "#D9A400", vencido: "#E3132B", quitado: "#1FAF55", concluido: "#1FAF55", cancelado: "#9A9AA5" };
+const TIPO_CAL = { conta: "Conta", rateio: "Conta compartilhada", compromisso: "Compromisso" };
+const MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+const ultimoDiaMes = iso => new Date(Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7), 0)).toISOString().slice(0, 10);
+const somaMes = (ym, n) => { const d = new Date(Date.UTC(+ym.slice(0, 4), +ym.slice(5, 7) - 1 + n, 1)); return d.toISOString().slice(0, 7); };
+Views.calendario = {
+  async render() {
+    const f = S.cal = S.cal || { mes: hojeISO().slice(0, 7), escopo: "loja", dia: null };
+    $("viewRoot").innerHTML = `<div class="page-h"><h2 style="flex:1">📆 Calendário administrativo</h2><button class="abtn red" data-a="calNovo">+ Compromisso</button></div><div class="empty">Carregando…</div>`;
+    await Views.calendario.carregar();
+  },
+  update() { return Views.calendario.carregar(); },
+  async carregar() {
+    const f = S.cal, hoje = hojeISO(), ini = f.mes + "-01", fim = ultimoDiaMes(ini), loja = f.escopo === "loja" ? S.loja.id : null;
+    let mes, prox;
+    try {
+      [mes, prox] = await Promise.all([rpc("calendario_admin", { p_loja_id: loja, p_inicio: ini, p_fim: fim }), rpc("calendario_admin", { p_loja_id: loja, p_inicio: hoje, p_fim: addDias(hoje, 30) })]);
+    } catch (e) {
+      if (S.tab !== "calendario") return;
+      $("viewRoot").innerHTML = `<div class="page-h"><h2>📆 Calendário administrativo</h2></div><div class="banner">Calendário indisponível: ${esc(/Could not find the function|schema cache/i.test(e.message) ? "falta aplicar a migração 012_calendario.sql no Supabase (veja o README)." : msgErro(e))}</div>`; return;
+    }
+    if (S.tab !== "calendario") return;
+    S.calDados = { mes, prox };
+    Views.calendario.desenha();
+  },
+  desenha() {
+    const f = S.cal, { mes, prox } = S.calDados, hoje = hojeISO(), ini = f.mes + "-01", dim = +ultimoDiaMes(ini).slice(8), offset = new Date(ini + "T12:00:00Z").getUTCDay();
+    const porDia = {}; for (const e of mes.eventos) (porDia[e.data] = porDia[e.data] || []).push(e);
+    let cells = ""; for (let i = 0; i < offset; i++) cells += `<div class="cal-c vazio"></div>`;
+    for (let d = 1; d <= dim; d++) {
+      const iso = `${f.mes}-${String(d).padStart(2, "0")}`, ev = porDia[iso] || [], sits = [...new Set(ev.map(e => e.situacao))];
+      cells += `<button class="cal-c ${iso === hoje ? "hoje" : ""} ${f.dia === iso ? "sel" : ""}" data-a="calDia" data-id="${iso}"><span class="n">${d}</span><span class="dots">${sits.map(s => `<i class="cal-dot" style="background:${DOT[s]}"></i>`).join("")}</span>${ev.length ? `<span class="q">${ev.length}</span>` : ""}</button>`;
+    }
+    const lista = f.dia ? (porDia[f.dia] || []) : mes.eventos;
+    $("viewRoot").innerHTML = `<div class="page-h"><h2 style="flex:1">📆 Calendário administrativo</h2><button class="abtn red" data-a="calNovo">+ Compromisso</button></div>
+      <div class="chips"><button class="chip ${f.escopo === "loja" ? "sel" : ""}" data-a="calEscopo" data-id="loja">Esta loja</button><button class="chip ${f.escopo === "todas" ? "sel" : ""}" data-a="calEscopo" data-id="todas">${S.perfil.papel === "dono" ? "Todas as lojas" : "Todas as minhas lojas"}</button></div>
+      <div class="two-col"><div class="card"><div class="row" style="justify-content:space-between;margin-bottom:8px"><button class="abtn soft sm" data-a="calMes" data-id="-1">‹</button><b>${esc(MESES[+f.mes.slice(5, 7) - 1])} de ${esc(f.mes.slice(0, 4))}</b><button class="abtn soft sm" data-a="calMes" data-id="1">›</button></div>
+        <div class="cal-g">${["D", "S", "T", "Q", "Q", "S", "S"].map(x => `<div class="cal-h">${x}</div>`).join("")}${cells}</div>
+        <div class="cal-leg">${[["pendente", "pendente"], ["vencido", "vencido"], ["quitado", "quitado/concluído"], ["cancelado", "cancelado"]].map(([k, l]) => `<span><i class="cal-dot" style="background:${DOT[k]}"></i>${l}</span>`).join("")}</div>
+        <small style="color:var(--muted);display:block;margin-top:6px">Vencimentos de contas exclusivas e compartilhadas e compromissos internos. Clique numa conta para abrir o detalhe financeiro (nada é duplicado).</small></div>
+      <div><div class="card"><div class="page-h" style="margin-bottom:6px"><h3 style="flex:1;margin:0">${f.dia ? "Dia " + esc(fmtD(f.dia)) : "Eventos de " + esc(MESES[+f.mes.slice(5, 7) - 1])}</h3>${f.dia ? `<button class="chip" data-a="calDia" data-id="">ver o mês todo</button>` : ""}</div>
+        ${mes.truncado ? `<div class="banner">Há mais de 800 eventos no período — a lista está <b>incompleta</b>. Use "Esta loja" ou um mês menor.</div>` : ""}
+        ${lista.length ? lista.map(e => Views.calendario.linha(e, true)).join("") : `<div class="empty">Nenhum evento ${f.dia ? "neste dia" : "neste mês"}.</div>`}</div>
+        <div class="card"><h3 style="margin-top:0">Próximos 30 dias</h3>${prox.truncado ? `<div class="banner">Lista incompleta (mais de 800 eventos).</div>` : ""}
+        ${prox.eventos.filter(e => !["quitado", "concluido", "cancelado"].includes(e.situacao)).length ? prox.eventos.filter(e => !["quitado", "concluido", "cancelado"].includes(e.situacao)).slice(0, 40).map(e => Views.calendario.linha(e, false)).join("") : `<div class="empty">Nada pendente nos próximos 30 dias.</div>`}</div></div></div>`;
+  },
+  linha(e, comDia) {
+    const [cls, txt] = SIT_CAL[e.situacao] || ["neutro", e.situacao];
+    return `<div class="list-row click" data-a="calAbrir" data-id="${esc(e.tipo)}:${esc(e.id)}"><div class="grow"><b>${esc(e.titulo)}</b>
+      <small>${comDia ? esc(fmtD(e.data)) : esc(fmtD(e.data))} · ${esc(TIPO_CAL[e.tipo])}${e.sentido ? " · " + (e.sentido === "entrada" ? "a receber" : "a pagar") : ""}${e.loja_nome ? " · " + esc(e.loja_nome) : ""}${e.responsavel_nome ? " · resp.: " + esc(e.responsavel_nome) : ""}${e.recorrente ? " · ↻ recorrente" : ""}</small></div>
+      <div style="text-align:right">${e.valor != null ? `<b>${esc(fmt(e.tipo === "compromisso" ? 0 : (e.situacao === "quitado" ? e.valor : e.saldo)))}</b><br>` : ""}<span class="tag ${cls}">${txt}</span>${e.parcial ? ` <span class="tag parcial">parcial</span>` : ""}</div></div>`;
+  },
+  abrir(chave) {
+    const [tipo, id] = chave.split(":");
+    if (tipo === "conta") return Views.financeiro.detalhe(id);
+    if (tipo === "rateio") return Views.rateios.detalhe(id);
+    return Views.calendario.compForm(id);
+  },
+  async compForm(id) {
+    const c = id ? await rpc("compromisso_detalhe", { p_id: id }) : null, loja = c ? c.loja_id : S.loja.id;
+    const pess = await rpc("responsaveis_loja", { p_loja_id: loja }).catch(() => []);
+    S.comp = c; S.chaveComp = c ? null : uuid();
+    const ed = !c || c.pode_editar, dis = ed ? "" : "disabled";
+    openModal(`<h3>${c ? "Compromisso" : "Novo compromisso"}${c ? ` <span class="tag ${c.status === "concluido" ? "pago" : c.status === "cancelado" ? "neutro" : "pendente"}">${c.status === "concluido" ? "concluído" : c.status}</span>` : ""}</h3>
+      ${c ? `<small style="color:var(--muted)">${esc(c.loja_nome)} · criado por ${esc(c.criado_por_nome || "—")} em ${esc(fmtDT(c.criado_em))} · última alteração por ${esc(c.atualizado_por_nome || "—")} em ${esc(fmtDT(c.atualizado_em))}</small>` : `<small style="color:var(--muted)">Lembrete interno de ${esc(S.loja.nome)} — não tem valor financeiro.</small>`}
+      <label>Título</label><input class="field" id="cpTitulo" maxlength="120" value="${esc(c ? c.titulo : "")}" ${dis}>
+      <div class="grid2"><div><label>Data</label><input class="field" id="cpData" type="date" value="${esc(c ? c.data : (S.cal && S.cal.dia) || hojeISO())}" ${dis}></div>
+        <div><label>Responsável</label><select class="field" id="cpResp" ${dis}><option value="">— sem responsável —</option>${pess.map(p => `<option value="${esc(p.id)}" ${c && c.responsavel_id === p.id ? "selected" : ""}>${esc(p.nome || "—")}</option>`).join("")}</select></div></div>
+      <label>Observação (opcional)</label><textarea class="field" id="cpObs" maxlength="1000" ${dis}>${esc(c ? c.observacao || "" : "")}</textarea>
+      ${c ? `<label>Histórico</label>${c.historico.map(h => `<div class="list-row"><div class="grow">${esc({ criado: "Criado", editado: "Editado", concluido: "Concluído", cancelado: "Cancelado", reaberto: "Reaberto" }[h.acao] || h.acao)} · versão ${h.versao}<small>${esc(h.por_nome || "—")} · ${esc(fmtDT(h.em))}</small></div></div>`).join("")}` : ""}
+      <div class="modal-actions" style="flex-wrap:wrap"><button class="btn btn-soft" data-a="fechar">Fechar</button>
+        ${c && ed && c.status === "pendente" ? `<button class="btn btn-soft" data-a="calCompStatus" data-id="concluido">Concluir</button><button class="btn btn-soft" data-a="calCompStatus" data-id="cancelado">Cancelar compromisso</button>` : ""}
+        ${c && ed && c.status !== "pendente" ? `<button class="btn btn-soft" data-a="calCompStatus" data-id="pendente">Reabrir</button>` : ""}
+        ${ed && (!c || c.status !== "cancelado") ? `<button class="btn btn-red" data-a="calCompSalvar">Salvar</button>` : ""}</div>`);
+  },
+  async compSalvar(btn) {
+    const c = S.comp, t = $("cpTitulo").value.trim();
+    if (t.length < 3) return toast("O título precisa ter pelo menos 3 caracteres", true);
+    if (!$("cpData").value) return toast("Informe a data", true);
+    await busy(btn, async () => {
+      const r = await rpc("salvar_compromisso", { p_id: c ? c.id : null, p_loja_id: c ? null : S.loja.id, p_titulo: t, p_data: $("cpData").value, p_responsavel: $("cpResp").value || null,
+        p_observacao: $("cpObs").value.trim() || null, p_versao_base: c ? c.versao : null, p_chave: S.chaveComp || uuid() });
+      closeModal(); toast(r.sem_mudanca ? "Nada mudou" : c ? "Compromisso atualizado" : "Compromisso criado"); await Views.calendario.carregar();
+    });
+  },
+  async compStatus(st, btn) {
+    const c = S.comp; if (!c) return;
+    if (st === "cancelado" && !confirm("Cancelar este compromisso? Ele continua no histórico.")) return;
+    await busy(btn, async () => { await rpc("mudar_status_compromisso", { p_id: c.id, p_status: st, p_versao_base: c.versao }); closeModal(); toast("Compromisso atualizado"); await Views.calendario.carregar(); });
+  },
+};
+
+/* ───────── ACESSOS (só dono) ───────── */
+Views.acessos = {
+  async render() {
+    $("viewRoot").innerHTML = `<div class="page-h"><h2>🔐 Acessos</h2></div><div class="empty">Carregando…</div>`;
+    let pes;
+    try { pes = await rpc("listar_pessoas", {}); }
+    catch (e) { if (S.tab === "acessos") $("viewRoot").innerHTML = `<div class="page-h"><h2>🔐 Acessos</h2></div><div class="banner">Acessos indisponíveis: ${esc(/Could not find the function|schema cache/i.test(e.message) ? "falta aplicar a migração 010_acessos.sql no Supabase (veja o README)." : msgErro(e))}</div>`; return; }
+    if (S.tab !== "acessos") return;
+    S.pessoas = pes;
+    $("viewRoot").innerHTML = `<div class="page-h"><h2>🔐 Acessos</h2></div>
+      <div class="banner">Desativar uma pessoa bloqueia o login e a API na hora, mas <b>preserva todo o histórico</b> (vendas, caixas, pagamentos, comunicados). Reativar devolve o acesso às mesmas lojas.</div>
+      ${pes.map((p, i) => `<div class="list-row"><div class="grow"><b>${esc(p.nome || p.usuario)}</b> <small style="display:inline">(${esc(p.usuario || "—")})</small>
+        <small>${esc(p.papel)} · ${p.lojas.length ? p.lojas.map(l => esc(l.nome)).join(", ") : "sem lojas"}${p.ativo ? "" : ` · desativado em ${esc(fmtDT(p.desativado_em))}${p.desativado_por_nome ? " por " + esc(p.desativado_por_nome) : ""}${p.motivo ? " — " + esc(p.motivo) : ""}`}</small></div>
+        <span class="tag ${p.ativo ? "pago" : "neutro"}">${p.ativo ? "ativo" : "desativado"}</span>
+        <button class="abtn soft sm" data-a="acLojas" data-id="${i}">Lojas</button>
+        ${p.id === S.perfil.id ? "" : p.ativo ? `<button class="abtn soft sm" data-a="acDesativar" data-id="${i}">Desativar</button>` : `<button class="abtn dark sm" data-a="acReativar" data-id="${i}">Reativar</button>`}</div>`).join("")}`;
+  },
+  desativarForm(i) {
+    const p = S.pessoas[i]; if (!p) return;
+    openModal(`<h3>Desativar ${esc(p.nome || p.usuario)}</h3><div class="banner">A pessoa perde o acesso imediatamente. O histórico dela continua visível para quem tem acesso à loja.</div>
+      <label>Motivo (obrigatório)</label><input class="field" id="acMotivo" maxlength="200" placeholder="Ex: saiu da equipe">
+      <div class="modal-actions"><button class="btn btn-soft" data-a="fechar">Cancelar</button><button class="btn btn-red" data-a="acDesativarOk" data-id="${i}">Desativar acesso</button></div>`);
+  },
+  async definir(i, ativo, btn) {
+    const p = S.pessoas[i]; if (!p) return;
+    const m = ativo ? null : $("acMotivo").value.trim(); if (!ativo && m.length < 3) return toast("Informe o motivo", true);
+    await busy(btn, async () => { await rpc("definir_acesso_pessoa", { p_perfil: p.id, p_ativo: ativo, p_motivo: m }); closeModal(); toast(ativo ? "Acesso reativado" : "Acesso desativado"); await Views.acessos.render(); });
+  },
+  async lojasForm(i) {
+    const p = S.pessoas[i]; if (!p) return;
+    const lojas = ok(await sb.from("lojas").select("id,nome,ativo").order("nome")).filter(l => l.ativo !== false), tem = new Set(p.lojas.map(l => l.id));
+    openModal(`<h3>Lojas de ${esc(p.nome || p.usuario)}</h3><small style="color:var(--muted)">Remover uma loja não apaga nada do histórico dela.</small>
+      ${lojas.map(l => `<div class="check"><input type="checkbox" class="acLoja" id="acl-${esc(l.id)}" value="${esc(l.id)}" ${tem.has(l.id) ? "checked" : ""}><label for="acl-${esc(l.id)}" style="margin:0;font-size:.84rem;color:var(--text)">${esc(l.nome)}</label></div>`).join("")}
+      <div class="modal-actions"><button class="btn btn-soft" data-a="fechar">Cancelar</button><button class="btn btn-red" data-a="acLojasOk" data-id="${i}">Salvar</button></div>`);
+  },
+  async lojasSalvar(i, btn) {
+    const p = S.pessoas[i], sel = [...document.querySelectorAll(".acLoja:checked")].map(c => c.value);
+    if (!sel.length) return toast("A pessoa precisa de pelo menos uma loja — para bloquear, desative o acesso", true);
+    await busy(btn, async () => { await rpc("definir_lojas_pessoa", { p_perfil: p.id, p_lojas: sel }); closeModal(); toast("Lojas atualizadas"); await Views.acessos.render(); });
+  },
+};
+
 /* CATÁLOGO (gerente/dono) */
 Views.catalogo = {
   render() {
@@ -1591,7 +1864,7 @@ Views.historico = {
     if (!S.lojasFiltro) { S.lojasFiltro = S.minhasLojas; if (S.perfil.papel === "dono") { try { S.lojasFiltro = ok(await sb.from("lojas").select("id,nome,ativo").order("nome")).filter(l => l.ativo !== false); } catch (e) {} } }
     $("viewRoot").innerHTML = `<div class="page-h"><h2>📅 Histórico financeiro</h2></div>
       <div class="card"><div class="grid2"><div><label>Loja</label><select class="field" id="hLoja"><option value="">${S.perfil.papel === "dono" ? "Todas (consolidado)" : "Todas as minhas"}</option>${S.lojasFiltro.map(l => `<option value="${esc(l.id)}" ${f.hLoja === l.id ? "selected" : ""}>${esc(l.nome)}</option>`).join("")}</select></div>
-        <div><label>Período</label><select class="field" id="hPeriodo">${[["7d", "Últimos 7 dias"], ["30d", "Últimos 30 dias"], ["mes", "Este mês"], ["90d", "Últimos 90 dias"]].map(([k, l]) => `<option value="${k}" ${f.hPeriodo === k ? "selected" : ""}>${l}</option>`).join("")}</select></div>
+        <div><label>Período</label><select class="field" id="hPeriodo">${[["7d", "Últimos 7 dias"], ["30d", "Últimos 30 dias"], ["mes", "Este mês (mês inteiro)"], ["ate", "Mês até hoje"], ["90d", "Últimos 90 dias"]].map(([k, l]) => `<option value="${k}" ${f.hPeriodo === k ? "selected" : ""}>${l}</option>`).join("")}</select></div>
         <div><label>Responsável</label><select class="field" id="hResp"><option value="">Todos</option>${S.respLista.map(p => `<option value="${esc(p.id)}" ${f.hResp === p.id ? "selected" : ""}>${esc(p.nome || "—")}</option>`).join("")}</select></div>
         <div><label>Situação do caixa</label><select class="field" id="hSit">${[["", "Todas"], ["aberto", "Aberto"], ["fechado", "Fechado"], ["diferenca", "Com diferença"]].map(([k, l]) => `<option value="${k}" ${f.hSit === k ? "selected" : ""}>${l}</option>`).join("")}</select></div></div></div>
       <div id="hLista"><div class="empty">Carregando…</div></div>
@@ -1601,10 +1874,11 @@ Views.historico = {
   async update() {
     const el = $("hLista"); if (!el) return;
     const f = S.f, hoje = hojeISO();
-    const ini = { "7d": addDias(hoje, -6), "30d": addDias(hoje, -29), "90d": addDias(hoje, -89), mes: hoje.slice(0, 8) + "01" }[f.hPeriodo];
-    const dias = await rpc("historico_financeiro", { p_loja_id: f.hLoja || null, p_inicio: ini, p_fim: hoje, p_responsavel: f.hResp || null, p_situacao: f.hSit || null });
+    const ini = { "7d": addDias(hoje, -6), "30d": addDias(hoje, -29), "90d": addDias(hoje, -89), mes: hoje.slice(0, 8) + "01", ate: hoje.slice(0, 8) + "01" }[f.hPeriodo];
+    const fimP = f.hPeriodo === "mes" ? ultimoDiaMes(hoje) : hoje;   // "Este mês" = mês inteiro; "Até hoje" = do dia 1º até hoje
+    const dias = await rpc("historico_financeiro", { p_loja_id: f.hLoja || null, p_inicio: ini, p_fim: fimP, p_responsavel: f.hResp || null, p_situacao: f.hSit || null });
     if (S.tab !== "historico" || !$("hLista")) return;
-    Views.historico.semCaixa(ini, hoje);   // seção separada: falha dela não derruba o histórico
+    Views.historico.semCaixa(ini, fimP);   // seção separada: falha dela não derruba o histórico
     S.hDias = dias;
     const sit = { aberto: ["pendente", "caixa aberto"], fechado: ["pago", "fechado"], sem_caixa: ["neutro", "sem caixa"] };
     $("hLista").innerHTML = dias.length ? dias.map((d, i) => `<div class="dia-row"><div class="dia-h" data-a="hDia" data-id="${i}"><div class="grow"><b>${esc(fmtD(d.dia))}</b> · ${esc(d.loja_nome)}</div><span class="tag ${sit[d.situacao][0]}">${sit[d.situacao][1]}</span>
@@ -1690,6 +1964,15 @@ const Act = {
   cmSalvar: (id, b) => Views.comunicados.salvar(b), cmCopiar: () => Views.comunicados.copiar(false), cmCopiarT: () => Views.comunicados.copiar(true),
   cmPublicarForm: () => Views.comunicados.publicarForm(), cmPublicarOk: (id, b) => Views.comunicados.publicarOk(b), cmDespublicar: (id, b) => Views.comunicados.despublicar(b),
   cmHistorico: () => Views.comunicados.historico(), cmRestaurar: (id, b) => Views.comunicados.restaurar(id, b),
+  serPrevia: (id, b) => Views.series.previa(b), serPausar: (id, b) => Views.series.controlar(id, "pausar", b), serRetomar: (id, b) => Views.series.controlar(id, "retomar", b),
+  serEncerrarForm: (id) => Views.series.encerrarForm(id), serEncerrarOk: (id, b) => Views.series.controlar(id, "encerrar", b, { cancelar: $("serCanc").checked, motivo: $("serMotivo").value.trim() }),
+  finEditar: (id) => { closeModal(); Views.contaEdit.form(id); }, ceSalvar: (id, b) => Views.contaEdit.salvar(b),
+  calNovo: () => Views.calendario.compForm(null).catch(e => toast(msgErro(e), true)), calAbrir: (id) => Promise.resolve(Views.calendario.abrir(id)).catch(e => toast(msgErro(e), true)),
+  calDia: (id) => { S.cal.dia = id || null; Views.calendario.desenha(); }, calMes: (id) => { S.cal.mes = somaMes(S.cal.mes, Number(id)); S.cal.dia = null; Views.calendario.carregar().catch(e => toast(msgErro(e), true)); },
+  calEscopo: (id) => { S.cal.escopo = id; S.cal.dia = null; Views.calendario.carregar().catch(e => toast(msgErro(e), true)); },
+  calCompSalvar: (id, b) => Views.calendario.compSalvar(b), calCompStatus: (id, b) => Views.calendario.compStatus(id, b),
+  acLojas: (id) => Views.acessos.lojasForm(id).catch(e => toast(msgErro(e), true)), acLojasOk: (id, b) => Views.acessos.lojasSalvar(id, b),
+  acDesativar: (id) => Views.acessos.desativarForm(id), acDesativarOk: (id, b) => Views.acessos.definir(id, false, b), acReativar: (id, b) => Views.acessos.definir(id, true, b),
   waCopiar: () => Views.whats.copiar(), waEnviar: () => Views.whats.enviar(),
   catGrupo: (id, b) => Views.catalogo.grupo(id, b), catItem: (id, b) => Views.catalogo.item(b), catEditar: (id) => Views.catalogo.editar(id),
   catSalvar: (id, b) => Views.catalogo.salvar(id, b), catSabor: (id, b) => Views.catalogo.sabor(id, b), catWpp: (id, b) => Views.catalogo.wpp(b),
@@ -1701,6 +1984,7 @@ document.addEventListener("click", ev => {
 });
 document.addEventListener("input", ev => {
   const id = ev.target.id;
+  if (["lInt", "lFimQtd", "lFimData", "lVenc"].includes(id) && $("lPrev")) { $("lPrev").innerHTML = ""; return; }
   if (ev.target.closest && ev.target.closest("#cmForm")) { Views.comunicados.atualiza(); return; }
   if (ev.target.closest && ev.target.closest("#ratForm")) { Views.rateios.invalida(); return; }
   if (id === "estBusca") { S.f.estBusca = ev.target.value; Views.estoque.update(); }
@@ -1716,6 +2000,7 @@ document.addEventListener("input", ev => {
 });
 document.addEventListener("change", ev => {
   const id = ev.target.id;
+  if (["lRep", "lFreq", "lFim", "lUni"].includes(id)) { Views.series.mudou(); return; }
   if (ev.target.classList && ev.target.classList.contains("arqRat")) { const f = ev.target.files[0]; ev.target.value = ""; Views.rateios.anexar(ev.target.dataset.mov, ev.target.dataset.kind, f).catch(e => toast(msgErro(e), true)); return; }
   if (ev.target.closest && ev.target.closest("#ratForm")) { if (id === "rtMetodo" || (ev.target.classList && ev.target.classList.contains("rtLoja"))) Views.rateios.ajustaEntradas(); Views.rateios.invalida(); return; }
   if (ev.target.classList && ev.target.classList.contains("arqInput")) { const f = ev.target.files[0]; ev.target.value = ""; Views.financeiro.anexar(ev.target.dataset.pag, f).catch(e => toast(msgErro(e), true)); return; }
