@@ -257,7 +257,7 @@ const S = {
   tab: "painel", channel: null, realtime: "off",
   f: { estBusca: "", estFiltro: "todos", vendaBusca: "", vendasPeriodo: "hoje", finStatus: "todos", finPeriodo: "mes", cliBusca: "",
        waPreco: true, waQtd: true, waSabores: true,
-       hLoja: "", hPeriodo: "30d", hResp: "", hSit: "" },
+       hLoja: "", hPeriodo: "30d", hResp: "", hSit: "", ratEscopo: "loja" },
 };
 const isGerente = () => S.perfil && (S.perfil.papel === "gerente" || S.perfil.papel === "dono");
 const itemById = id => S.itens.find(i => i.id === id);
@@ -415,6 +415,7 @@ Views.painel = {
     const dow = d => ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"][new Date(d + "T12:00:00Z").getUTCDay()];
     $("viewRoot").innerHTML = `
       ${Avisos.html(avisos)}
+      ${Views.rateios.painelHtml(r.rateios, S.loja.nome)}
       <div class="kpi-grid">
         <div class="kpi"><div class="v">${fmt(r.hoje.total)}</div><div class="l">Vendas hoje · ${r.hoje.qtd} venda(s)</div></div>
         <div class="kpi"><div class="v">${fmt(r.mes.total)}</div><div class="l">Vendas no mês · ${r.mes.qtd} venda(s)</div></div>
@@ -692,6 +693,7 @@ Views.financeiro = {
     const f = S.f, [ini, fim] = Views.financeiro.periodo();
     $("viewRoot").innerHTML = `<div class="page-h"><h2>💰 Financeiro · ${esc(S.loja.nome)}</h2><button class="abtn red" data-a="finForm">+ Conta / lançamento</button><button class="abtn soft" data-a="finCsv">⬇ CSV</button></div>
       <div class="chips">${[["hoje", "Hoje"], ["7d", "7 dias"], ["mes", "Este mês"], ["tudo", "Tudo"]].map(([k, l]) => `<button class="chip ${f.finPeriodo === k ? "sel" : ""}" data-a="finPeriodo" data-id="${k}">${l}</button>`).join("")}</div>
+      <div id="finRateiosResumo"></div>
       <div id="finRateios"></div>
       <div id="finResumo"></div>
       <div class="chips">${FIN_FILTROS.map(([k, l]) => `<button class="chip ${f.finStatus === k ? "sel" : ""}" data-a="finStatus" data-id="${k}">${l}</button>`).join("")}</div>
@@ -703,14 +705,16 @@ Views.financeiro = {
       rpc("listar_contas", { p_loja_id: S.loja.id, p_inicio: ini, p_fim: fim, p_situacao: sit })]);
     if (S.tab !== "financeiro") return;
     S.finLista = ls;
+    Views.rateios.resumo(r.rateios || null, ini, fim).catch(() => {});
     $("finResumo").innerHTML = `<div class="kpi-grid">
       <div class="kpi good"><div class="v">${esc(fmt(r.entradas))}</div><div class="l">Entradas efetivadas no período</div></div>
       <div class="kpi warn"><div class="v">${esc(fmt(r.saidas))}</div><div class="l">Saídas efetivadas no período</div></div>
       <div class="kpi"><div class="v">${esc(fmt(r.saldo_periodo))}</div><div class="l">Resultado do período</div></div>
       <div class="kpi"><div class="v">${esc(fmt(r.saldo_caixa))}</div><div class="l">Saldo efetivado (total)</div></div>
-      <div class="kpi"><div class="v">${esc(fmt(r.a_receber.total))}</div><div class="l">A receber (saldo) · ${r.a_receber.qtd}</div></div>
-      <div class="kpi ${r.atrasados.qtd ? "warn" : ""}"><div class="v">${esc(fmt(r.a_pagar.total))}</div><div class="l">A pagar (saldo) · ${r.a_pagar.qtd} (${r.atrasados.qtd} vencida)</div></div></div>`;
-    $("finLista").innerHTML = ls.length ? ls.map(l => `<div class="list-row click" data-a="finDetalhe" data-id="${esc(l.id)}"><span class="tag ${l.tipo}">${l.tipo === "entrada" ? "ENTRADA" : "SAÍDA"}</span>
+      <div class="kpi"><div class="v">${esc(fmt(r.a_receber.total))}</div><div class="l">Contas exclusivas — a receber (saldo) · ${r.a_receber.qtd}</div></div>
+      <div class="kpi ${r.atrasados.qtd ? "warn" : ""}"><div class="v">${esc(fmt(r.a_pagar.total))}</div><div class="l">Contas exclusivas — a pagar (saldo) · ${r.a_pagar.qtd} (${r.atrasados.qtd} vencida)</div></div></div>
+      <small style="color:var(--muted);display:block;margin-bottom:8px">Entradas e saídas efetivadas usam a <b>data do pagamento</b> e incluem os pagamentos externos de contas compartilhadas (uma vez só, na loja que pagou); <b>reembolsos entre lojas não entram</b>. "A pagar/receber" e "vencida" são da foto de hoje e valem só para contas exclusivas.</small>`;
+    $("finLista").innerHTML = ls.length ? ls.map(l => `<div class="list-row click" data-a="finDetalhe" data-id="${esc(l.id)}"><span class="tag ${l.tipo}">${l.tipo === "entrada" ? "ENTRADA" : "SAÍDA"}</span><span class="tag neutro">exclusiva</span>
       <div class="grow"><b>${esc(l.descricao || l.categoria)}</b><small>${esc(l.categoria)} · ${esc(fmtD(String(l.data_ref).slice(0, 10)))}${l.vencimento ? " · vence " + esc(fmtD(l.vencimento)) : ""} · original ${esc(fmt(l.valor))} · pago ${esc(fmt(l.total_pago))}${l.legado ? " · lançamento antigo" : ""}</small>
         <span class="tag ${SIT_CLS[l.situacao]}">${SIT_TXT[l.situacao]}</span>${l.vencida ? ' <span class="tag atrasado">saldo vencido</span>' : ""}${l.envios_pendentes ? ' <span class="tag pendente">comprovante: envio pendente</span>' : ""}${l.qtd_comprovantes ? ` <span class="tag neutro">📎 ${l.qtd_comprovantes}</span>` : ""}</div>
       <div style="text-align:right"><b class="${l.tipo === "entrada" ? "pos" : "neg"}">${esc(fmt(l.saldo))}</b><br><small style="color:var(--muted)">saldo</small></div></div>`).join("") : `<div class="empty">Nenhuma conta no filtro.</div>`;
@@ -891,11 +895,50 @@ Views.rateios = {
     if (S.tab !== "financeiro" || !$("finRateios")) return;
     S.ratLista = ls;
     $("finRateios").innerHTML = `<div class="card" id="ratCard"><div class="page-h" style="margin-bottom:6px"><h3 style="flex:1;margin:0">🤝 Contas compartilhadas (rateio entre lojas)</h3>${isGerente() ? `<button class="abtn dark sm" data-a="ratNovo">+ Conta compartilhada</button>` : ""}</div>
-      ${ls.length ? ls.map(r => `<div class="list-row click" data-a="ratDetalhe" data-id="${esc(r.id)}"><div class="grow"><b>${esc(r.descricao)}</b>
+      ${ls.length ? ls.map(r => `<div class="list-row click" data-a="ratDetalhe" data-id="${esc(r.id)}"><span class="tag neutro">compartilhada</span><div class="grow"><b>${esc(r.descricao)}</b>
         <small>${esc(r.categoria)} · total ${esc(fmt(r.valor_total))} · ${r.lojas} lojas${r.vencimento ? " · vence " + esc(fmtD(r.vencimento)) : ""}</small>
         <span class="tag ${RAT_SIT[r.situacao][0]}">${RAT_SIT[r.situacao][1]}</span>${r.vencida ? ' <span class="tag atrasado">saldo externo vencido</span>' : ""}
         <small>pago ao externo ${esc(fmt(r.pago_externo))} · saldo externo ${esc(fmt(r.saldo_externo))}</small>
         ${(r.minhas || []).map(m => `<small>${esc(m.loja_nome)}: parcela ${esc(fmt(m.parcela))} · pagou ao externo ${esc(fmt(m.pago_externo))} · ${posHtml(m.posicao)}</small>`).join("")}</div><span style="color:var(--muted)">›</span></div>`).join("") : `<div class="empty">Nenhuma conta compartilhada. A conta exclusiva continua sendo o padrão.</div>`}</div>`;
+  },
+
+  /* ---- resumo (consolidado, por loja) ---- */
+  async resumo(rt, ini, fim) {
+    const el = $("finRateiosResumo"); if (!el) return;
+    if (S.f.ratEscopo === "todas") { try { rt = await rpc("rateios_resumo", { p_loja_id: null, p_inicio: ini, p_fim: fim }); } catch (e) { rt = null; } }
+    if (!rt || S.tab !== "financeiro" || !$("finRateiosResumo")) { if ($("finRateiosResumo")) $("finRateiosResumo").innerHTML = ""; return; }
+    S.ratResumo = rt;
+    const c = rt.consolidado, d = rt.datas, esc_ = S.f.ratEscopo === "todas";
+    $("finRateiosResumo").innerHTML = `<div class="card" id="ratResumo"><div class="page-h" style="margin-bottom:6px"><h3 style="flex:1;margin:0">🤝 Contas compartilhadas — resumo ${esc_ ? "(todas as minhas lojas)" : "(" + esc(S.loja.nome) + ")"}</h3>
+        <button class="chip ${esc_ ? "" : "sel"}" data-a="ratEscopo" data-id="loja">Esta loja</button><button class="chip ${esc_ ? "sel" : ""}" data-a="ratEscopo" data-id="todas">${S.perfil.papel === "dono" ? "Consolidado (todas as lojas)" : "Todas as minhas lojas"}</button></div>
+      <small style="color:var(--muted);display:block;margin-bottom:6px"><b>Consolidado:</b> cada despesa externa aparece <b>uma única vez</b>, qualquer que seja o número de lojas.</small>
+      <div class="kpi-grid">
+        <div class="kpi"><div class="v">${esc(fmt(c.previsto_periodo))}</div><div class="l">Previsto · ${c.qtd_periodo} despesa(s) com data prevista no período</div></div>
+        <div class="kpi good"><div class="v">${esc(fmt(c.pago_periodo))}</div><div class="l">Pago ao externo (efetivo) no período</div></div>
+        <div class="kpi"><div class="v">${esc(fmt(c.saldo_externo_pendente.total))}</div><div class="l">Saldo externo pendente (hoje) · ${c.saldo_externo_pendente.qtd}</div></div>
+        <div class="kpi ${c.saldo_externo_vencido.qtd ? "warn" : ""}"><div class="v">${esc(fmt(c.saldo_externo_vencido.total))}</div><div class="l">Saldo externo vencido (hoje) · ${c.saldo_externo_vencido.qtd}</div></div></div>
+      <small style="color:var(--muted);display:block;margin-bottom:8px">Datas: <b>previsto</b> = ${esc(d.previsto)}; <b>pago</b> = ${esc(d.pago)}; <b>saldo externo</b> = ${esc(d.saldo_externo)}.</small>
+      ${c.itens.length ? c.itens.map(i => `<div class="list-row click" data-a="ratDetalhe" data-id="${esc(i.id)}"><span class="tag neutro">compartilhada</span><div class="grow"><b>${esc(i.descricao)}</b>
+          <small>${esc(i.categoria)} · ${i.lojas} lojas · data prevista ${esc(fmtD(i.data_prevista))}${i.no_periodo ? "" : " (fora do período; tem pagamento no período)"} · total ${esc(fmt(i.valor_total))} · pago ${esc(fmt(i.pago_total))}</small>
+          <span class="tag ${RAT_SIT[i.situacao][0]}">${RAT_SIT[i.situacao][1]}</span>${i.vencida ? ' <span class="tag atrasado">saldo externo vencido</span>' : ""}</div>
+          <div style="text-align:right"><b>${esc(fmt(i.saldo_externo))}</b><br><small style="color:var(--muted)">saldo externo</small></div></div>`).join("") : `<div class="empty">Nenhuma despesa compartilhada no período.</div>`}
+      <label>Por loja — parcela, pagamentos externos e acerto entre lojas (separados)</label>
+      ${rt.por_loja.length ? rt.por_loja.map(l => `<div class="card" style="padding:10px;margin-bottom:6px"><b>${esc(l.loja_nome)}</b>
+        <div class="grid2" style="font-size:.78rem;color:var(--muted);margin-top:4px">
+          <span>Parcela de responsabilidade (prevista): <b>${esc(fmt(l.parcela_periodo))}</b></span><span>Pagamentos externos realizados (no período): <b>${esc(fmt(l.pago_externo_periodo))}</b></span>
+          <span>A receber de outras lojas: <b class="pos">${esc(fmt(l.a_receber_de_outras_lojas))}</b></span><span>A reembolsar a outras lojas: <b class="${Number(l.a_reembolsar_a_outras_lojas) ? "neg" : ""}">${esc(fmt(l.a_reembolsar_a_outras_lojas))}</b></span>
+          <span>Parcela ainda não coberta (externo em aberto): <b>${esc(fmt(l.parcela_ainda_nao_coberta))}</b></span><span>Reembolsos no período: pagos ${esc(fmt(l.reembolsos_pagos_periodo))} · recebidos ${esc(fmt(l.reembolsos_recebidos_periodo))}</span></div></div>`).join("") : `<div class="empty">Sem parcelas.</div>`}
+      <small style="color:var(--muted);display:block;margin-top:6px"><b>Saldo externo</b> (o que falta pagar ao fornecedor) e <b>acerto entre lojas</b> (a receber / a reembolsar) são informações <b>diferentes</b>: a parcela que ainda não foi coberta pode ser quitada pagando o fornecedor ou reembolsando outra loja — não é dívida ao fornecedor.
+        Acerto entre lojas: ${esc(d.acerto_entre_lojas)}. Reembolsos: ${esc(d.reembolsos)}. ${esc(rt.reembolsos_internos.nota)} Pagamentos externos já entram em entradas/saídas efetivadas (uma vez só, na loja que pagou).</small></div>`;
+  },
+  painelHtml(rt, nomeLoja) {
+    if (!rt) return "";
+    const c = rt.consolidado, l = (rt.por_loja || [])[0];
+    return `<div class="card"><h3>🤝 Despesas compartilhadas do mês <span class="tag neutro">compartilhadas</span></h3>
+      <div class="kpi-grid"><div class="kpi"><div class="v">${esc(fmt(c.previsto_periodo))}</div><div class="l">Previsto (data prevista no mês)</div></div><div class="kpi good"><div class="v">${esc(fmt(c.pago_periodo))}</div><div class="l">Pago ao externo no mês</div></div>
+        <div class="kpi ${c.saldo_externo_vencido.qtd ? "warn" : ""}"><div class="v">${esc(fmt(c.saldo_externo_pendente.total))}</div><div class="l">Saldo externo pendente (hoje)${c.saldo_externo_vencido.qtd ? " · " + c.saldo_externo_vencido.qtd + " vencida(s)" : ""}</div></div></div>
+      ${l ? `<small style="color:var(--muted)">${esc(nomeLoja)}: a receber de outras lojas <b>${esc(fmt(l.a_receber_de_outras_lojas))}</b> · a reembolsar a outras lojas <b>${esc(fmt(l.a_reembolsar_a_outras_lojas))}</b> · parcela ainda não coberta <b>${esc(fmt(l.parcela_ainda_nao_coberta))}</b> (acerto entre lojas ≠ saldo externo).</small>` : ""}
+      <small style="display:block;margin-top:4px"><a href="#" data-a="avisoIr" data-id="financeiro" onclick="return false">Ver no Financeiro →</a></small></div>`;
   },
 
   /* ---- assistente (criar / revisar) ---- */
@@ -973,7 +1016,7 @@ Views.rateios = {
     const sit = RAT_SIT[r.situacao], pagLojas = d.pode_pagar_lojas.length > 0;
     const temDev = d.posicoes.some(p => Number(p.posicao) < 0), temCred = d.posicoes.some(p => Number(p.posicao) > 0);
     openModal(`<h3>${esc(r.descricao)}</h3>
-      <div class="row" style="margin-bottom:6px"><span class="tag ${sit[0]}">${sit[1]}</span>${r.situacao !== "cancelado" && r.vencimento && r.vencimento < hojeISO() && Number(r.saldo_externo) > 0 ? '<span class="tag atrasado">saldo externo vencido</span>' : ""}<span class="tag neutro">versão ${r.versao}</span>
+      <div class="row" style="margin-bottom:6px"><span class="tag ${sit[0]}">${sit[1]}</span>${r.situacao !== "cancelado" && r.vencimento && r.vencimento < hojeISO() && Number(r.saldo_externo) > 0 ? '<span class="tag atrasado">saldo externo vencido</span>' : ""}<span class="tag neutro">compartilhada</span><span class="tag neutro">versão ${r.versao}</span>
         <small style="color:var(--muted)">${esc(r.categoria)} · ${esc(METODOS[r.metodo])}${r.vencimento ? " · vence " + esc(fmtD(r.vencimento)) : ""} · criado por ${esc(r.criado_por_nome || "—")}</small></div>
       <div class="banner" id="ratAviso">Pagamentos externos e reembolsos aqui <b>apenas registram operações já realizadas</b>: não transferem dinheiro e <b>não movimentam o caixa automaticamente</b>. Reembolso entre lojas <b>não quita de novo</b> a conta externa e <b>não é receita nem despesa</b>.</div>
       ${r.status === "cancelado" ? `<div class="banner">Cancelada em ${esc(fmtDT(r.cancelado_em))} — ${esc(r.motivo_cancelamento || "")}</div>` : ""}
@@ -1471,6 +1514,7 @@ const Act = {
   finCancelarForm: (id) => Views.financeiro.cancelarForm(id), finCancelarOk: (id, b) => Views.financeiro.cancelarOk(id, b),
   finAnexar: (id) => Views.financeiro.escolherArquivo(id), finTentar: (id, b) => Views.financeiro.registrarArq(id, b), finBaixar: (id) => Views.financeiro.baixar(id),
   finEnvio: (id, b) => Views.financeiro.confirmarEnvio(id, b),
+  ratEscopo: (id) => { S.f.ratEscopo = id; Views.financeiro.render().catch(e => toast(msgErro(e), true)); },
   ratNovo: () => Views.rateios.novo(false).catch(e => toast(msgErro(e), true)), ratRevisar: () => Views.rateios.novo(true).catch(e => toast(msgErro(e), true)),
   ratPrevia: (id, b) => Views.rateios.previa(b), ratCriar: (id, b) => Views.rateios.criar(b),
   ratDetalhe: (id) => Views.rateios.detalhe(id).catch(e => toast(msgErro(e), true)), ratVoltar: (id) => Views.rateios.detalhe(id).catch(e => toast(msgErro(e), true)),

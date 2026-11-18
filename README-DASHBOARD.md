@@ -57,9 +57,9 @@ Em `dashboard.html`, ajuste `SUPABASE_URL` e `SUPABASE_ANON_KEY` (só a chave an
 
 ## Pagamentos parciais e comprovantes (migração 005)
 
-**Ordem de aplicação no Supabase (nenhuma foi aplicada ainda no projeto remoto):** `schema.sql` → `002` → `003` → `004` → `005` → `006` → `007`.
+**Ordem de aplicação no Supabase (nenhuma foi aplicada ainda no projeto remoto):** `schema.sql` → `002` → `003` → `004` → `005` → `006` → `007` → `008`.
 A 005 depende da 003 (permissões e caixa), a 006 da 005 e a 007 da 005/006 (comprovantes e limpeza). Rode uma por vez no SQL Editor e confira que terminou sem erro antes da próxima.
-A ordem foi conferida instalando do zero (schema → 007) numa pilha Supabase local real (veja "Validação contra a pilha real").
+A ordem foi conferida instalando do zero (schema → 008) numa pilha Supabase local real (veja "Validação contra a pilha real").
 
 - **Contas:** cada conta tem valor original, total pago e saldo pendente. Situações: pendente, parcialmente paga, paga e cancelada
   ("saldo vencido" é calculado pela data de vencimento). Vários pagamentos até quitar; valor/data/forma/observação/responsável em cada um.
@@ -118,10 +118,22 @@ A ordem foi conferida instalando do zero (schema → 007) numa pilha Supabase lo
 - **Acessos:** dono administra todas as lojas; gerente só cria/revisa rateios com lojas em que tem autorização; cada loja vê sua parcela e os pagamentos/reembolsos **do rateio de que participa** (para conferir), sem ganhar acesso ao financeiro completo das demais.
 - **Alerta:** "despesa compartilhada com saldo externo vencido" no painel. Limitações: rateios não entram em "a pagar/receber" dos resumos antigos (têm tela própria) e **recorrência não foi implementada**.
 
+## Rateios nos resumos financeiros (migração 008)
+
+`rateios_resumo` é a fonte única dos números de rateio; `financeiro_resumo` e `painel_resumo` ganharam só a chave nova `rateios` (as chaves antigas não mudaram).
+- **Consolidado (cada despesa externa UMA vez):** previsto (valor total das despesas cuja **data prevista** — vencimento, ou a criação se não houver — cai no período), pago (**data do pagamento** externo no período, líquido de estornos),
+  saldo externo pendente e vencido (**foto de hoje**, independem do período). Mesmos filtros de período e permissões dos demais registros; cada indicador declara a data que usa (campo `datas`).
+- **Por loja, separado:** parcela de responsabilidade (prevista) · pagamentos externos realizados · **acerto entre lojas** (a receber de outras lojas; a reembolsar a outras lojas, só quando o externo já foi quitado) ·
+  **parcela ainda não coberta** (externo em aberto: pode ser quitada pagando o fornecedor ou reembolsando outra loja). Posição de rateio **nunca** é apresentada como dívida ao fornecedor; saldo externo e acerto entre lojas são informações diferentes.
+- **Sem duplicar:** o pagamento externo entra em entradas/saídas efetivadas uma vez, na loja que pagou. **Reembolsos internos não são receita nem despesa**: aparecem à parte e não alteram entradas, saídas nem saldo.
+- `financeiro_resumo` agora abate o **estorno de um pagamento** na própria família (despesa ou receita), em vez de contá-lo como "entrada"; sem estornos de pagamento os números são idênticos aos de antes.
+- Telas: cartão "Contas compartilhadas — resumo" no Financeiro (esta loja / todas as minhas lojas; dono: consolidado de todas), cartão no Painel, etiquetas **exclusiva** × **compartilhada**, e os KPIs antigos de a pagar/receber rotulados como "contas exclusivas".
+- Limitações: "Este mês" termina hoje, então uma despesa com vencimento futuro só entra em "previsto" quando o período a alcança (use "Tudo"); rateios não entram nos KPIs antigos de a pagar/receber (têm resumo próprio); recorrência não implementada.
+
 ## Validação contra a pilha real (Docker)
 
 `supabase/tests/stack/` sobe **Postgres do Supabase + Auth (GoTrue) + PostgREST + Storage API** reais em contêineres, instala `schema.sql → 002 → 003 → 004 → 005 → 006` do zero como o papel `postgres`
-(o mesmo do SQL Editor), cria usuários por SQL direto (como no projeto remoto) e roda: `real_api.test.js` (login, isolamento entre lojas, pagamentos, Storage, limpeza), `real_api_rateios.test.js` (rateios/reembolsos) e `real_ui.test.js` + `real_ui_rateios.test.js` (o `dashboard.html` no Chromium).
+(o mesmo do SQL Editor), cria usuários por SQL direto (como no projeto remoto) e roda: `real_api.test.js` (login, isolamento entre lojas, pagamentos, Storage, limpeza), `real_api_rateios.test.js` (rateios/reembolsos), `real_api_resumos.test.js` (resumos) e `real_ui.test.js` + `real_ui_rateios.test.js` + `real_ui_resumos.test.js` (o `dashboard.html` no Chromium).
 Requisitos: Docker com daemon ativo, Node 18+, Playwright. Uso: `supabase/tests/stack/run_all.sh` (`--keep` deixa a pilha de pé). Os segredos são gerados na hora (`.env`, não versionado).
 Não valida: o **Kong** (gateway do Supabase hospedado, inclusive CORS) — aqui um mini-gateway (`gateway.js`) o substitui —, Realtime, e e-mails/recuperação de senha. Nada é enviado ao projeto remoto.
 
@@ -132,6 +144,7 @@ Não valida: o **Kong** (gateway do Supabase hospedado, inclusive CORS) — aqui
 - `supabase/tests/sem_caixa_testes.sql` — 17 verificações dos valores sem caixa (janelas, permissões, somente leitura); tela: `ui/ui_sem_caixa.test.js`.
 - `supabase/tests/pagamentos_testes.sql` — 71 verificações de pagamentos parciais, estornos, comprovantes (políticas do bucket), envio confirmado e acesso indevido; tela: `ui/ui.test.js` (104).
 - `supabase/tests/rateios_testes.sql` — 83 verificações de rateio/reembolso (arredondamento, exemplo de R$ 900, parcial, estornos após reembolso, permissões, comprovantes); `lab/concorrencia_rateios.sh` — concorrência.
+- `supabase/tests/rateios_resumos_testes.sql` — 40 verificações dos resumos de rateio (exemplo de R$ 900, reembolso, parcial, vencimento, estornos, período, uma loja só, dono).
 - `supabase/tests/lab/` — banco local + concorrência (`concorrencia.sh` vendas; `concorrencia_caixa.sh` abertura/estorno/fechamento simultâneos; `concorrencia_pagamentos.sh` pagamentos/estornos/repetições simultâneos). As suítes locais acima usam um Storage simulado só nas **políticas**; a API real (limite de 5 MB, tipo MIME, upload, links assinados) é validada em `supabase/tests/stack/`.
 - `supabase/tests/ui/` — a tela no Chromium com Supabase simulado e checagem dos
   nomes de parâmetros das funções contra o SQL:
