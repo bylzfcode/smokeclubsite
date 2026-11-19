@@ -12,24 +12,61 @@ compartilhado. Fica separado do site público (`index (23).html`).
   itens/preços no Catálogo).
 - Estoque é **compartilhado**; preços, clientes, vendas e financeiro são **por loja**.
 
-## Instalar do zero
+## Instalar a versão administrativa (migrações 001–013)
 
-No SQL Editor do Supabase, **uma por vez, nesta ordem** (confira que terminou sem erro antes da próxima):
-1. `supabase/schema.sql` · 2. `002_melhorias.sql` · 3. `003_caixa_avisos.sql` (caixa, histórico, avisos) · 4. `004_entradas_sem_caixa.sql` · 5. `005_pagamentos_comprovantes.sql` (pagamentos parciais e comprovantes; exige o bucket privado do Storage)
-6. `006_limpeza_comprovantes.sql` · 7. `007_rateios_reembolsos.sql` · 8. `008_rateios_resumos.sql` · 9. `009_comunicados.sql` · 10. `010_acessos.sql` · 11. `011_recorrencia.sql` · 12. `012_calendario.sql`
+> **Nada disto foi aplicado no projeto Supabase hospedado.** Siga este roteiro no destino, na ordem. Os scripts de consulta abaixo são **somente leitura**.
 
-Sem uma migração, só a parte dela mostra "falta aplicar a migração …" (o resto do painel continua funcionando). **Nada disto foi aplicado no projeto hospedado.**
+### 0. Regras de ouro
+- **Nunca rode `schema.sql` em um banco que já tem dados/tabelas.** Ele só serve para um projeto **vazio**: usa `create table` sem "if not exists" (falha em banco existente) e insere as lojas iniciais. Num banco existente, **primeiro inspecione** (passo 2) e aplique somente as migrações que faltam.
+- Uma migração por vez, na ordem, conferindo que terminou **sem erro** antes da próxima. Não pule números.
+- Nunca reaplique uma migração antiga sozinha com outras mais novas já aplicadas (ela recria funções que as novas substituíram). Se precisar repetir a migração N, repita **de N até 013**, em ordem — todas são repetíveis (testado: 002–013 rodadas duas vezes seguidas num banco já migrado, sem erro nem perda de dados).
 
-Crie os usuários (Authentication → Users, e-mail `user@painel.local`, auto-confirm),
-depois vincule:
+### 1. Backup (obrigatório antes de qualquer migração)
+- **Supabase → Database → Backups:** confirme que existe backup recente e anote data/hora (a disponibilidade de backups automáticos e de recuperação a qualquer instante — PITR — **depende do plano**; confira no seu projeto). Se não houver backup recente, faça o manual abaixo antes de continuar.
+- **Backup manual do banco** (no seu computador, com `pg_dump` ≥ 15; a *connection string* está em Project Settings → Database; **não cole a senha em chat nem em arquivos do repositório**):
+  ```bash
+  pg_dump "postgresql://postgres:<SENHA>@<HOST>:5432/postgres" --format=custom --no-owner --file=backup-antes-das-migracoes.dump
+  ```
+  Guarde o arquivo fora do repositório. O dump **não inclui os arquivos do Storage** (comprovantes): a migração 005 não os altera, mas se quiser garantia extra baixe o bucket `comprovantes` pelo painel (Storage).
+- Faça as migrações num horário de pouco movimento (as funções são recriadas; há milissegundos de indisponibilidade por função).
 
+### 2. Descobrir o que já está aplicado (somente leitura)
+No SQL Editor do **destino**, execute `supabase/ops/verificar_migracoes.sql`. Cada linha é uma migração: **aplicada** (todos os objetos existem), **ausente** (nenhum) ou **PARCIAL** (alguns — banco fora do padrão ou migração interrompida: **pare** e veja "Recuperação"). Aplique, em ordem, apenas as que estão **ausentes**, começando pela primeira ausente. Exemplo: se `schema.sql`…`008` estão aplicadas e `009`…`013` ausentes, comece pela `009`.
+
+### 3. Ordem exata e pré-requisitos
+| # | Arquivo | Pré-requisito | O que faz (resumo) | Cuidados |
+|---|---|---|---|---|
+| 1 | `schema.sql` | **banco vazio** | tabelas base, RLS, vendas/estoque/financeiro, lojas iniciais | só em projeto novo |
+| 2 | `002_melhorias.sql` | 1 | funções de papel (`eh_gerente`), `data_ref`, resumos | |
+| 3 | `003_caixa_avisos.sql` | 1, 2 | caixa, histórico, avisos | |
+| 4 | `004_entradas_sem_caixa.sql` | 3 | valores sem caixa (leitura) | |
+| 5 | `005_pagamentos_comprovantes.sql` | 3 | pagamentos parciais, comprovantes, bucket privado `comprovantes` | exige Storage ativo |
+| 6 | `006_limpeza_comprovantes.sql` | 5 | limpeza segura de órfãos | |
+| 7 | `007_rateios_reembolsos.sql` | 5, 6 | contas compartilhadas e reembolsos | |
+| 8 | `008_rateios_resumos.sql` | 7 | rateios nos resumos | |
+| 9 | `009_comunicados.sql` | 3 | comunicados/versões (usa avisos) | |
+| 10 | `010_acessos.sql` | 1–9 | `perfis.ativo`, helpers de acesso ativos, auditoria | **recria** `eh_dono`, `eh_gerente`, `minhas_lojas`… e as políticas de escrita do catálogo (mesma regra + "ativo") |
+| 11 | `011_recorrencia.sql` | 5 | séries de contas exclusivas, `editar_conta` | amplia `listar_contas` e o CHECK de auditoria |
+| 12 | `012_calendario.sql` | 7, 11 | calendário, compromissos, `series_agendamento` | só leitura sobre contas/rateios |
+| 13 | `013_series_compartilhadas.sql` | **7 e 11** (e 12 para o calendário) | séries de contas compartilhadas, retomada com prévia, `series_auditoria` | recria `serie_gerar`, `serie_controlar`, `listar_series`, `gerar_series_*`; estende `listar_rateios`, `rateio_detalhe`, `calendario_admin` |
+
+Usuários e vínculos (depois das migrações): crie em Authentication → Users (e-mail `usuario@painel.local`, auto-confirm) e vincule:
 ```sql
 insert into perfis (id, nome, papel) values ('<id do auth.users>', 'LUIZ', 'dono');
-insert into perfis_lojas (perfil_id, loja_id)
-select '<id do auth.users>', id from lojas where slug in ('smoke-club','ez-store');
+insert into perfis_lojas (perfil_id, loja_id) select '<id do auth.users>', id from lojas where slug in ('smoke-club','ez-store');
 ```
+Em `dashboard.html` ajuste `SUPABASE_URL` e `SUPABASE_ANON_KEY` (só a chave anon/pública, **nunca** a `service_role`).
 
-Em `dashboard.html`, ajuste `SUPABASE_URL` e `SUPABASE_ANON_KEY` (só a chave anon/pública, nunca a service_role).
+### 4. Conferência depois de cada migração e no final
+1. Rode de novo `verificar_migracoes.sql`: a migração aplicada deve aparecer como **aplicada**.
+2. No fim, rode `supabase/ops/conferencia_pos_migracao.sql` (somente leitura): nenhuma linha pode estar **FALHA**. Ela confere RLS ligado, ausência de privilégios diretos para `anon`/`authenticated`, quem pode executar as funções de geração, índices anti-duplicação, séries com erro e o estado do agendador (linhas "informativo" dependem do ambiente).
+3. Faça o **roteiro de conferência da interface** (abaixo).
+
+### 5. Recuperação em caso de falha
+- Se uma migração falhar: **não rode a próxima**. Leia a mensagem de erro, rode `verificar_migracoes.sql` (a migração aparecerá "parcial" ou "ausente") e corrija a causa (ex.: Storage não habilitado para a 005, permissão insuficiente — use o papel `postgres` do SQL Editor).
+- Depois de corrigir, **rode o mesmo arquivo de novo** (todos são repetíveis). Se voltar a "aplicada", siga.
+- As migrações **só adicionam** tabelas/colunas/funções e recriam funções e políticas; não apagam nem reescrevem dados existentes. Se, mesmo assim, algo estiver inconsistente ou você quiser desfazer tudo, **restaure o backup do passo 1**: Dashboard → Database → Backups → Restore (ou `pg_restore --clean --if-exists --no-owner -d "<conexão>" backup-antes-das-migracoes.dump`) — esta é a única forma de "voltar atrás"; não há script de rollback por migração.
+- Depois de restaurar, repita o passo 2 (inspeção) antes de tentar de novo.
 
 ## Garantias de estoque/financeiro
 
@@ -58,9 +95,9 @@ Em `dashboard.html`, ajuste `SUPABASE_URL` e `SUPABASE_ANON_KEY` (só a chave an
 
 ## Pagamentos parciais e comprovantes (migração 005)
 
-**Ordem de aplicação no Supabase (nenhuma foi aplicada ainda no projeto remoto):** `schema.sql` → `002` → `003` → `004` → `005` → `006` → `007` → `008` → `009` → `010` → `011` → `012`.
+**Ordem de aplicação no Supabase (nenhuma foi aplicada ainda no projeto remoto):** `schema.sql` → `002` → `003` → `004` → `005` → `006` → `007` → `008` → `009` → `010` → `011` → `012` → `013`.
 A 005 depende da 003 (permissões e caixa), a 006 da 005 e a 007 da 005/006 (comprovantes e limpeza). Rode uma por vez no SQL Editor e confira que terminou sem erro antes da próxima.
-A ordem foi conferida instalando do zero (schema → 012) numa pilha Supabase local real (veja "Validação contra a pilha real").
+A ordem foi conferida instalando do zero (schema → 013) numa pilha Supabase local real (veja "Validação contra a pilha real").
 
 - **Contas:** cada conta tem valor original, total pago e saldo pendente. Situações: pendente, parcialmente paga, paga e cancelada
   ("saldo vencido" é calculado pela data de vencimento). Vários pagamentos até quitar; valor/data/forma/observação/responsável em cada um.
@@ -142,41 +179,68 @@ Aba **📣 Comunicados**: editor de comunicados **administrativos** (título, ca
 - **Permissões (no servidor):** dono acessa todas as lojas; gerente edita/publica/despublica só nas lojas que administra; operador cria e edita rascunhos das lojas a que tem acesso, mas **não publica**; sem acesso à loja não lista nem abre. Aviso **global** só o dono (e só o dono o despublica — regra dos avisos).
 - Limitações: validade é por data (até 23:59 de Brasília); não há agendamento de publicação nem anexos; editar o texto já publicado só chega às pessoas ao republicar.
 
-## Acessos, períodos, recorrência e calendário (migrações 010, 011 e 012)
+## Acessos, períodos, recorrência, calendário e retomada (migrações 010 a 013)
 
 **Acessos (010).** `perfis.ativo`: o dono desativa/reativa pessoas (aba **🔐 Acessos**) e altera as lojas de cada uma, sempre com auditoria (`acessos_auditoria`, imutável). Desativar **bloqueia na hora** todas as funções e leituras (inclusive chamadas diretas à API com token ainda válido) e **preserva o histórico** (vendas, caixas, contas, comunicados continuam apontando para a pessoa). Reativar devolve as mesmas lojas. Ninguém desativa a si mesmo nem o último dono ativo; desativar exige motivo. O login continua existindo (é do Supabase Auth), mas a pessoa não vê nada e a tela avisa "Seu acesso foi desativado". Ao trocar de loja a tela e a memória da loja anterior são limpas.
 
 **Períodos.** "**Este mês**" = o mês **inteiro** (dia 1 ao último dia, inclusive datas futuras, que são previsões); "**Até hoje**" é um filtro à parte (do dia 1º até hoje); "Hoje", "7 dias" e "Tudo" como antes. O intervalo aplicado aparece escrito sob os botões, e cada indicador do Financeiro/rateios continua dizendo qual data usa (pagamento, vencimento, foto de hoje). O Histórico tem "Este mês (mês inteiro)" e "Mês até hoje".
 
-**Contas recorrentes (011)** — opcionais, só para **contas exclusivas** de uma loja (conta única é o padrão; rateios não se repetem: crie um novo rateio).
+**Contas recorrentes (011 e 013)** — opcionais (conta única é o padrão), para **contas exclusivas** (formulário "+ Conta / lançamento") e para **contas compartilhadas** (formulário "Nova conta compartilhada"), no mesmo mecanismo de séries.
 - Frequência semanal, a cada 15 dias, mensal, anual ou personalizada (a cada N dias/semanas/meses/anos). Término sem prazo, até uma data ou após N ocorrências (1–120). **Prévia** dos vencimentos antes de salvar.
 - Datas sempre calculadas a partir do 1º vencimento: mensal a partir de 31/01 → 28|29/02, 31/03, 30/04… (dia inexistente vira o último dia do mês; a referência original é preservada em `vencimento_ref`).
 - Cada ocorrência é uma conta comum **sempre pendente**, sem pagamentos nem comprovantes copiados, valor exato em centavos. Geração **no servidor**, com **janela futura de 60 dias** (a 1ª ocorrência é sempre criada; no máx. 24 por execução), trava por série e índice único (`serie_id, serie_n`) → sem duplicação com cliques repetidos, abas simultâneas ou agendador + tela. Séries iniciadas no passado geram também as ocorrências já vencidas (aparecem como vencidas).
 - Editar **só esta** ou **esta e as próximas** (descrição, categoria, valor, forma, comprovante; a data só na própria ocorrência). Ocorrências com pagamento, parciais, canceladas ou editadas à mão são **preservadas** (a tela diz quantas).
-- **Pausar / retomar / encerrar** nunca apagam nada. Retomar pula o que venceu durante a pausa (não cria conta no passado). Encerrar pode cancelar as contas futuras ainda sem movimentação.
-- **Agendamento:** as contas novas são criadas (a) quando alguém abre o Financeiro (`gerar_series_loja`, sem configuração externa) e (b) por um agendador diário — **opcional e ainda a configurar no Supabase hospedado**: veja "Configurar o agendador" abaixo. A tela mostra no cartão "Contas recorrentes" se o agendador está configurado.
+- **Pausar / retomar / encerrar** nunca apagam nada. Encerrar pode cancelar as contas futuras ainda sem movimentação (compartilhadas: só as sem pagamento, reembolso, comprovante nem revisão).
+- **Retomar com prévia (013):** o botão "Retomar…" mostra, **antes de confirmar**, quantos vencimentos ficaram sem conta durante a pausa e escolhe o que fazer: **Pular** (não cria contas no passado; os números ficam registrados como pulados) ou **Gerar** (cria as contas desse intervalo, pendentes e já vencidas; máx. 120 por vez — acima disso só "pular"). A prévia lista também o que **já existe** (inclusive cancelado, editado à mão ou movimentado), que **nunca é recriado nem alterado**, e os próximos vencimentos da janela de 60 dias (gerados nos dois casos). Cada número da série tem no máximo um registro (índice único), então repetir/concorrer não duplica.
+- **Contas compartilhadas recorrentes (013):** o modelo guarda o valor total, o método de divisão (igual, percentual ou valores) e as lojas; cada ocorrência é um rateio comum (versão 1) calculado pelo mesmo `rateio_calcular` da criação manual (centavos distribuídos de forma determinística; a soma das parcelas é sempre o total), **sem pagamentos externos, reembolsos nem comprovantes**. Só cria/controla quem administra **todas** as lojas envolvidas (ou o dono). Cada ocorrência registra "criado" na auditoria do rateio com a série e se foi automático; a série registra criação, pausa, retomada e encerramento em `series_auditoria`. Ocorrências já pagas, reembolsadas ou revisadas à mão não são alteradas. Para mudar valor/lojas do modelo, encerre a série e crie outra. Se a geração falhar numa série (ex.: loja desativada no rateio), o erro fica na própria série (aviso vermelho no cartão) e as demais séries seguem.
+- **Geração das contas — dois caminhos separados** (os dois usam o mesmo gerador e nunca duplicam):
+
+| | Geração **automática agendada** | Geração **ao abrir o Financeiro** |
+|---|---|---|
+| Quem dispara | o agendador (`pg_cron`) chama `gerar_series_pendentes()` todos os dias | a tela chama `gerar_series_loja(loja)` ao abrir/atualizar o Financeiro |
+| Depende do ambiente? | **Sim — precisa ser configurado uma vez no Supabase hospedado** (abaixo); sem configuração **não existe** | Não: já vale após aplicar a migração |
+| Alcance | todas as séries ativas, com ou sem alguém logado | séries da loja aberta (e das compartilhadas que a incluem), só com alguém logado |
+| Quem pode executar | dono do banco (`pg_cron`) e `service_role`; **nunca** `anon`/`authenticated` | qualquer pessoa logada com acesso à loja |
+| Fuso | agenda em UTC; "hoje" calculado em America/Sao_Paulo | idem |
 
 **Calendário administrativo (012)** — aba **📆 Calendário**: vencimentos de contas exclusivas e compartilhadas (um evento por conta/rateio, que abre o **detalhe financeiro existente**; nada é duplicado) + **compromissos internos** (título, data, responsável, observação; versões e histórico com autor). Visão mensal com pontos por situação e lista dos próximos 30 dias; escopo "esta loja" ou "todas as minhas lojas" (dono: todas). Situações: **pendente, vencido, quitado, cancelado** (compromisso: pendente, vencido = passou sem concluir, concluído, cancelado). Respeita o acesso por loja (rateio só aparece para as lojas participantes). Se o período tiver mais de 800 eventos a tela avisa que a lista está incompleta.
 
-**Configurar o agendador (opcional, uma vez, no Supabase hospedado).** Painel do Supabase → Database → Extensions → habilite `pg_cron`; depois, no SQL Editor:
+**Configurar o agendador (opcional, uma vez, no Supabase hospedado).** Painel do Supabase → Database → Extensions → habilite `pg_cron`; depois, no SQL Editor (papel `postgres`):
 ```sql
 select cron.schedule('series-diarias', '10 6 * * *', $$ select public.gerar_series_pendentes() $$);
--- conferir: select jobname, schedule, active from cron.job;      remover: select cron.unschedule('series-diarias');
+-- conferir: select jobname, schedule, active from cron.job where jobname = 'series-diarias';
+-- histórico das execuções: select status, return_message, start_time from cron.job_run_details order by start_time desc limit 5;
+-- remover: select cron.unschedule('series-diarias');
 ```
-(06:10 UTC = 03:10 em Brasília.) Sem isso nada quebra: a geração acontece ao abrir o Financeiro, só não ocorre "sozinha" quando ninguém abre o painel.
+- **Fuso:** o `pg_cron` interpreta o horário em **UTC**. `10 6 * * *` = 06:10 UTC = **03:10 em Brasília** (UTC−3, sem horário de verão desde 2019). Dentro do banco, "hoje" e a janela de 60 dias são calculados **explicitamente em America/Sao_Paulo**, não no fuso do servidor; se o agendador rodar entre 00:00 e 03:00 UTC (noite anterior em Brasília) a janela simplesmente começa um dia antes — sem efeito prático.
+- **Permissões da função de geração:** `gerar_series_pendentes()` só é executável pelo dono do banco (onde o `pg_cron` roda) e pelo `service_role` (caso prefira agendar por uma Edge Function com a chave de serviço **guardada como segredo**, nunca no navegador). Para conferir: `select has_function_privilege('anon','public.gerar_series_pendentes()','execute'), has_function_privilege('authenticated','public.gerar_series_pendentes()','execute'), has_function_privilege('service_role','public.gerar_series_pendentes()','execute');` → `false, false, true` (o `conferencia_pos_migracao.sql` já faz isso). As funções internas `serie_gerar`/`serie_gerar_seguro` não são executáveis por ninguém logado.
+- A tela informa, no cartão "Contas recorrentes", se o agendador está configurado (`series_agendamento()`); sem ele nada quebra: a geração acontece ao abrir o Financeiro.
+
+### O que ainda depende do ambiente hospedado (não validado localmente)
+- [ ] Aplicar as migrações pendentes, na ordem (passo 2/3), com backup feito.
+- [ ] Storage ativo com o bucket privado `comprovantes` (criado pela 005) e limites de tamanho/tipo conforme o plano.
+- [ ] `pg_cron` habilitado e o job `series-diarias` criado (opcional); conferir `cron.job_run_details` depois da 1ª execução.
+- [ ] Usuários criados no Authentication (e-mail `usuario@painel.local`, auto-confirm) e vinculados a perfis/lojas; senhas "1234" trocadas.
+- [ ] `SUPABASE_URL` e `SUPABASE_ANON_KEY` corretos no `dashboard.html` publicado; domínio do site permitido no CORS/URLs do projeto (o gateway local não reproduz o Kong).
+- [ ] Realtime habilitado para as tabelas usadas pela tela (estoque, vendas, financeiro) — só afeta a atualização automática.
+- [ ] Backups automáticos ativos/PITR conforme o plano; teste de restauração fora do horário de uso.
+- [ ] Versão do Postgres do projeto (testado em 15 e 17).
+- [ ] Rodar `verificar_migracoes.sql` e `conferencia_pos_migracao.sql` no destino e guardar o resultado.
 
 ## Roteiro rápido para conferir a interface
 1. Entre como gerente (ex.: `luiz`), escolha a Smoke Club → **Financeiro**: confira o texto "Período aplicado" em *Este mês* (mês inteiro) e em *Até hoje*.
-2. **+ Conta / lançamento** → marque "Repetir esta conta" → Mensal, vencimento no dia 31, término "Após 4 ocorrências" → *Ver prévia* (28/02 e 30/04 aparecem como ajustadas) → Salvar. O cartão "Contas recorrentes" lista a série; pause, retome e encerre; abra uma ocorrência → ✏️ *Editar conta* → "esta e as próximas".
-3. **📆 Calendário**: navegue pelos meses, clique num dia, abra uma conta (abre o detalhe financeiro), crie um compromisso, conclua-o. Alterne "Esta loja" / "Todas as minhas lojas".
-4. **Trocar de loja** (botão do topo): a tela anterior desaparece; na Start o calendário não mostra nada da Smoke.
-5. Entre como dono (`chefe`) → **🔐 Acessos**: desative uma operadora (motivo obrigatório); ela não consegue entrar ("acesso foi desativado"); reative.
-6. Reduza a janela para ~375 px (celular): Financeiro, Calendário e os formulários não têm rolagem horizontal da página.
+2. **+ Conta / lançamento** → "Repetir esta conta" → Mensal, vencimento no dia 31, término "Após 4 ocorrências" → *Ver prévia* (28/02 e 30/04 aparecem como ajustadas) → Salvar. No cartão "Contas recorrentes", pause a série; abra uma ocorrência → ✏️ *Editar conta* → "esta e as próximas".
+3. **Nova conta compartilhada** → marque 2 ou 3 lojas, valor 100,01, vencimento daqui a 2 dias → "Repetir esta conta compartilhada" semanal, 20 ocorrências → *Ver prévia* → *Calcular prévia* → Criar. Confira que só ~9 contas nascem (janela de 60 dias), cada uma com a mesma divisão (33,34 + 33,33 + 33,33), sem pagamentos.
+4. No cartão de séries, **Pausar** a compartilhada e clique em **Retomar…**: a janela mostra a quantidade de vencimentos do período pausado, as opções **Pular** × **Gerar** (o texto e o botão mudam com a quantidade) e o que já existe. Confirme a opção desejada; nada existente é duplicado, cancelado ou alterado. **Encerrar** com "cancelar futuras" preserva o que já tem pagamento/reembolso.
+5. **📆 Calendário**: navegue pelos meses, clique num dia, abra uma conta (abre o detalhe financeiro), crie um compromisso, conclua-o. Alterne "Esta loja" / "Todas as minhas lojas".
+6. **Trocar de loja**: a tela anterior desaparece; na Start o calendário não mostra nada da Smoke.
+7. Entre como dono (`chefe`) → **🔐 Acessos**: desative uma operadora (motivo obrigatório); ela não consegue entrar ("acesso foi desativado"); reative.
+8. Reduza a janela para ~375 px (celular): Financeiro, Calendário e os formulários não têm rolagem horizontal da página.
 
 ## Validação contra a pilha real (Docker)
 
-`supabase/tests/stack/` sobe **Postgres do Supabase + Auth (GoTrue) + PostgREST + Storage API** reais em contêineres, instala `schema.sql → 002 → … → 012` do zero como o papel `postgres`
-(o mesmo do SQL Editor), cria usuários por SQL direto (como no projeto remoto) e roda: `real_api.test.js` (login, isolamento entre lojas, pagamentos, Storage, limpeza), `real_api_rateios.test.js` (rateios/reembolsos), `real_api_resumos.test.js` (resumos) `real_api_comunicados.test.js` / `real_ui_comunicados.test.js` (comunicados), `real_api_admin.test.js` / `real_ui_admin.test.js` (acessos, recorrência, calendário, períodos) e `real_ui.test.js` + `real_ui_rateios.test.js` + `real_ui_resumos.test.js` (o `dashboard.html` no Chromium).
+`supabase/tests/stack/` sobe **Postgres do Supabase + Auth (GoTrue) + PostgREST + Storage API** reais em contêineres, instala `schema.sql → 002 → … → 013` do zero como o papel `postgres`
+(o mesmo do SQL Editor), cria usuários por SQL direto (como no projeto remoto) e roda: `real_api.test.js` (login, isolamento entre lojas, pagamentos, Storage, limpeza), `real_api_rateios.test.js` (rateios/reembolsos), `real_api_resumos.test.js` (resumos) `real_api_comunicados.test.js` / `real_ui_comunicados.test.js` (comunicados), `real_api_admin.test.js` / `real_ui_admin.test.js` (acessos, recorrência, calendário, períodos), `real_api_series_comp.test.js` (séries compartilhadas e retomada) e `real_ui.test.js` + `real_ui_rateios.test.js` + `real_ui_resumos.test.js` (o `dashboard.html` no Chromium).
 Requisitos: Docker com daemon ativo, Node 18+, Playwright. Uso: `supabase/tests/stack/run_all.sh` (`--keep` deixa a pilha de pé). Os segredos são gerados na hora (`.env`, não versionado).
 Não valida: o **Kong** (gateway do Supabase hospedado, inclusive CORS) — aqui um mini-gateway (`gateway.js`) o substitui —, Realtime, e e-mails/recuperação de senha. Nada é enviado ao projeto remoto.
 
@@ -190,7 +254,9 @@ Não valida: o **Kong** (gateway do Supabase hospedado, inclusive CORS) — aqui
 - `supabase/tests/rateios_resumos_testes.sql` — 40 verificações dos resumos de rateio (exemplo de R$ 900, reembolso, parcial, vencimento, estornos, período, uma loja só, dono).
 - `supabase/tests/comunicados_testes.sql` — 40 verificações dos comunicados (texto exato, versões, restauração, concorrência otimista, permissões por papel/loja, publicação como aviso, republicação, despublicação, global só dono).
 - `supabase/tests/acessos_series_testes.sql` — 47 verificações de acessos (desativar/reativar, API direta, lojas, auditoria) e recorrência (datas, prévia, geração, janela, edição por escopo, pausa/retomada/encerramento, permissões).
-- `supabase/tests/calendario_testes.sql` — 26 verificações do calendário e compromissos (situações, rateio, isolamento por loja, versões, permissões). `lab/concorrencia_series.sh` — criação/geração/edição simultâneas.
+- `supabase/tests/calendario_testes.sql` — 26 verificações do calendário e compromissos (situações, rateio, isolamento por loja, versões, permissões). `lab/concorrencia_series.sh` — criação/geração/edição simultâneas, inclusive séries compartilhadas e retomada.
+- `supabase/tests/series_compartilhadas_testes.sql` — 34 verificações de séries compartilhadas (centavos, sem movimentação, permissões por loja, movimentadas preservadas, retomada pular × gerar com lacunas, limite de 120, erro isolado, privilégios do gerador).
+- `supabase/tests/lab/verificar_ops.sh` — valida os scripts somente leitura de `supabase/ops/` em banco completo, parcial e vazio (e prova que nada muda).
 - `supabase/tests/lab/` — banco local + concorrência (`concorrencia.sh` vendas; `concorrencia_caixa.sh` abertura/estorno/fechamento simultâneos; `concorrencia_pagamentos.sh` pagamentos/estornos/repetições simultâneos). As suítes locais acima usam um Storage simulado só nas **políticas**; a API real (limite de 5 MB, tipo MIME, upload, links assinados) é validada em `supabase/tests/stack/`.
 - `supabase/tests/ui/` — a tela no Chromium com Supabase simulado e checagem dos
   nomes de parâmetros das funções contra o SQL:

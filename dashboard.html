@@ -780,7 +780,7 @@ Views.financeiro = {
       if (!venc) return toast("Informe o vencimento da 1ª conta da série", true);
       return busy(btn, async () => {
         const r = await rpc("criar_serie", { p_loja_id: S.loja.id, p_tipo: $("lTipo").value, p_categoria: $("lCat").value, p_descricao: $("lDesc").value.trim() || null, p_valor: valor, p_forma: null,
-          p_exige_comprovante: $("lComp").checked, ...Views.series.args(), p_chave: S.chaveConta });
+          p_exige_comprovante: $("lComp").checked, ...Views.series.args("l"), p_chave: S.chaveConta });
         S.chaveConta = null; closeModal(); toast(`Série criada — ${r.geradas} conta(s) gerada(s) agora`); await Views.financeiro.render();
       });
     }
@@ -942,7 +942,7 @@ Views.rateios = {
     if (S.tab !== "financeiro" || !$("finRateios")) return;
     S.ratLista = ls;
     $("finRateios").innerHTML = `<div class="card" id="ratCard"><div class="page-h" style="margin-bottom:6px"><h3 style="flex:1;margin:0">🤝 Contas compartilhadas (rateio entre lojas)</h3>${isGerente() ? `<button class="abtn dark sm" data-a="ratNovo">+ Conta compartilhada</button>` : ""}</div>
-      ${ls.length ? ls.map(r => `<div class="list-row click" data-a="ratDetalhe" data-id="${esc(r.id)}"><span class="tag neutro">compartilhada</span><div class="grow"><b>${esc(r.descricao)}</b>
+      ${ls.length ? ls.map(r => `<div class="list-row click" data-a="ratDetalhe" data-id="${esc(r.id)}"><div class="tags-col"><span class="tag neutro">compartilhada</span>${r.serie_id ? `<span class="tag neutro">↻ ${r.serie_n ? r.serie_n + "ª" : "série"}</span>` : ""}</div><div class="grow"><b>${esc(r.descricao)}</b>
         <small>${esc(r.categoria)} · total ${esc(fmt(r.valor_total))} · ${r.lojas} lojas${r.vencimento ? " · vence " + esc(fmtD(r.vencimento)) : ""}</small>
         <span class="tag ${RAT_SIT[r.situacao][0]}">${RAT_SIT[r.situacao][1]}</span>${r.vencida ? ' <span class="tag atrasado">saldo externo vencido</span>' : ""}
         <small>pago ao externo ${esc(fmt(r.pago_externo))} · saldo externo ${esc(fmt(r.saldo_externo))}</small>
@@ -1010,6 +1010,7 @@ Views.rateios = {
         <input class="field rtEntrada hidden" data-loja="${esc(l.id)}" inputmode="decimal" style="width:110px;margin:0" placeholder="—"></div>`).join("")}
       ${rev ? `<label>Motivo da revisão (mín. 5 letras)</label><input class="field" id="rtMotivo" placeholder="Ex: divisão combinada com o contador">` : ""}
       </div>
+      ${rev ? "" : Views.series.formHtml("rt", "Repetir esta conta compartilhada")}
       <div class="banner" style="margin-top:8px">A conta <b>exclusiva</b> continua sendo o padrão. ${AVISO_CAIXA}</div>
       <div id="rtPrevia"></div>
       <div class="modal-actions"><button class="btn btn-soft" data-a="${rev ? "ratVoltar" : "fechar"}" data-id="${rev ? esc(r.id) : ""}">Cancelar</button><button class="btn btn-soft" data-a="ratPrevia">Calcular prévia</button><button class="btn btn-red" data-a="ratCriar" id="rtCriar" disabled>${rev ? "Salvar revisão" : "Criar rateio"}</button></div>`);
@@ -1052,6 +1053,11 @@ Views.rateios = {
     if (!confirm(c.rev ? "Salvar a revisão? Uma nova versão das parcelas será criada e a anterior fica no histórico." : `Criar a conta compartilhada de ${fmt(a.total)} entre ${a.itens.length} lojas?`)) return;
     await busy(btn, async () => {
       if (c.rev) { await rpc("revisar_rateio", { p_id: c.rev, p_descricao: desc, p_valor_total: a.total, p_vencimento: venc, p_metodo: a.metodo, p_itens: a.itens, p_motivo: $("rtMotivo").value.trim() }); toast("Rateio revisado (nova versão)"); S.ratCtx = null; await Views.rateios.detalhe(c.rev); }
+      else if ($("rtRep") && $("rtRep").checked) {
+        if (!venc) return toast("Informe o vencimento da 1ª conta da série", true);
+        const r = await rpc("criar_serie_rateio", { p_loja_id: S.loja.id, p_descricao: desc, p_categoria: $("rtCat").value, p_valor_total: a.total, p_exige_comprovante: $("rtComp").checked, p_metodo: a.metodo, p_itens: a.itens, ...Views.series.args("rt"), p_chave: c.chave });
+        toast(`Série criada — ${r.geradas} conta(s) compartilhada(s) gerada(s) agora`); S.ratCtx = null; closeModal(); await Views.financeiro.render(); return;
+      }
       else { const id = await rpc("criar_rateio", { p_descricao: desc, p_categoria: $("rtCat").value, p_valor_total: a.total, p_vencimento: venc, p_exige_comprovante: $("rtComp").checked, p_metodo: a.metodo, p_itens: a.itens, p_chave: c.chave }); toast("Conta compartilhada criada"); S.ratCtx = null; await Views.rateios.detalhe(id); }
       Views.rateios.carregar().catch(() => {});
     });
@@ -1062,7 +1068,7 @@ Views.rateios = {
     const d = await rpc("rateio_detalhe", { p_id: id }), r = d.rateio; S.ratDet = d;
     const sit = RAT_SIT[r.situacao], pagLojas = d.pode_pagar_lojas.length > 0;
     const temDev = d.posicoes.some(p => Number(p.posicao) < 0), temCred = d.posicoes.some(p => Number(p.posicao) > 0);
-    openModal(`<h3>${esc(r.descricao)}</h3>
+    openModal(`<h3>${esc(r.descricao)}${r.serie_id ? ` <span class="tag neutro">↻ ocorrência ${esc(String(r.serie_n))} de uma série recorrente</span>` : ""}</h3>
       <div class="row" style="margin-bottom:6px"><span class="tag ${sit[0]}">${sit[1]}</span>${r.situacao !== "cancelado" && r.vencimento && r.vencimento < hojeISO() && Number(r.saldo_externo) > 0 ? '<span class="tag atrasado">saldo externo vencido</span>' : ""}<span class="tag neutro">compartilhada</span><span class="tag neutro">versão ${r.versao}</span>
         <small style="color:var(--muted)">${esc(r.categoria)} · ${esc(METODOS[r.metodo])}${r.vencimento ? " · vence " + esc(fmtD(r.vencimento)) : ""} · criado por ${esc(r.criado_por_nome || "—")}</small></div>
       <div class="banner" id="ratAviso">Pagamentos externos e reembolsos aqui <b>apenas registram operações já realizadas</b>: não transferem dinheiro e <b>não movimentam o caixa automaticamente</b>. Reembolso entre lojas <b>não quita de novo</b> a conta externa e <b>não é receita nem despesa</b>.</div>
@@ -1375,35 +1381,35 @@ const UNI_TXT = { dia: ["dia", "dias"], semana: ["semana", "semanas"], mes: ["m�
 const freqTxt = s => s.frequencia === "personalizada" ? `A cada ${s.intervalo} ${UNI_TXT[s.unidade][s.intervalo === 1 ? 0 : 1]}` : FREQ_TXT[s.frequencia];
 const fimTxt = s => s.fim_tipo === "data" ? `até ${fmtD(s.fim_data)}` : s.fim_tipo === "quantidade" ? `${s.fim_qtd} ocorrência(s)` : "sem prazo";
 Views.series = {
-  /* bloco do formulário de nova conta */
-  formHtml() {
-    return `<div class="check"><input type="checkbox" id="lRep"><label for="lRep" style="margin:0;font-size:.84rem;color:var(--text)">↻ Repetir esta conta (opcional — o padrão é conta única)</label></div>
-      <div id="lRepBox" class="hidden card" style="padding:10px;margin-bottom:8px">
-        <div class="grid2"><div><label>Frequência</label><select class="field" id="lFreq"><option value="semanal">Semanal</option><option value="quinzenal">A cada 15 dias</option><option value="mensal" selected>Mensal</option><option value="anual">Anual</option><option value="personalizada">Personalizada…</option></select></div>
-          <div id="lPersBox" class="hidden"><label>A cada</label><div class="row" style="flex-wrap:nowrap"><input class="field" id="lInt" type="number" min="1" max="365" value="2" style="max-width:80px"><select class="field" id="lUni"><option value="dia">dias</option><option value="semana">semanas</option><option value="mes" selected>meses</option><option value="ano">anos</option></select></div></div></div>
-        <div class="grid2"><div><label>Término</label><select class="field" id="lFim"><option value="sem_prazo">Sem prazo</option><option value="quantidade">Após N ocorrências</option><option value="data">Até uma data</option></select></div>
-          <div><label id="lFimLbl" class="hidden">Quantidade</label><input class="field hidden" id="lFimQtd" type="number" min="1" max="120" value="12"><input class="field hidden" id="lFimData" type="date"></div></div>
-        <small style="color:var(--muted);display:block;margin:6px 0">A 1ª ocorrência vence na data de vencimento acima. Dias que não existem no mês (31, 29/02…) viram o último dia do mês, sem mudar a referência original. As contas novas nascem <b>pendentes</b>, sem pagamentos nem comprovantes.</small>
-        <button class="abtn soft sm" type="button" data-a="serPrevia">Ver prévia dos vencimentos</button><div id="lPrev" style="margin-top:6px"></div></div>`;
+  /* bloco do formulário (p = prefixo dos ids: "l" = conta exclusiva, "rt" = conta compartilhada) */
+  formHtml(p = "l", rot = "Repetir esta conta") {
+    return `<div class="check"><input type="checkbox" id="${p}Rep"><label for="${p}Rep" style="margin:0;font-size:.84rem;color:var(--text)">↻ ${rot} (opcional — o padrão é conta única)</label></div>
+      <div id="${p}RepBox" class="hidden card" style="padding:10px;margin-bottom:8px">
+        <div class="grid2"><div><label>Frequência</label><select class="field" id="${p}Freq"><option value="semanal">Semanal</option><option value="quinzenal">A cada 15 dias</option><option value="mensal" selected>Mensal</option><option value="anual">Anual</option><option value="personalizada">Personalizada…</option></select></div>
+          <div id="${p}PersBox" class="hidden"><label>A cada</label><div class="row" style="flex-wrap:nowrap"><input class="field" id="${p}Int" type="number" min="1" max="365" value="2" style="max-width:80px"><select class="field" id="${p}Uni"><option value="dia">dias</option><option value="semana">semanas</option><option value="mes" selected>meses</option><option value="ano">anos</option></select></div></div></div>
+        <div class="grid2"><div><label>Término</label><select class="field" id="${p}Fim"><option value="sem_prazo">Sem prazo</option><option value="quantidade">Após N ocorrências</option><option value="data">Até uma data</option></select></div>
+          <div><label id="${p}FimLbl" class="hidden">Quantidade</label><input class="field hidden" id="${p}FimQtd" type="number" min="1" max="120" value="12"><input class="field hidden" id="${p}FimData" type="date"></div></div>
+        <small style="color:var(--muted);display:block;margin:6px 0">A 1ª ocorrência vence na data de vencimento informada acima. Dias que não existem no mês (31, 29/02…) viram o último dia do mês, sem mudar a referência original. ${p === "rt" ? "Cada ocorrência é uma conta compartilhada nova com a <b>mesma divisão</b>, sem pagamentos, reembolsos nem comprovantes." : "As contas novas nascem <b>pendentes</b>, sem pagamentos nem comprovantes."}</small>
+        <button class="abtn soft sm" type="button" data-a="serPrevia" data-id="${p}">Ver prévia dos vencimentos</button><div id="${p}Prev" style="margin-top:6px"></div></div>`;
   },
-  mudou() {
-    const rep = $("lRep").checked; $("lRepBox").classList.toggle("hidden", !rep);
-    $("lPersBox").classList.toggle("hidden", $("lFreq").value !== "personalizada");
-    const ft = $("lFim").value; $("lFimQtd").classList.toggle("hidden", ft !== "quantidade"); $("lFimData").classList.toggle("hidden", ft !== "data"); $("lFimLbl").classList.toggle("hidden", ft === "sem_prazo");
-    $("lFimLbl").textContent = ft === "data" ? "Data final" : "Quantidade";
-    if (rep) { $("lJaPaga").checked = false; $("lPagBox").classList.add("hidden"); }
-    $("lJaPaga").disabled = rep; if ($("lPrev")) $("lPrev").innerHTML = "";
+  mudou(p = "l") {
+    const rep = $(p + "Rep").checked; $(p + "RepBox").classList.toggle("hidden", !rep);
+    $(p + "PersBox").classList.toggle("hidden", $(p + "Freq").value !== "personalizada");
+    const ft = $(p + "Fim").value; $(p + "FimQtd").classList.toggle("hidden", ft !== "quantidade"); $(p + "FimData").classList.toggle("hidden", ft !== "data"); $(p + "FimLbl").classList.toggle("hidden", ft === "sem_prazo");
+    $(p + "FimLbl").textContent = ft === "data" ? "Data final" : "Quantidade";
+    if (p === "l") { if (rep) { $("lJaPaga").checked = false; $("lPagBox").classList.add("hidden"); } $("lJaPaga").disabled = rep; }
+    if ($(p + "Prev")) $(p + "Prev").innerHTML = "";
   },
-  args() {
-    const ft = $("lFim").value;
-    return { p_frequencia: $("lFreq").value, p_intervalo: $("lFreq").value === "personalizada" ? parseInt($("lInt").value, 10) || null : null, p_unidade: $("lFreq").value === "personalizada" ? $("lUni").value : null,
-      p_inicio: $("lVenc").value || null, p_fim_tipo: ft, p_fim_data: ft === "data" ? ($("lFimData").value || null) : null, p_fim_qtd: ft === "quantidade" ? (parseInt($("lFimQtd").value, 10) || null) : null };
+  args(p = "l") {
+    const ft = $(p + "Fim").value, pers = $(p + "Freq").value === "personalizada";
+    return { p_frequencia: $(p + "Freq").value, p_intervalo: pers ? parseInt($(p + "Int").value, 10) || null : null, p_unidade: pers ? $(p + "Uni").value : null,
+      p_inicio: $(p === "l" ? "lVenc" : "rtVenc").value || null, p_fim_tipo: ft, p_fim_data: ft === "data" ? ($(p + "FimData").value || null) : null, p_fim_qtd: ft === "quantidade" ? (parseInt($(p + "FimQtd").value, 10) || null) : null };
   },
-  async previa(btn) {
-    const a = Views.series.args(); if (!a.p_inicio) return toast("Informe o vencimento da 1ª conta", true);
+  async previa(p, btn) {
+    p = p || "l"; const a = Views.series.args(p); if (!a.p_inicio) return toast("Informe o vencimento da 1ª conta", true);
     await busy(btn, async () => {
       const r = await rpc("serie_previa", { ...a, p_limite: 12 });
-      $("lPrev").innerHTML = `<div class="list-row"><div class="grow"><b>${r.datas.length} vencimento(s)${r.tem_mais ? " (mostrando os primeiros 12)" : ""}</b></div></div>` +
+      $(p + "Prev").innerHTML = `<div class="list-row"><div class="grow"><b>${r.datas.length} vencimento(s)${r.tem_mais ? " (mostrando os primeiros 12)" : ""}</b></div></div>` +
         r.datas.map(d => `<div class="list-row"><div class="grow">${d.n}ª · ${esc(fmtD(d.vencimento))}${d.ajustada ? ` <span class="tag pendente">ajustada ao último dia do mês</span>` : ""}</div></div>`).join("");
     });
   },
@@ -1417,19 +1423,36 @@ Views.series = {
     if (!lista.length) { $("finSeries").innerHTML = ""; return; }
     const st = { ativa: ["pago", "ativa"], pausada: ["pendente", "pausada"], encerrada: ["neutro", "encerrada"] };
     $("finSeries").innerHTML = `<div class="card"><h3 style="margin-top:0">↻ Contas recorrentes</h3>
-      ${lista.map((s, i) => `<div class="list-row"><span class="tag ${s.tipo}">${s.tipo === "entrada" ? "ENTRADA" : "SAÍDA"}</span><div class="grow"><b>${esc(s.descricao || s.categoria)}</b> · ${esc(fmt(s.valor))}
-        <small>${esc(freqTxt(s))} · desde ${esc(fmtD(s.inicio))} · ${esc(fimTxt(s))} · ${s.geradas} conta(s) criada(s)${s.proximo_vencimento ? " · próximo vencimento em aberto " + esc(fmtD(s.proximo_vencimento)) : ""}${s.puladas ? ` · ${s.puladas} pulada(s) na pausa` : ""}</small></div>
-        <span class="tag ${st[s.status][0]}">${st[s.status][1]}</span>
-        ${s.pode_gerir && s.status === "ativa" ? `<button class="abtn soft sm" data-a="serPausar" data-id="${i}">Pausar</button>` : ""}${s.pode_gerir && s.status === "pausada" ? `<button class="abtn soft sm" data-a="serRetomar" data-id="${i}">Retomar</button>` : ""}
-        ${s.pode_gerir && s.status !== "encerrada" ? `<button class="abtn soft sm" data-a="serEncerrarForm" data-id="${i}">Encerrar</button>` : ""}</div>`).join("")}
+      ${lista.map((s, i) => `<div class="list-row"><span class="tag ${s.escopo === "compartilhada" ? "parcial" : s.tipo}">${s.escopo === "compartilhada" ? "COMPARTILHADA" : s.tipo === "entrada" ? "ENTRADA" : "SAÍDA"}</span><div class="grow"><b>${esc(s.descricao || s.categoria)}</b> · ${esc(fmt(s.valor))}
+        <small>${esc(freqTxt(s))} · desde ${esc(fmtD(s.inicio))} · ${esc(fimTxt(s))} · ${s.geradas} conta(s) criada(s)${s.proximo_vencimento ? " · próximo vencimento em aberto " + esc(fmtD(s.proximo_vencimento)) : ""}${s.puladas ? ` · ${s.puladas} pulada(s) na pausa` : ""}${s.escopo === "compartilhada" && s.lojas ? " · lojas: " + s.lojas.map(esc).join(", ") : ""}</small>
+        ${s.ultimo_erro ? `<small style="color:var(--red)">⚠️ Última geração falhou (${esc(fmtDT(s.ultimo_erro_em))}): ${esc(s.ultimo_erro)}</small>` : ""}</div>
+        <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;flex-shrink:0"><span class="tag ${st[s.status][0]}">${st[s.status][1]}</span>
+        ${s.pode_gerir && s.status === "ativa" ? `<button class="abtn soft sm" data-a="serPausar" data-id="${i}">Pausar</button>` : ""}${s.pode_gerir && s.status === "pausada" ? `<button class="abtn soft sm" data-a="serRetomarForm" data-id="${i}">Retomar…</button>` : ""}
+        ${s.pode_gerir && s.status !== "encerrada" ? `<button class="abtn soft sm" data-a="serEncerrarForm" data-id="${i}">Encerrar</button>` : ""}</div></div>`).join("")}
       <small id="serAgenda" style="color:var(--muted);display:block;margin-top:6px">As próximas contas são criadas ao abrir o Financeiro (janela de 60 dias).</small></div>`;
     rpc("series_agendamento", {}).then(a => { const e = $("serAgenda"); if (e) e.innerHTML = a.configurado ? `✅ Agendador diário configurado: as contas são criadas mesmo sem ninguém abrir o painel.` : `⚠️ O agendador automático <b>não está configurado</b>: as próximas contas só são criadas quando alguém abre o Financeiro (instruções no README).`; }).catch(() => {});
   },
   async controlar(i, acao, btn, extra) {
     const s = (S.series || [])[i]; if (!s) return;
-    await busy(btn, async () => { const r = await rpc("serie_controlar", { p_id: s.id, p_acao: acao, p_cancelar_futuras: !!(extra && extra.cancelar), p_motivo: (extra && extra.motivo) || null });
-      closeModal(); toast(acao === "pausar" ? "Série pausada" : acao === "retomar" ? `Série retomada${r.puladas ? ` — ${r.puladas} vencimento(s) do período pausado foram pulados` : ""}` : `Série encerrada${r.canceladas ? ` — ${r.canceladas} conta(s) futura(s) cancelada(s)` : ""}`);
+    await busy(btn, async () => { const r = await rpc("serie_controlar", { p_id: s.id, p_acao: acao, p_cancelar_futuras: !!(extra && extra.cancelar), p_motivo: (extra && extra.motivo) || null, p_modo: (extra && extra.modo) || "pular" });
+      closeModal(); toast(acao === "pausar" ? "Série pausada" : acao === "retomar" ? `Série retomada${r.puladas ? ` — ${r.puladas} vencimento(s) do período pausado foram pulados` : ""}${extra && extra.modo === "gerar" ? ` — ${r.geradas} conta(s) gerada(s)` : ""}` : `Série encerrada${r.canceladas ? ` — ${r.canceladas} conta(s) futura(s) cancelada(s)` : ""}`);
       await Views.financeiro.render(); });
+  },
+  async retomarForm(i) {
+    const s = (S.series || [])[i]; if (!s) return;
+    const pv = await rpc("serie_retomar_previa", { p_id: s.id }); S.serPrev = { i, pv, modo: "pular" };
+    Views.series.retomarDesenha();
+  },
+  retomarDesenha() {
+    const { i, pv, modo } = S.serPrev, s = S.series[i], n = Number(pv.faltantes_total), lista = a => a.map(x => `<div class="list-row"><div class="grow">${x.n}ª · ${esc(fmtD(x.vencimento))}${x.situacao ? ` <span class="tag neutro">${esc(x.situacao)}</span>` : ""}</div></div>`).join("");
+    openModal(`<h3>Retomar série</h3><div class="banner"><b>${esc(s.descricao || s.categoria)}</b> · ${esc(freqTxt(s))} · pausada desde ${esc(fmtDT(pv.pausada_em))}. Nada é apagado nem duplicado: números que já têm registro (inclusive cancelados ou editados à mão) não são recriados nem alterados.</div>
+      <div class="check"><input type="radio" name="serModo" id="serModoP" value="pular" ${modo === "pular" ? "checked" : ""}><label for="serModoP" style="margin:0;font-size:.84rem;color:var(--text)"><b>Pular</b> os ${n} vencimento(s) do período pausado (não cria contas no passado)</label></div>
+      <div class="check"><input type="radio" name="serModo" id="serModoG" value="gerar" ${modo === "gerar" ? "checked" : ""} ${pv.pode_gerar ? "" : "disabled"}><label for="serModoG" style="margin:0;font-size:.84rem;color:var(--text)"><b>Gerar</b> os ${n} vencimento(s) do período pausado (nascem pendentes e já vencidos)${pv.pode_gerar ? "" : ` — indisponível: o limite é ${pv.limite_gerar} por vez`}</label></div>
+      <label>${modo === "gerar" ? `Serão geradas ${n} conta(s) do período pausado` : `Serão puladas ${n} conta(s) do período pausado (ficam registradas como puladas)`}</label>
+      ${n ? lista(pv.faltantes) + (n > pv.faltantes.length ? `<small style="color:var(--muted)">…e mais ${n - pv.faltantes.length}.</small>` : "") : `<div class="empty">Nenhum vencimento ficou pendente durante a pausa.</div>`}
+      ${pv.ja_existem.length ? `<label>Já existem (${pv.ja_existem.length}) — não serão tocadas</label>${lista(pv.ja_existem)}` : ""}
+      ${pv.proximas.length ? `<label>Próximos vencimentos (janela de 60 dias, gerados nos dois casos)</label>${lista(pv.proximas.slice(0, 5))}${pv.proximas.length > 5 ? `<small style="color:var(--muted)">…</small>` : ""}` : ""}
+      <div class="modal-actions"><button class="btn btn-soft" data-a="fechar">Cancelar</button><button class="btn btn-red" data-a="serRetomarOk" data-id="${i}">${modo === "gerar" ? `Retomar e gerar ${n}` : `Retomar pulando ${n}`}</button></div>`);
   },
   encerrarForm(i) {
     const s = (S.series || [])[i]; if (!s) return;
@@ -1964,7 +1987,9 @@ const Act = {
   cmSalvar: (id, b) => Views.comunicados.salvar(b), cmCopiar: () => Views.comunicados.copiar(false), cmCopiarT: () => Views.comunicados.copiar(true),
   cmPublicarForm: () => Views.comunicados.publicarForm(), cmPublicarOk: (id, b) => Views.comunicados.publicarOk(b), cmDespublicar: (id, b) => Views.comunicados.despublicar(b),
   cmHistorico: () => Views.comunicados.historico(), cmRestaurar: (id, b) => Views.comunicados.restaurar(id, b),
-  serPrevia: (id, b) => Views.series.previa(b), serPausar: (id, b) => Views.series.controlar(id, "pausar", b), serRetomar: (id, b) => Views.series.controlar(id, "retomar", b),
+  serPrevia: (id, b) => Views.series.previa(id, b), serPausar: (id, b) => Views.series.controlar(id, "pausar", b),
+  serRetomarForm: (id) => Views.series.retomarForm(id).catch(e => toast(msgErro(e), true)),
+  serRetomarOk: (id, b) => Views.series.controlar(id, "retomar", b, { modo: document.querySelector("input[name=serModo]:checked").value }),
   serEncerrarForm: (id) => Views.series.encerrarForm(id), serEncerrarOk: (id, b) => Views.series.controlar(id, "encerrar", b, { cancelar: $("serCanc").checked, motivo: $("serMotivo").value.trim() }),
   finEditar: (id) => { closeModal(); Views.contaEdit.form(id); }, ceSalvar: (id, b) => Views.contaEdit.salvar(b),
   calNovo: () => Views.calendario.compForm(null).catch(e => toast(msgErro(e), true)), calAbrir: (id) => Promise.resolve(Views.calendario.abrir(id)).catch(e => toast(msgErro(e), true)),
@@ -1984,7 +2009,7 @@ document.addEventListener("click", ev => {
 });
 document.addEventListener("input", ev => {
   const id = ev.target.id;
-  if (["lInt", "lFimQtd", "lFimData", "lVenc"].includes(id) && $("lPrev")) { $("lPrev").innerHTML = ""; return; }
+  { const m = /^(l|rt)(Int|FimQtd|FimData|Venc)$/.exec(id || ""); if (m && $(m[1] + "Prev")) { $(m[1] + "Prev").innerHTML = ""; return; } }
   if (ev.target.closest && ev.target.closest("#cmForm")) { Views.comunicados.atualiza(); return; }
   if (ev.target.closest && ev.target.closest("#ratForm")) { Views.rateios.invalida(); return; }
   if (id === "estBusca") { S.f.estBusca = ev.target.value; Views.estoque.update(); }
@@ -2000,10 +2025,11 @@ document.addEventListener("input", ev => {
 });
 document.addEventListener("change", ev => {
   const id = ev.target.id;
-  if (["lRep", "lFreq", "lFim", "lUni"].includes(id)) { Views.series.mudou(); return; }
+  { const m = /^(l|rt)(Rep|Freq|Fim|Uni)$/.exec(id || ""); if (m) { Views.series.mudou(m[1]); return; } }
   if (ev.target.classList && ev.target.classList.contains("arqRat")) { const f = ev.target.files[0]; ev.target.value = ""; Views.rateios.anexar(ev.target.dataset.mov, ev.target.dataset.kind, f).catch(e => toast(msgErro(e), true)); return; }
   if (ev.target.closest && ev.target.closest("#ratForm")) { if (id === "rtMetodo" || (ev.target.classList && ev.target.classList.contains("rtLoja"))) Views.rateios.ajustaEntradas(); Views.rateios.invalida(); return; }
   if (ev.target.classList && ev.target.classList.contains("arqInput")) { const f = ev.target.files[0]; ev.target.value = ""; Views.financeiro.anexar(ev.target.dataset.pag, f).catch(e => toast(msgErro(e), true)); return; }
+  if (ev.target.name === "serModo" && S.serPrev) { S.serPrev.modo = ev.target.value; Views.series.retomarDesenha(); return; }
   if (id === "lJaPaga") { $("lPagBox").classList.toggle("hidden", !ev.target.checked); return; }
   if (id === "waPreco" || id === "waQtd" || id === "waSabores") { S.f[id] = ev.target.checked; Views.whats.render(); }
   else if (["hLoja", "hPeriodo", "hResp", "hSit"].includes(id)) { S.f[id] = ev.target.value; Views.historico.update().catch(e => toast(msgErro(e), true)); }

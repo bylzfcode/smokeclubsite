@@ -65,11 +65,44 @@ const semRolagem = page => page.evaluate(() => document.documentElement.scrollWi
   await page.check("#ceProx"); await page.fill("#ceValor", "1500"); await page.click("[data-a=ceSalvar]"); await toastOk(page, /alterada\(s\); \d+ preservada/);
   const nAlt = Number((await page.textContent("#toast")).match(/^(\d+) conta/)[1]);
   check("editar 'esta e as próximas' altera o modelo e só as ocorrências intocadas a partir da escolhida (as anteriores permanecem)", nAlt >= 1 && sql(`select count(*) from financeiro_lancamentos f join contas_series s on s.id=f.serie_id where s.descricao='Aluguel ${TAG}' and f.valor=1500`) === String(nAlt) && sql(`select valor from contas_series where descricao='Aluguel ${TAG}'`) === "1500.00", nAlt);
-  await page.waitForSelector("[data-a=serPausar]"); await page.click("[data-a=serPausar]"); await toastOk(page, /pausada/); await page.waitForSelector("[data-a=serRetomar]");
+  await page.waitForSelector("[data-a=serPausar]"); await page.click("[data-a=serPausar]"); await toastOk(page, /pausada/); await page.waitForSelector("[data-a=serRetomarForm]");
   check("pausar: série marcada como pausada e com opção de retomar", /pausada/.test(await page.textContent("#finSeries")));
-  await page.click("[data-a=serRetomar]"); await toastOk(page, /retomada/);
+  await page.click("[data-a=serRetomarForm]"); await page.waitForSelector("#serModoP");
+  check("retomar abre uma prévia com as duas opções (pular × gerar) e a quantidade antes de confirmar", /Pular/.test(await page.textContent(".modal-box")) && /Gerar/.test(await page.textContent(".modal-box")) && /Retomar pulando \d+/.test(await page.textContent("[data-a=serRetomarOk]")));
+  await page.click("[data-a=serRetomarOk]"); await toastOk(page, /retomada/);
   await page.click("[data-a=serEncerrarForm]"); await page.waitForSelector("#serCanc"); await page.check("#serCanc"); await page.click("[data-a=serEncerrarOk]"); await toastOk(page, /encerrada/);
   check("encerrar cancelando as futuras sem movimentação; nada é apagado", sql(`select status from contas_series where descricao='Aluguel ${TAG}'`) === "encerrada" && Number(sql(`select count(*) from financeiro_lancamentos f join contas_series s on s.id=f.serie_id where s.descricao='Aluguel ${TAG}'`)) === nCont);
+
+  /* ---- conta COMPARTILHADA recorrente pelo formulário de rateio ---- */
+  const idsL = sql("select slug||'|'||id from lojas").split("\n").map(l => l.split("|")), LJ = Object.fromEntries(idsL), luizId = sql("select id from auth.users where email='luiz@painel.local'");
+  await page.click("#tab-financeiro"); await page.waitForSelector("[data-a=ratNovo]"); await page.click("[data-a=ratNovo]"); await page.waitForSelector("#rtRep");
+  await page.fill("#rtDesc", `Internet ${TAG}`); await page.fill("#rtValor", "100,01"); await page.fill("#rtVenc", addDias(hoje, 2));
+  for (const b of await page.locator(".rtLoja").all()) await b.check();
+  await page.check("#rtRep"); await page.selectOption("#rtFreq", "semanal"); await page.selectOption("#rtFim", "quantidade"); await page.fill("#rtFimQtd", "20");
+  await page.click("[data-a=serPrevia][data-id=rt]"); await page.waitForSelector("#rtPrev .list-row");
+  check("prévia dos vencimentos também no formulário de conta compartilhada", (await page.locator("#rtPrev .list-row").count()) === 13);
+  await page.click("[data-a=ratPrevia]"); await page.waitForSelector("#rtCriar:not([disabled])"); await page.click("#rtCriar"); await toastOk(page, /Série criada/);
+  const sidc = sql(`select id from contas_series where descricao='Internet ${TAG}' and escopo='compartilhada'`);
+  const nRat = Number(sql(`select count(*) from rateios where serie_id='${sidc}'`));
+  check("série compartilhada criada pela tela: só a janela de 60 dias (8–10 contas), parcelas somando 100,01, sem pagamentos", nRat >= 8 && nRat <= 10 && sql(`select count(*) from rateios r where r.serie_id='${sidc}' and (select sum(valor) from rateio_parcelas p where p.rateio_id=r.id)=100.01`) === String(nRat) && sql(`select count(*) from rateio_pagamentos x join rateios r on r.id=x.rateio_id where r.serie_id='${sidc}'`) === "0", nRat);
+  await page.waitForSelector("#finSeries");
+  check("o cartão de séries mostra a série como COMPARTILHADA, com as lojas", await page.locator(`#finSeries .list-row:has-text("Internet ${TAG}"):has-text("COMPARTILHADA")`).count() === 1 && /lojas:/.test(await page.textContent(`#finSeries .list-row:has-text("Internet ${TAG}")`)));
+  await page.click(`#finSeries .list-row:has-text("Internet ${TAG}") [data-a=serPausar]`); await toastOk(page, /pausada/);
+  await page.waitForSelector(`#finSeries .list-row:has-text("Internet ${TAG}") [data-a=serRetomarForm]`); await page.click(`#finSeries .list-row:has-text("Internet ${TAG}") [data-a=serRetomarForm]`); await page.waitForSelector("#serModoP");
+  check("série sem vencimentos perdidos: prévia diz 0 e oferece retomar", /0 vencimento/.test(await page.textContent(".modal-box")) && /Retomar pulando 0/.test(await page.textContent("[data-a=serRetomarOk]")));
+  await page.click("[data-a=fechar]");
+  // pausa com lacunas (registros cancelado e editado no meio): prévia, troca de modo e confirmação
+  const sg = sql(`insert into contas_series (loja_id,tipo,categoria,descricao,valor,exige_comprovante,frequencia,intervalo,unidade,inicio,fim_tipo,status,proximo_k,pausada_em,criado_por,chave_criacao,escopo,metodo,itens) values ('${LJ["smoke-club"]}','saida','internet','Lacunas ${TAG}',100,false,'semanal',1,'semana',current_date-40,'sem_prazo','pausada',0,now()-interval '41 days','${luizId}',gen_random_uuid(),'compartilhada','igual','${JSON.stringify([{ loja_id: LJ["smoke-club"] }, { loja_id: LJ["start-br01"] }])}'::jsonb) returning id`).split("\n")[0];
+  sql(`insert into rateios (descricao,categoria,valor_total,vencimento,metodo,exige_comprovante,chave_criacao,criado_por,serie_id,serie_n,vencimento_ref,status,versao) values ('Cancelada x','internet',100,current_date-33,'igual',false,gen_random_uuid(),'${luizId}','${sg}',2,current_date-33,'cancelado',1)`);
+  sql(`insert into rateios (descricao,categoria,valor_total,vencimento,metodo,exige_comprovante,chave_criacao,criado_por,serie_id,serie_n,vencimento_ref,status,versao) values ('Editada x','internet',777,current_date-26,'igual',false,gen_random_uuid(),'${luizId}','${sg}',3,current_date-26,'ativo',2)`);
+  await page.click("[data-a=finPeriodo][data-id=tudo]"); await page.waitForSelector(`#finSeries .list-row:has-text("Lacunas ${TAG}") [data-a=serRetomarForm]`); await page.click(`#finSeries .list-row:has-text("Lacunas ${TAG}") [data-a=serRetomarForm]`); await page.waitForSelector("#serModoP");
+  let mt = await page.textContent(".modal-box");
+  check("prévia da retomada com lacunas: 4 vencimentos do período, 2 já existentes (cancelada e editada) que não serão tocados", /4 vencimento/.test(mt) && /Já existem \(2\)/.test(mt) && /cancelada/.test(mt) && /editada/.test(mt) && /Retomar pulando 4/.test(await page.textContent("[data-a=serRetomarOk]")));
+  await page.check("#serModoG"); await page.waitForFunction(() => /Retomar e gerar 4/.test(document.querySelector("[data-a=serRetomarOk]").textContent));
+  check("trocar para 'Gerar' atualiza o texto e o botão com a quantidade, sem gravar nada ainda", /Serão geradas 4/.test(await page.textContent(".modal-box")) && sql(`select count(*) from rateios where serie_id='${sg}'`) === "2");
+  await page.click("[data-a=serRetomarOk]"); await toastOk(page, /13 conta\(s\) gerada/);
+  check("confirmar: 4 do intervalo + janela futura criadas; cancelada e editada preservadas; sem duplicar", sql(`select count(*) from rateios where serie_id='${sg}'`) === "15" && sql(`select count(*) from rateios where serie_id='${sg}' and serie_n=2 and status='cancelado'`) === "1" && sql(`select count(*) from rateios where serie_id='${sg}' and serie_n=3 and valor_total=777 and versao=2`) === "1" && sql(`select count(*) = count(distinct serie_n) from rateios where serie_id='${sg}'`) === "t");
+  await page.click("[data-a=finPeriodo][data-id=mes]");
 
   /* ---- calendário ---- */
   const contaUnica = sql(`select id from financeiro_lancamentos where serie_id is null and loja_id=(select id from lojas where slug='smoke-club') and vencimento is not null and status='pendente' order by criado_em desc limit 1`);
