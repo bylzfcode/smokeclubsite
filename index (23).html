@@ -123,6 +123,12 @@ nav.catnav .container::-webkit-scrollbar{display:none}
 @media(min-width:760px){.pgrid{grid-template-columns:repeat(auto-fill,minmax(205px,1fr))}}
 .pcard{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;display:flex;flex-direction:column;box-shadow:var(--shadow);transition:transform .15s ease,box-shadow .15s ease;position:relative}
 .pcard:hover{transform:translateY(-3px);box-shadow:var(--shadow-lg)}
+.pcard.esgotado .pic,.pcard.esgotado .name,.pcard.esgotado .price{opacity:.5}
+.pcard .flag.esg{background:#55555F}.buy:disabled,.mbuy:disabled{opacity:.55;cursor:not-allowed}
+.mcard.esgotado .mpic,.mcard.esgotado .mname,.mcard.esgotado .mpreco{opacity:.5}
+.live-nota{font-size:.78rem;color:var(--muted);text-align:center;padding:30px 0}
+/* celular: o selo 'Atendimento online' vira só a bolinha verde, senão empurra o botão do carrinho para fora da tela */
+@media(max-width:560px){.badge-online{padding:5px 8px}.badge-online #badgeOnlineTxt{display:none}.search{min-width:0}}
 .pcard .flag{position:absolute;top:10px;left:10px;z-index:2;background:var(--red);color:#fff;font-size:.66rem;font-weight:800;letter-spacing:.06em;padding:4px 9px;border-radius:6px}
 .pcard .pic{height:128px;background:linear-gradient(135deg,#FAFAFB,#EFEFF2);display:flex;align-items:center;justify-content:center;font-size:3rem;overflow:hidden}
 .pcard .pic img{width:100%;height:100%;object-fit:cover}
@@ -915,9 +921,125 @@ const App = (() => {
   const cssId = s => s.normalize("NFD").replace(/[^\w]/g,"").toLowerCase();
   const escAttr = s => String(s).replace(/'/g,"\\'");
 
+  /* ═══ CATÁLOGO AO VIVO — produtos, preços e ESTOQUE vêm do mesmo banco da dashboard (somente leitura, sem login) ═══
+     Cada sabor é uma linha ("Essência 50g — Uva"); o que está sem estoque aparece como ESGOTADO e não entra no carrinho.
+     Se o banco não responder, a loja usa o último catálogo recebido (até 6 h) ou, na falta dele, os dados embutidos neste arquivo. */
+  const LIVE = { ativo: true, url: "https://viqgnzppazhcvthaknzi.supabase.co", key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpcWduenBwYXpoY3Z0aGFrbnppIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyNTYwMjMsImV4cCI6MjEwMDgzMjAyM30.NyGmfSLNAdq0CqjSx1kq6kK_L2iSSV5RtzgwgI0_ncc", loja: "smoke-club", intervalo: 60000, validade: 6*3600*1000, ok: false, ultimo: 0, busy: false, erro: null, linhas: 0, esgotadas: 0 };
+  const CORES_CAT = ["fogo","azul","amarelo","escuro","rosa","roxo","verde","vermelho"];
+  const hexOk = v => typeof v === "string" && /^#[0-9a-fA-F]{6}$/.test(v);
+  async function liveFetch(){
+    const r = await fetch(`${LIVE.url}/rest/v1/rpc/catalogo_publico`, { method:"POST", cache:"no-store", signal: AbortSignal.timeout(6000),
+      headers:{ "apikey": LIVE.key, "Authorization": "Bearer " + LIVE.key, "Content-Type":"application/json" }, body: JSON.stringify({ p_loja_slug: LIVE.loja }) });
+    if(!r.ok) throw new Error("catálogo ao vivo: HTTP " + r.status);
+    const j = await r.json();
+    if(!j || !Array.isArray(j.produtos) || !Array.isArray(j.marcas)) throw new Error("catálogo ao vivo: resposta inválida");
+    return j;
+  }
+  const linhaProd = (l, cat) => ({ id:l.id, cat, emoji:l.emoji||"🛍", nome:l.nome, desc:l.desc||"", preco:Number(l.preco), de:l.de ? Number(l.de) : null, destaque:!!l.destaque, img:l.img||null, ativo:true, estoque:l.estoque !== false, limite:(l.limite == null ? null : Number(l.limite)), sabores:[] });
+  /* troca produtos/marcas/categorias pelo catálogo vivo, preservando o carrinho (que é indexado por posição) */
+  function trocarCatalogo(prod, marcas, cats, whats){
+    const snap = cartSnapshot();
+    DATA.produtos = prod; DATA.marcas = marcas; DATA.categorias = cats;
+    if(whats) DATA.whatsapp = whats;
+    restoreCart(snap);
+  }
+  function liveApply(j){
+    const antigas = Object.fromEntries((DATA.categorias||[]).map(c => [c.nome, c]));
+    const cats = (j.categorias||[]).map(c => ({ nome:c.nome, cor: antigas[c.nome]?.cor || (CORES_CAT.includes(c.cor) ? c.cor : "fogo"), img: antigas[c.nome]?.img || null }));
+    const prod = j.produtos.map(l => linhaProd(l, l.categoria || "Outros"));
+    const marcas = j.marcas.map(m => ({ nome:m.nome, descricao:m.descricao||"", ativo:true, corFita:hexOk(m.cor_fita)?m.cor_fita:"#2A2A30", corTexto:"#FFFFFF",
+      corGradA:hexOk(m.cor_grad_a)?m.cor_grad_a:"#E3132B", corGradB:hexOk(m.cor_grad_b)?m.cor_grad_b:"#FF8C2B", corFundo:hexOk(m.cor_fundo)?m.cor_fundo:"#1A1A22",
+      modelos:(m.modelos||[]).map(l => ({ id:l.id, nome:l.nome, desc:l.desc||"", preco:Number(l.preco), de:l.de ? Number(l.de) : null, img:l.img||null, emoji:l.emoji||"💨", ativo:true, estoque:l.estoque !== false, limite:(l.limite == null ? null : Number(l.limite)), sabores:[] })) }));
+    const wa = j.loja && j.loja.whatsapp && /^\d{10,15}$/.test(j.loja.whatsapp) ? j.loja.whatsapp : null;
+    trocarCatalogo(prod, marcas, cats, wa);
+    LIVE.linhas = prod.length + marcas.reduce((n,m)=>n+m.modelos.length,0);
+    LIVE.esgotadas = prod.filter(p=>!p.estoque).length + marcas.reduce((n,m)=>n+m.modelos.filter(x=>!x.estoque).length,0);
+  }
+  const SNAP_KEY = "sc_live";
+  function lerSnap(){ try { const o = JSON.parse(localStorage.getItem(SNAP_KEY)||"null"); return o && o.cat && Date.now() - o.t < LIVE.validade ? o.cat : null; } catch(e){ return null; } }
+  function gravarSnap(cat){ try { localStorage.setItem(SNAP_KEY, JSON.stringify({ t: Date.now(), cat })); } catch(e){} }
+  function cartSnapshot(){
+    return Object.keys(state.cart).map(i => { const p = DATA.produtos[i]; return p ? { id: p.id || null, nome: p.nome, qtd: state.cart[i] } : null; }).filter(Boolean);
+  }
+  function marcasAtivas(){ return (DATA.marcas||[]).filter(m => m.ativo && m.modelos && m.modelos.length); }
+  /* modelo de marca vira um "produto" do carrinho (o carrinho trabalha com DATA.produtos) */
+  function produtoDoModelo(mi, idx){
+    const m = marcasAtivas()[mi], mod = m && m.modelos[idx]; if(!mod) return -1;
+    const key = `marca_${mi}_${idx}`;
+    let pi = DATA.produtos.findIndex(p => p._marcaKey === key);
+    if(pi === -1){
+      DATA.produtos.push({ id: mod.id||null, cat: m.nome, emoji: mod.emoji||"💨", nome: mod.nome, desc: mod.desc||"", preco: mod.preco, de: mod.de||null,
+        destaque:false, img: mod.img||null, estoque: mod.estoque !== false, limite: mod.limite == null ? null : mod.limite, _marcaKey: key });
+      pi = DATA.produtos.length - 1;
+    }
+    return pi;
+  }
+  function restoreCart(snap){
+    state.cart = {}; const fora = [], ajust = [];
+    for(const it of snap){
+      let idx = it.id ? DATA.produtos.findIndex(p => p.id === it.id) : DATA.produtos.findIndex(p => p.nome === it.nome && !p._marcaKey);
+      if(idx === -1 && it.id){
+        const ms = marcasAtivas();
+        for(let mi=0; mi<ms.length && idx === -1; mi++){ const k = ms[mi].modelos.findIndex(x => x.id === it.id); if(k >= 0) idx = produtoDoModelo(mi, k); }
+      }
+      if(idx === -1){ fora.push(it.nome); continue; }
+      const p = DATA.produtos[idx];
+      if(p.estoque === false){ fora.push(p.nome); continue; }
+      let q = it.qtd; if(p.limite != null && q > p.limite){ q = p.limite; ajust.push(p.nome); }
+      if(q > 0) state.cart[idx] = q;
+    }
+    if(fora.length) setTimeout(() => toast("Saiu do carrinho (esgotado/indisponível): " + fora.join(", ")), 50);
+    else if(ajust.length) setTimeout(() => toast("Quantidade ajustada ao estoque: " + ajust.join(", ")), 50);
+  }
+  /* redesenha só o que depende do catálogo (não reinicia banner, digitação nem rolagem) */
+  function refreshCatalog(){
+    const marcaPos = Object.assign({}, marcaState);
+    const ativo = document.querySelector(".navlink.active")?.dataset.cat || "__home";
+    $("catNav").innerHTML = `<button class="navlink" data-cat="__home" onclick="App.goCat('__home')">Início</button>` + cats().map(c => `<button class="navlink" data-cat="${c}" onclick="App.goCat('${escAttr(c)}')">${c}</button>`).join("");
+    document.querySelectorAll(".navlink").forEach(n => n.classList.toggle("active", n.dataset.cat === ativo));
+    $("catGrid").innerHTML = catBanners();
+    $("footCats").innerHTML = cats().map(c => `<li><a href="#" onclick="App.goCat('${escAttr(c)}');return false">${c}</a></li>`).join("");
+    buildMarcas();
+    Object.keys(marcaPos).forEach(k => { if($(`mt-${k}`)){ marcaState[k] = marcaPos[k]; updateSlide(+k); } });
+    render();
+  }
+  async function syncLive(){
+    if(!LIVE.ativo || LIVE.busy) return false;
+    LIVE.busy = true;
+    try {
+      const wa0 = DATA.whatsapp; const j = await liveFetch(); liveApply(j); gravarSnap(j);
+      LIVE.ok = true; LIVE.erro = null; LIVE.ultimo = Date.now(); state.aguardandoLive = false; delete DATA.__estatico;
+      if(!LIVE.montou || DATA.whatsapp !== wa0){ LIVE.montou = true; build(); } else refreshCatalog();
+      return true;
+    } catch(e){
+      LIVE.erro = String(e && e.message || e); console.warn(LIVE.erro);
+      if(state.aguardandoLive){          // nunca respondeu: usa os dados embutidos no arquivo
+        const est = DATA.__estatico; state.aguardandoLive = false;
+        if(est) trocarCatalogo(est.produtos, est.marcas, est.categorias);
+        delete DATA.__estatico;
+        refreshCatalog();
+      }
+      return false;
+    } finally { LIVE.busy = false; }
+  }
+  function liveInicio(){
+    if(!LIVE.ativo) return;
+    const snap = lerSnap();
+    if(snap){ try { liveApply(snap); LIVE.ok = true; return; } catch(e){} }
+    state.aguardandoLive = true;       // sem catálogo recente: espera o banco (não mostra produtos antigos do arquivo)
+    DATA.__estatico = { produtos: DATA.produtos, marcas: DATA.marcas, categorias: DATA.categorias };
+    DATA.produtos = []; DATA.marcas = []; DATA.categorias = [];
+  }
+  function liveDepois(){
+    if(!LIVE.ativo) return;
+    syncLive();
+    setInterval(() => { if(document.visibilityState === "visible") syncLive(); }, LIVE.intervalo);
+    document.addEventListener("visibilitychange", () => { if(document.visibilityState === "visible" && Date.now() - LIVE.ultimo > 15000) syncLive(); });
+  }
+
   /* mantém a lista de categorias em dia com os produtos */
   function syncCats(){
-    const usados = [...new Set(DATA.produtos.map(p => p.cat))];
+    const usados = [...new Set(DATA.produtos.filter(p => !p._marcaKey).map(p => p.cat))];
     DATA.categorias = DATA.categorias.filter(c => usados.includes(c.nome));
     usados.forEach(n => {
       if(!DATA.categorias.find(c => c.nome === n))
@@ -926,17 +1048,32 @@ const App = (() => {
   }
   const cats = () => { syncCats(); return DATA.categorias.map(c => c.nome); };
 
+  function catBanners(){
+    return DATA.categorias.map(c => {
+      const list = DATA.produtos.filter(p => p.cat === c.nome && !p._marcaKey);
+      if(!list.length) return "";
+      const menor = Math.min(...list.map(p => p.preco));
+      const visual = c.img
+        ? `<img class="cimg" src="${c.img}" alt=""><span class="cfade"></span>`
+        : `<span class="cemoji">${list[0].emoji||"🛍"}</span>`;
+      return `<button class="catbanner cg-${c.cor||"fogo"}" onclick="App.goCat('${escAttr(c.nome)}')">
+        ${visual}
+        <div class="cinfo"><b>${c.nome}</b><small>a partir de ${fmt(menor)} →</small></div>
+      </button>`;
+    }).join("");
+  }
+
   /* ---------- monta tudo que depende dos dados ---------- */
   function build(){
     const T = DATA.textos;
     const logo = `${DATA.marca.p1}<span>${DATA.marca.p2}</span>`;
 
     // marca / gate
-    $("gateLogo").innerHTML = logo;
+    if($("gateLogo")) $("gateLogo").innerHTML = logo;     // o aviso de maioridade some do DOM depois de confirmado
     $("headLogo").innerHTML = `${logo}<small>${DATA.marca.slogan.replace(/ /g,"&nbsp;")}</small>`;
     $("footLogo").innerHTML = logo;
-    $("gateTitulo").textContent = T.gateTitulo;
-    $("gateTexto").textContent = T.gateTexto;
+    if($("gateTitulo")) $("gateTitulo").textContent = T.gateTitulo;
+    if($("gateTexto")) $("gateTexto").textContent = T.gateTexto;
     $("searchInput").placeholder = T.buscaPlaceholder;
 
     // topbar (duplicada para o letreiro girar)
@@ -972,18 +1109,7 @@ const App = (() => {
 
     // banners de categoria
     $("tituloCategorias").textContent = T.tituloCategorias;
-    $("catGrid").innerHTML = DATA.categorias.map(c => {
-      const list = DATA.produtos.filter(p => p.cat === c.nome);
-      if(!list.length) return "";
-      const menor = Math.min(...list.map(p => p.preco));
-      const visual = c.img
-        ? `<img class="cimg" src="${c.img}" alt=""><span class="cfade"></span>`
-        : `<span class="cemoji">${list[0].emoji||"🛍"}</span>`;
-      return `<button class="catbanner cg-${c.cor||"fogo"}" onclick="App.goCat('${escAttr(c.nome)}')">
-        ${visual}
-        <div class="cinfo"><b>${c.nome}</b><small>a partir de ${fmt(menor)} →</small></div>
-      </button>`;
-    }).join("");
+    $("catGrid").innerHTML = catBanners();
 
     // strip + footer
     const chat = waUrl(DATA.waSaudacao);
@@ -1090,11 +1216,12 @@ const App = (() => {
         const thumb = mod.img
           ? `<img src="${mod.img}" alt="${mod.nome}">`
           : `<span>${mod.emoji || "💨"}</span>`;
-        return `<div class="mcard" style="--mf-cor:${fita}">
+        const esg = mod.estoque === false;
+        return `<div class="mcard${esg ? " esgotado" : ""}" style="--mf-cor:${fita}">
           <div class="mfita"></div>
           <div class="mpic">
             ${thumb}
-            ${mod.de ? `<span class="mbadge">OFERTA</span>` : ""}
+            ${esg ? `<span class="mbadge" style="background:#55555F">ESGOTADO</span>` : mod.de ? `<span class="mbadge">OFERTA</span>` : ""}
           </div>
           <div class="mbody">
             <span class="mbrand">${m.nome}</span>
@@ -1102,7 +1229,7 @@ const App = (() => {
             <span class="mdesc">${mod.desc || ""}</span>
             ${mod.de ? `<span class="mold">de R$ ${mod.de.toFixed(2).replace(".",",")}</span>` : ""}
             <span class="mpreco">R$ ${mod.preco.toFixed(2).replace(".",",")}</span>
-            <button class="mbuy ripple-host" onclick="App.addMarca(${mi},${idx})">Adicionar ao carrinho</button>
+            ${esg ? `<button class="mbuy" disabled>Esgotado</button>` : `<button class="mbuy ripple-host" onclick="App.addMarca(${mi},${idx})">Adicionar ao carrinho</button>`}
           </div>
         </div>`;
       }).join("");
@@ -1200,12 +1327,12 @@ const App = (() => {
   /* ---------- produtos ---------- */
   function pic(p){ return p.img ? `<img src="${p.img}" alt="${p.nome}">` : (p.emoji || "🛍"); }
   function productCard(p,i){
-    const q = state.cart[i] || 0;
-    const control = q === 0
+    const q = state.cart[i] || 0, esg = p.estoque === false;
+    const control = esg ? `<button class="buy" disabled>Esgotado</button>` : q === 0
       ? `<button class="buy" onclick="App.add(${i})">Adicionar ao carrinho</button>`
       : `<div class="qty"><button onclick="App.chg(${i},-1)" aria-label="Diminuir">−</button><span>${q}</span><button onclick="App.chg(${i},1)" aria-label="Aumentar">+</button></div>`;
-    return `<article class="pcard">
-      ${p.de ? `<span class="flag oferta-badge" id="ofb-${i}">${DATA.textos.ofertaBadgeTexto||'OFERTA'}</span>` : ""}
+    return `<article class="pcard${esg ? " esgotado" : ""}" data-pid="${p.id||""}">
+      ${esg ? `<span class="flag esg">ESGOTADO</span>` : p.de ? `<span class="flag oferta-badge" id="ofb-${i}">${DATA.textos.ofertaBadgeTexto||'OFERTA'}</span>` : ""}
       <div class="pic">${pic(p)}</div>
       <div class="body">
         <span class="cat-tag">${(p.cat||"").toUpperCase()}</span>
@@ -1217,11 +1344,12 @@ const App = (() => {
       </div></article>`;
   }
   function renderProducts(){
+    if(state.aguardandoLive){ $("productSections").innerHTML = `<p class="live-nota">Carregando produtos…</p>`; return; }
     const q = state.query;
     const match = p => !q || (p.nome+" "+(p.desc||"")+" "+p.cat).toLowerCase().includes(q);
     let html = "";
     if(q){
-      const found = DATA.produtos.map((p,i)=>({p,i})).filter(({p})=>match(p));
+      const found = DATA.produtos.map((p,i)=>({p,i})).filter(({p})=>!p._marcaKey && match(p));
       html = `<section class="section"><h2 class="section-title">Resultados para "${q}"</h2>
         ${found.length
           ? `<div class="pgrid">${found.map(({p,i})=>productCard(p,i)).join("")}</div>`
@@ -1232,11 +1360,11 @@ const App = (() => {
     } else {
       $("catShowcase").classList.remove("hidden");
       $("heroWrap").classList.remove("hidden");
-      const dest = DATA.produtos.map((p,i)=>({p,i})).filter(({p})=>p.destaque);
+      const dest = DATA.produtos.map((p,i)=>({p,i})).filter(({p})=>!p._marcaKey && p.destaque);
       if(dest.length)
         html += `<section class="section"><h2 class="section-title">${DATA.textos.tituloDestaques}</h2><div class="pgrid">${dest.map(({p,i})=>productCard(p,i)).join("")}</div></section>`;
       for(const c of cats()){
-        const list = DATA.produtos.map((p,i)=>({p,i})).filter(({p})=>p.cat===c);
+        const list = DATA.produtos.map((p,i)=>({p,i})).filter(({p})=>!p._marcaKey && p.cat===c);
         html += `<section class="section" id="sec-${cssId(c)}"><h2 class="section-title">${c}</h2><div class="pgrid">${list.map(({p,i})=>productCard(p,i)).join("")}</div></section>`;
       }
     }
@@ -1245,6 +1373,8 @@ const App = (() => {
 
   /* ---------- carrinho ---------- */
   function add(i){
+    const pp = DATA.produtos[i];
+    if(pp && pp.estoque === false){ toast("Esse produto está esgotado"); return; }
     state.cart[i]=1;
     // tracking de cliques para o dashboard
     try {
@@ -1258,20 +1388,11 @@ const App = (() => {
 
   // adicionar modelo de marca ao carrinho como produto avulso
   function addMarca(mi, idx){
-    const marcas = (DATA.marcas||[]).filter(m=>m.ativo&&m.modelos&&m.modelos.length);
-    const mod = marcas[mi]?.modelos[idx];
-    if(!mod) return;
-    // converte modelo em produto temporário (adiciona ao fim de DATA.produtos se não existir)
-    const key = `marca_${mi}_${idx}`;
-    let pi = DATA.produtos.findIndex(p=>p._marcaKey===key);
-    if(pi === -1){
-      DATA.produtos.push({
-        cat: marcas[mi].nome, emoji: mod.emoji||"💨", nome: mod.nome,
-        desc: mod.desc||"", preco: mod.preco, de: mod.de||null,
-        destaque: false, img: mod.img||null, _marcaKey: key
-      });
-      pi = DATA.produtos.length - 1;
-    }
+    const pi = produtoDoModelo(mi, idx);
+    if(pi === -1) return;
+    const p = DATA.produtos[pi];
+    if(p.estoque === false){ toast("Esse modelo está esgotado"); return; }
+    if(p.limite != null && (state.cart[pi]||0) + 1 > p.limite){ toast(`Só temos ${p.limite} unidade(s) disponível(is)`); return; }
     state.cart[pi] = (state.cart[pi]||0) + 1;
     toast("Adicionado ao carrinho ✓");
     render();
@@ -1280,6 +1401,8 @@ const App = (() => {
     if(btn){ btn.textContent = `${state.cart[pi]}× no carrinho`; btn.style.background = "var(--ink)"; }
   }
   function chg(i,d){
+    const pp = DATA.produtos[i];
+    if(d > 0 && pp && pp.limite != null && (state.cart[i]||0) + d > pp.limite){ toast(`Só temos ${pp.limite} unidade(s) disponível(is)`); return; }
     state.cart[i]=(state.cart[i]||0)+d;
     if(state.cart[i]<=0) delete state.cart[i];
     render();
@@ -1434,6 +1557,7 @@ const App = (() => {
   /* ---------- checkout ---------- */
   function openCheckout(){
     if(totals().count === 0){ toast("Seu carrinho está vazio"); return; }
+    if(LIVE.ativo) syncLive();        // confere o estoque de novo antes de fechar o pedido
     closeDrawer();
     $("checkout").classList.add("show");
     document.body.style.overflow = "hidden";
@@ -1634,7 +1758,9 @@ const App = (() => {
   function passGate(){ const g = $("ageGate"); if(g) g.remove(); }
 
   document.addEventListener("DOMContentLoaded", () => {
+    liveInicio();
     build();
+    liveDepois();
     // conta visitas por sessão (não conta recarregamentos)
     try {
       if(!sessionStorage.getItem("sc_sess")){
@@ -1646,7 +1772,8 @@ const App = (() => {
   });
   return { passGate, goHome, goCat, goSlide, search, add, chg, addMarca, slideM, clearCart,
            openDrawer, closeDrawer, openCheckout, closeCheckout,
-           setMode, setPay, render, sendOrder, openWaChat, build, toast,
+           setMode, setPay, render, sendOrder, openWaChat, build, toast, syncLive,
+           get live(){ return { ativo: LIVE.ativo, ok: LIVE.ok, ultimo: LIVE.ultimo, erro: LIVE.erro, linhas: LIVE.linhas, esgotadas: LIVE.esgotadas }; },
            maskCep, buscaCep, buscaCepNac,
            get cats(){ return cats(); } };
 })();
@@ -1971,7 +2098,7 @@ const Admin = (() => {
   let logged = false;
   let tab = "produtos";
 
-  const TABS = [
+  const TABS_TODAS = [
     ["dashboard","📊 Dashboard"],
     ["produtos","📦 Produtos"],
     ["marcas","🏷️ Marcas"],
@@ -1982,6 +2109,10 @@ const Admin = (() => {
     ["loja","🏪 Loja"],
     ["publicar","🚀 Publicar"]
   ];
+  /* com o catálogo ao vivo, produtos/marcas/categorias/estoque são editados na dashboard: estas abas dão lugar a um aviso */
+  const TABS_LIVE_OCULTAS = ["produtos","marcas","categorias"];
+  const tabsVisiveis = () => !App.live.ativo ? TABS_TODAS
+    : TABS_TODAS.filter(([id]) => !TABS_LIVE_OCULTAS.includes(id)).flatMap(t => t[0] === "dashboard" ? [t, ["catalogo","📦 Catálogo"]] : [t]);
 
   /* ---------- login ---------- */
   function askLogin(e){ if(e) e.preventDefault(); $("admLogin").classList.add("show"); setTimeout(()=>$("admPass").focus(),50); }
@@ -2022,7 +2153,7 @@ const Admin = (() => {
     App.build();               // aplica as edições na loja ao vivo
   }
   function drawTabs(){
-    $("admTabs").innerHTML = TABS.map(([id,label]) =>
+    $("admTabs").innerHTML = tabsVisiveis().map(([id,label]) =>
       `<button class="adm-tab ${tab===id?'active':''}" onclick="Admin.go('${id}')">${label}</button>`).join("");
   }
   function go(t){ tab = t; drawTabs(); draw(); $("admin").querySelector(".adm-body").scrollTop = 0; }
@@ -2033,6 +2164,7 @@ const Admin = (() => {
 
   function draw(){
     if(tab === "dashboard") drawDashboard();
+    else if(tab === "catalogo") drawCatalogoLive();
     else if(tab === "produtos") drawProdutos();
     else if(tab === "marcas") drawMarcas();
     else if(tab === "categorias") drawCategorias();
@@ -2041,6 +2173,20 @@ const Admin = (() => {
     else if(tab === "frete") drawFrete();
     else if(tab === "loja") drawLoja();
     else drawPublicar();
+  }
+
+  /* ══════════ ABA CATÁLOGO (ao vivo) ══════════ */
+  function drawCatalogoLive(){
+    const L = App.live, quando = L.ultimo ? new Date(L.ultimo).toLocaleTimeString("pt-BR") : "—";
+    $("admBody").innerHTML = `
+      <div class="adm-note">📦 <b>Produtos, preços, estoque, marcas e categorias</b> agora são editados na <b>dashboard</b> (aba Catálogo e aba Estoque) e aparecem aqui sozinhos, a cada minuto. Banners, textos, frete e pagamento continuam sendo editados neste painel.</div>
+      <div class="dash-grid" style="margin:12px 0">
+        <div class="dash-kpi"><div class="dk-val" style="color:${L.ok?'#1a7a40':'var(--red)'}">${L.ok ? "ao vivo" : "offline"}</div><div class="dk-lbl">CONEXÃO COM A DASHBOARD</div><div class="dk-sub">${L.ok ? "última leitura " + quando : esc(L.erro || "ainda não conectou")}</div></div>
+        <div class="dash-kpi"><div class="dk-val">${L.linhas}</div><div class="dk-lbl">ITENS NO SITE</div><div class="dk-sub">cada sabor conta como um item</div></div>
+        <div class="dash-kpi"><div class="dk-val" style="color:${L.esgotadas?'var(--red)':'#1a7a40'}">${L.esgotadas}</div><div class="dk-lbl">ESGOTADOS</div><div class="dk-sub">some o botão de compra</div></div>
+      </div>
+      <div class="adm-actions"><a class="abtn dark" href="dashboard.html" target="_blank" rel="noopener" style="text-decoration:none">Abrir a dashboard →</a>
+        <button class="abtn soft" onclick="App.syncLive().then(()=>Admin.draw())">Atualizar agora</button></div>`;
   }
 
   /* ══════════ ABA PRODUTOS ══════════ */

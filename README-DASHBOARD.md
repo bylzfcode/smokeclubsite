@@ -1,7 +1,7 @@
 # Escritório — Painel Compartilhado (4 lojas)
 
 `dashboard.html` é um arquivo único (sem build) que usa o Supabase como banco
-compartilhado. Fica separado do site público (`index (23).html`).
+compartilhado. O site público (`index (23).html`) lê o catálogo e o estoque deste mesmo banco (ver "Catálogo online").
 
 ## Como funciona o acesso
 
@@ -12,14 +12,14 @@ compartilhado. Fica separado do site público (`index (23).html`).
   itens/preços no Catálogo).
 - Estoque é **compartilhado**; preços, clientes, vendas e financeiro são **por loja**.
 
-## Instalar a versão administrativa (migrações 001–013)
+## Instalar a versão administrativa (migrações 001–014)
 
 > **Nada disto foi aplicado no projeto Supabase hospedado.** Siga este roteiro no destino, na ordem. Os scripts de consulta abaixo são **somente leitura**.
 
 ### 0. Regras de ouro
 - **Nunca rode `schema.sql` em um banco que já tem dados/tabelas.** Ele só serve para um projeto **vazio**: usa `create table` sem "if not exists" (falha em banco existente) e insere as lojas iniciais. Num banco existente, **primeiro inspecione** (passo 2) e aplique somente as migrações que faltam.
 - Uma migração por vez, na ordem, conferindo que terminou **sem erro** antes da próxima. Não pule números.
-- Nunca reaplique uma migração antiga sozinha com outras mais novas já aplicadas (ela recria funções que as novas substituíram). Se precisar repetir a migração N, repita **de N até 013**, em ordem — todas são repetíveis (testado: 002–013 rodadas duas vezes seguidas num banco já migrado, sem erro nem perda de dados).
+- Nunca reaplique uma migração antiga sozinha com outras mais novas já aplicadas (ela recria funções que as novas substituíram). Se precisar repetir a migração N, repita **de N até 014**, em ordem — todas são repetíveis (testado: 002–013 rodadas duas vezes seguidas num banco já migrado, sem erro nem perda de dados).
 
 ### 1. Backup (obrigatório antes de qualquer migração)
 - **Supabase → Database → Backups:** confirme que existe backup recente e anote data/hora (a disponibilidade de backups automáticos e de recuperação a qualquer instante — PITR — **depende do plano**; confira no seu projeto). Se não houver backup recente, faça o manual abaixo antes de continuar.
@@ -49,6 +49,7 @@ No SQL Editor do **destino**, execute `supabase/ops/verificar_migracoes.sql`. Ca
 | 11 | `011_recorrencia.sql` | 5 | séries de contas exclusivas, `editar_conta` | amplia `listar_contas` e o CHECK de auditoria |
 | 12 | `012_calendario.sql` | 7, 11 | calendário, compromissos, `series_agendamento` | só leitura sobre contas/rateios |
 | 13 | `013_series_compartilhadas.sql` | **7 e 11** (e 12 para o calendário) | séries de contas compartilhadas, retomada com prévia, `series_auditoria` | recria `serie_gerar`, `serie_controlar`, `listar_series`, `gerar_series_*`; estende `listar_rateios`, `rateio_detalhe`, `calendario_admin` |
+| 14 | `014_catalogo_online.sql` | 1 (schema: catálogo, estoque, preços) | função pública `catalogo_publico` que alimenta o **site** com itens, preços e estoque | só leitura; liberada para `anon` (é a porta do site); não expõe vendas, clientes nem o saldo exato |
 
 Usuários e vínculos (depois das migrações): crie em Authentication → Users (e-mail `usuario@painel.local`, auto-confirm) e vincule:
 ```sql
@@ -95,9 +96,9 @@ Em `dashboard.html` ajuste `SUPABASE_URL` e `SUPABASE_ANON_KEY` (só a chave ano
 
 ## Pagamentos parciais e comprovantes (migração 005)
 
-**Ordem de aplicação no Supabase (nenhuma foi aplicada ainda no projeto remoto):** `schema.sql` → `002` → `003` → `004` → `005` → `006` → `007` → `008` → `009` → `010` → `011` → `012` → `013`.
+**Ordem de aplicação no Supabase (nenhuma foi aplicada ainda no projeto remoto):** `schema.sql` → `002` → `003` → `004` → `005` → `006` → `007` → `008` → `009` → `010` → `011` → `012` → `013` → `014`.
 A 005 depende da 003 (permissões e caixa), a 006 da 005 e a 007 da 005/006 (comprovantes e limpeza). Rode uma por vez no SQL Editor e confira que terminou sem erro antes da próxima.
-A ordem foi conferida instalando do zero (schema → 013) numa pilha Supabase local real (veja "Validação contra a pilha real").
+A ordem foi conferida instalando do zero (schema → 014) numa pilha Supabase local real (veja "Validação contra a pilha real").
 
 - **Contas:** cada conta tem valor original, total pago e saldo pendente. Situações: pendente, parcialmente paga, paga e cancelada
   ("saldo vencido" é calculado pela data de vencimento). Vários pagamentos até quitar; valor/data/forma/observação/responsável em cada um.
@@ -218,6 +219,7 @@ select cron.schedule('series-diarias', '10 6 * * *', $$ select public.gerar_seri
 
 ### O que ainda depende do ambiente hospedado (não validado localmente)
 - [ ] Aplicar as migrações pendentes, na ordem (passo 2/3), com backup feito.
+- [ ] **Site público:** publicar o `index (23).html` atualizado (uma vez), confirmar no bloco `LIVE` a URL e a chave **anon** do projeto hospedado e abrir o site para ver os produtos da dashboard; CORS do projeto precisa aceitar o domínio do site (o padrão do Supabase aceita qualquer origem).
 - [ ] Storage ativo com o bucket privado `comprovantes` (criado pela 005) e limites de tamanho/tipo conforme o plano.
 - [ ] `pg_cron` habilitado e o job `series-diarias` criado (opcional); conferir `cron.job_run_details` depois da 1ª execução.
 - [ ] Usuários criados no Authentication (e-mail `usuario@painel.local`, auto-confirm) e vinculados a perfis/lojas; senhas "1234" trocadas.
@@ -235,11 +237,26 @@ select cron.schedule('series-diarias', '10 6 * * *', $$ select public.gerar_seri
 5. **📆 Calendário**: navegue pelos meses, clique num dia, abra uma conta (abre o detalhe financeiro), crie um compromisso, conclua-o. Alterne "Esta loja" / "Todas as minhas lojas".
 6. **Trocar de loja**: a tela anterior desaparece; na Start o calendário não mostra nada da Smoke.
 7. Entre como dono (`chefe`) → **🔐 Acessos**: desative uma operadora (motivo obrigatório); ela não consegue entrar ("acesso foi desativado"); reative.
-8. Reduza a janela para ~375 px (celular): Financeiro, Calendário e os formulários não têm rolagem horizontal da página.
+8. **Catálogo online:** em **🏷️ Catálogo online** edite um item (preço, preço "de", descrição, destaque) e abra **Ver o site ↗** — em até 1 minuto (ou recarregando) a mudança aparece. Na aba **Estoque** zere um sabor: no site ele vira **ESGOTADO** e o botão some; dê entrada e ele volta. Adicione um item ao carrinho do site, reduza o estoque dele na dashboard e veja o carrinho se ajustar. No painel do lojista do site (`#admin`, senha atual) confira que Produtos/Marcas/Categorias deram lugar a **Catálogo**.
+9. Reduza a janela para ~375 px (celular): Financeiro, Calendário e os formulários não têm rolagem horizontal da página.
+
+## Catálogo online: o site lê o estoque e o catálogo da dashboard (migração 014)
+
+O site público (`index (23).html`) passou a mostrar **os mesmos itens, preços e estoque da dashboard**, em tempo quase real. Não há mais "baixar o site atualizado e subir de novo" para mudar produto, preço ou estoque.
+- **Como funciona:** o site chama a função pública `catalogo_publico('smoke-club')` (somente leitura, sem login) e monta a vitrine com o resultado, a cada 60 s, ao voltar para a aba e ao abrir o checkout. O catálogo exibido é o da loja **Smoke Club** (preços e itens publicados dela). Cada **sabor** vira uma linha ("Essência 50g — Uva"), igual à dashboard e ao que o site já fazia; item sem sabor é uma linha.
+- **O que a dashboard edita e o site mostra** (aba **Catálogo online**, só gerente/dono): nome, emoji, descrição, imagem (endereço https), preço, preço "de" riscado (só aparece se for maior que o preço), destaque na home, ordem, sabores (renomear/adicionar), "vender nesta loja", item ativo, **marcas** (nome, descrição, cores, ordem, visível) e **categorias** (nome, cor, ordem), além do **WhatsApp** da loja. O **estoque** é o da aba Estoque: venda, entrada e ajuste mudam o site sozinhos.
+- **Regras de publicação:** aparece no site o item **ativo**, com **preço da Smoke Club ativo e maior que zero** e (se for modelo) de **marca visível**. Sem estoque → aparece como **ESGOTADO** com o botão desativado e não entra no carrinho. Sem preço, oculto, inativo ou de marca oculta → não aparece. A tela mostra o status de cada item ("no site · N em estoque", "no site como ESGOTADO", "sem preço — não aparece no site"…).
+- **Estoque no carrinho:** o site só deixa pedir até a quantidade disponível (informa no máximo 20 por linha — **não expõe o saldo exato**); se o estoque mudar enquanto a pessoa navega, o carrinho se ajusta e avisa ("Saiu do carrinho (esgotado)…", "Quantidade ajustada ao estoque…"), e o estoque é reconferido ao abrir o checkout. O pedido continua indo **pelo WhatsApp** (o site não grava pedido no banco): o estoque só baixa quando a venda é registrada na dashboard.
+- **Segurança:** o site usa apenas a chave pública (anon) e só consegue executar `catalogo_publico`; as tabelas continuam fechadas para o público (RLS). A função não devolve vendas, clientes, financeiro, custos nem pessoas, e não altera nada.
+- **Se o banco não responder:** o site usa o último catálogo recebido (até 6 h, guardado no navegador) ou, na falta dele, os produtos embutidos no próprio arquivo (como antes). Enquanto espera a primeira resposta, mostra "Carregando produtos…" em vez de produtos antigos.
+- **Painel do lojista dentro do site:** com o catálogo ao vivo, as abas Produtos, Marcas e Categorias saem e entra a aba **Catálogo**, que mostra se está "ao vivo", quantos itens e esgotados, e aponta para a dashboard. **Banners, textos, frete, bairros e formas de pagamento continuam sendo editados no painel do site** (e exportados como antes).
+- **Configuração:** no bloco `LIVE` do `index (23).html` ficam a URL do projeto, a chave **anon** (a mesma do `dashboard.html`; nunca a `service_role`) e o `loja: "smoke-club"`. Para desligar a ligação, `ativo: false` (volta aos dados do arquivo). Para a dashboard saber qual loja o site representa, existe a constante `SITE_SLUG` no `dashboard.html`; em outra loja a aba avisa que o preço publicado é o da Smoke Club.
+- **Também corrigido:** o erro "Cannot set properties of null (setting 'innerHTML')" ao fechar o painel do lojista depois de confirmar a maioridade; e, no celular, o selo "Atendimento online" empurrava o botão do carrinho para fora da tela (agora vira só a bolinha verde).
+- **Limitações:** o site só mostra a loja Smoke Club; imagens são endereços https (não há envio de arquivo pela dashboard); pedidos não são gravados no banco; remover um sabor não é possível (preserva o histórico de estoque — use o estoque zerado, que aparece como esgotado); as mudanças chegam ao site em até 60 s.
 
 ## Validação contra a pilha real (Docker)
 
-`supabase/tests/stack/` sobe **Postgres do Supabase + Auth (GoTrue) + PostgREST + Storage API** reais em contêineres, instala `schema.sql → 002 → … → 013` do zero como o papel `postgres`
+`supabase/tests/stack/` sobe **Postgres do Supabase + Auth (GoTrue) + PostgREST + Storage API** reais em contêineres, instala `schema.sql → 002 → … → 014` do zero como o papel `postgres`
 (o mesmo do SQL Editor), cria usuários por SQL direto (como no projeto remoto) e roda: `real_api.test.js` (login, isolamento entre lojas, pagamentos, Storage, limpeza), `real_api_rateios.test.js` (rateios/reembolsos), `real_api_resumos.test.js` (resumos) `real_api_comunicados.test.js` / `real_ui_comunicados.test.js` (comunicados), `real_api_admin.test.js` / `real_ui_admin.test.js` (acessos, recorrência, calendário, períodos), `real_api_series_comp.test.js` (séries compartilhadas e retomada) e `real_ui.test.js` + `real_ui_rateios.test.js` + `real_ui_resumos.test.js` (o `dashboard.html` no Chromium).
 Requisitos: Docker com daemon ativo, Node 18+, Playwright. Uso: `supabase/tests/stack/run_all.sh` (`--keep` deixa a pilha de pé). Os segredos são gerados na hora (`.env`, não versionado).
 Não valida: o **Kong** (gateway do Supabase hospedado, inclusive CORS) — aqui um mini-gateway (`gateway.js`) o substitui —, Realtime, e e-mails/recuperação de senha. Nada é enviado ao projeto remoto.
@@ -256,6 +273,8 @@ Não valida: o **Kong** (gateway do Supabase hospedado, inclusive CORS) — aqui
 - `supabase/tests/acessos_series_testes.sql` — 47 verificações de acessos (desativar/reativar, API direta, lojas, auditoria) e recorrência (datas, prévia, geração, janela, edição por escopo, pausa/retomada/encerramento, permissões).
 - `supabase/tests/calendario_testes.sql` — 26 verificações do calendário e compromissos (situações, rateio, isolamento por loja, versões, permissões). `lab/concorrencia_series.sh` — criação/geração/edição simultâneas, inclusive séries compartilhadas e retomada.
 - `supabase/tests/series_compartilhadas_testes.sql` — 34 verificações de séries compartilhadas (centavos, sem movimentação, permissões por loja, movimentadas preservadas, retomada pular × gerar com lacunas, limite de 120, erro isolado, privilégios do gerador).
+- `supabase/tests/catalogo_online_testes.sql` — 13 verificações do catálogo público (publicação, sabores, estoque e limite, preço riscado, lojas isoladas, nada sensível, reflexo de estoque/venda/edição).
+- `supabase/tests/stack/real_api_catalogo.test.js` (19) e `real_ui_catalogo.test.js` (31, **site e dashboard no navegador** contra a pilha real: vitrine do banco, esgotado, carrinho × estoque, reordenação, fallback sem banco, painel do lojista, edição pela dashboard refletida no site).
 - `supabase/tests/lab/verificar_ops.sh` — valida os scripts somente leitura de `supabase/ops/` em banco completo, parcial e vazio (e prova que nada muda).
 - `supabase/tests/lab/` — banco local + concorrência (`concorrencia.sh` vendas; `concorrencia_caixa.sh` abertura/estorno/fechamento simultâneos; `concorrencia_pagamentos.sh` pagamentos/estornos/repetições simultâneos). As suítes locais acima usam um Storage simulado só nas **políticas**; a API real (limite de 5 MB, tipo MIME, upload, links assinados) é validada em `supabase/tests/stack/`.
 - `supabase/tests/ui/` — a tela no Chromium com Supabase simulado e checagem dos

@@ -276,6 +276,7 @@ const S = {
        waPreco: true, waQtd: true, waSabores: true,
        hLoja: "", hPeriodo: "30d", hResp: "", hSit: "", ratEscopo: "loja" },
 };
+const SITE_SLUG = "smoke-club";   // loja cujo catálogo/preços o site público mostra
 const isGerente = () => S.perfil && (S.perfil.papel === "gerente" || S.perfil.papel === "dono");
 const itemById = id => S.itens.find(i => i.id === id);
 const saborById = id => S.sabores.find(s => s.id === id);
@@ -385,7 +386,7 @@ const App = {
   },
   tabs() {
     const t = [["painel", "📊 Painel"], ["venda", "🛒 Nova venda"], ["vendas", "🧾 Vendas"], ["estoque", "📦 Estoque"], ["clientes", "👥 Clientes"], ["financeiro", "💰 Financeiro"], ["caixa", "💵 Caixa"], ["historico", "📅 Histórico"], ["comunicados", "📣 Comunicados"], ["calendario", "📆 Calendário"], ["whats", "📋 Lista WhatsApp"]];
-    if (isGerente()) t.push(["catalogo", "🏷️ Catálogo"]);
+    if (isGerente()) t.push(["catalogo", "🏷️ Catálogo online"]);
     if (S.perfil.papel === "dono") t.push(["acessos", "🔐 Acessos"]);
     $("tabsNav").innerHTML = t.map(([id, l]) => `<button class="tabbtn" id="tab-${id}" data-a="tab" data-id="${id}">${l}</button>`).join("");
   },
@@ -1630,7 +1631,10 @@ Views.catalogo = {
   render() {
     const marcaOpts = S.marcas.map(m => `<option value="m:${esc(m.id)}">${esc(m.nome)} (modelo)</option>`).join("");
     const catOpts = S.categorias.map(c => `<option value="c:${esc(c.id)}">${esc(c.nome)} (produto)</option>`).join("");
-    $("viewRoot").innerHTML = `<div class="page-h"><h2>🏷️ Catálogo</h2></div>
+    const ehSite = S.loja.slug === SITE_SLUG;
+    $("viewRoot").innerHTML = `<div class="page-h"><h2>🏷️ Catálogo online</h2><a class="abtn soft" href="index%20(23).html" target="_blank" rel="noopener" style="text-decoration:none">Ver o site ↗</a></div>
+      ${ehSite ? `<div class="banner">O que você edita aqui <b>aparece no site</b> sozinho (atualiza a cada minuto): itens, sabores, preços, preço "de", destaque, imagem, descrição, marcas, categorias, WhatsApp — e o <b>estoque</b> é o da aba Estoque (venda, entrada e ajuste mudam o site na hora). Item sem estoque aparece como <b>ESGOTADO</b>; item sem preço, oculto ou inativo não aparece. Banners, textos, frete e pagamento do site seguem no painel do próprio site.</div>`
+        : `<div class="banner">O site mostra os preços e itens da loja <b>Smoke Club</b>. Você está na loja <b>${esc(S.loja.nome)}</b>: itens, marcas, categorias e estoque são compartilhados com o site, mas o <b>preço publicado</b> é o da Smoke Club (troque de loja para alterá-lo).</div>`}
       <div class="card"><h3>Nova marca / categoria</h3><div class="row"><input class="field grow" id="novoGrupo" placeholder="Nome (ex: Ignite, Essências)" style="margin:0">
         <button class="abtn dark" data-a="catGrupo" data-id="marca">+ Marca</button><button class="abtn soft" data-a="catGrupo" data-id="categoria">+ Categoria</button></div></div>
       <div class="card"><h3>Novo item</h3>
@@ -1639,9 +1643,11 @@ Views.catalogo = {
         <label>Sabores (separe por vírgula — deixe vazio se não tiver)</label><input class="field" id="niSabores" placeholder="Menta, Uva, Morango">
         <div class="grid2"><div><label>Estoque inicial (por sabor)</label><input class="field" id="niQtd" type="number" min="0" value="0"></div><div><label>Estoque mínimo</label><input class="field" id="niMin" type="number" min="0" value="3"></div></div>
         <button class="btn btn-red" data-a="catItem">Criar item</button></div>
-      <div class="card"><h3>Itens e preços da loja ${esc(S.loja.nome)}</h3>${S.itens.length ? S.itens.map(it => { const p = precoRow(it.id);
-        return `<div class="list-row"><div class="ic">${esc(it.emoji || "📦")}</div><div class="grow"><b>${esc(it.nome)}</b><small>${esc(marcaNome(it) || "")} · ${saboresDe(it.id).length} sabor(es) · ${it.ativo ? "ativo" : "inativo"}</small></div>
+      <div class="card"><h3>Itens e preços da loja ${esc(S.loja.nome)}</h3>${S.itens.length ? S.itens.map(it => { const p = precoRow(it.id), [cls, txt] = Views.catalogo.statusOnline(it);
+        return `<div class="list-row"><div class="ic">${esc(it.emoji || "📦")}</div><div class="grow"><b>${esc(it.nome)}</b><small>${esc(marcaNome(it) || "")} · ${saboresDe(it.id).length} sabor(es) · ${it.ativo ? "ativo" : "inativo"}</small><span class="tag ${cls}">${esc(txt)}</span></div>
         <b>${p ? (p.ativo ? esc(fmt(p.preco)) : "oculto") : '<span class="neg">sem preço</span>'}</b><button class="abtn soft sm" data-a="catEditar" data-id="${esc(it.id)}">Editar</button></div>`; }).join("") : `<div class="empty">Nenhum item ainda.</div>`}</div>
+      <div class="card"><h3>Marcas</h3>${S.marcas.length ? S.marcas.map(m => `<div class="list-row"><div class="grow"><b>${esc(m.nome)}</b><small>${S.itens.filter(i => i.marca_id === m.id).length} modelo(s)</small></div><span class="tag ${m.ativo ? "pago" : "neutro"}">${m.ativo ? "visível" : "oculta"}</span><button class="abtn soft sm" data-a="catMarca" data-id="${esc(m.id)}">Editar</button></div>`).join("") : `<div class="empty">Nenhuma marca.</div>`}</div>
+      <div class="card"><h3>Categorias</h3>${S.categorias.length ? S.categorias.map(c => `<div class="list-row"><div class="grow"><b>${esc(c.nome)}</b><small>${S.itens.filter(i => i.categoria_id === c.id).length} item(ns) · cor ${esc(c.cor || "fogo")}</small></div><button class="abtn soft sm" data-a="catCategoria" data-id="${esc(c.id)}">Editar</button></div>`).join("") : `<div class="empty">Nenhuma categoria.</div>`}</div>
       <div class="card"><h3>WhatsApp da loja</h3><div class="row"><input class="field grow" id="lojaWpp" inputmode="tel" placeholder="5511999999999" value="${esc(S.loja.whatsapp || "")}" style="margin:0"><button class="abtn dark" data-a="catWpp">Salvar</button></div></div>`;
   },
   async grupo(tipo, btn) {
@@ -1661,24 +1667,85 @@ Views.catalogo = {
       await Promise.all([DB.catalogo(), DB.estoque()]); toast("Item criado — defina o preço em Editar"); Views.catalogo.render();
     });
   },
+  /* situação do item no site: [classe da etiqueta, texto] */
+  statusOnline(it) {
+    const p = precoRow(it.id), marca = it.tipo === "modelo" ? S.marcas.find(m => m.id === it.marca_id) : null;
+    if (!it.ativo) return ["neutro", "inativo — não aparece no site"];
+    if (marca && !marca.ativo) return ["neutro", "marca oculta — não aparece no site"];
+    if (!p) return ["neutro", "sem preço — não aparece no site"];
+    if (!p.ativo || !(Number(p.preco) > 0)) return ["neutro", "oculto nesta loja — não aparece no site"];
+    const tem = saboresDe(it.id).length > 0, qtd = S.estoque.filter(e => e.item_id === it.id && (tem ? e.sabor_id : !e.sabor_id)).reduce((n, e) => n + e.quantidade, 0);
+    return qtd > 0 ? ["pago", "no site · " + qtd + " em estoque"] : ["atrasado", "no site como ESGOTADO"];
+  },
   editar(id) {
-    const it = itemById(id); if (!it) return; const p = precoRow(id);
+    const it = itemById(id); if (!it) return; const p = precoRow(id), sabs = saboresDe(id), [cls, txt] = Views.catalogo.statusOnline(it);
     openModal(`<h3>${esc(it.emoji || "")} ${esc(it.nome)}</h3>
-      <label>Preço nesta loja (R$)</label><input class="field" id="pPreco" inputmode="decimal" value="${p ? esc(String(p.preco).replace(".", ",")) : ""}" placeholder="0,00">
-      <div class="check"><input type="checkbox" id="pAtivo" ${!p || p.ativo ? "checked" : ""}><label for="pAtivo" style="margin:0;font-size:.84rem;color:var(--text)">Vender nesta loja</label></div>
+      <div class="banner" style="margin-bottom:8px"><span class="tag ${cls}">${esc(txt)}</span> O estoque é editado na aba Estoque.</div>
+      <label>Nome</label><input class="field" id="iNome" maxlength="80" value="${esc(it.nome)}">
+      <div class="grid2"><div><label>Emoji</label><input class="field" id="iEmoji" maxlength="8" value="${esc(it.emoji || "")}"></div><div><label>Ordem (menor aparece primeiro)</label><input class="field" id="iOrdem" type="number" min="-9999" max="9999" value="${esc(String(it.ordem ?? 0))}"></div></div>
+      <label>Descrição no site (opcional)</label><input class="field" id="iDesc" maxlength="200" value="${esc(it.descricao || "")}" placeholder="Ex: Doce e refrescante, fumaça densa">
+      <label>Imagem (endereço https://…, opcional)</label><input class="field" id="iImg" maxlength="500" inputmode="url" value="${esc(it.imagem_url || "")}" placeholder="https://…/foto.jpg">
+      <div class="grid2"><div><label>Preço no site (R$)</label><input class="field" id="pPreco" inputmode="decimal" value="${p ? esc(String(p.preco).replace(".", ",")) : ""}" placeholder="0,00"></div>
+        <div><label>Preço "de" riscado (opcional)</label><input class="field" id="pDe" inputmode="decimal" value="${p && p.preco_de ? esc(String(p.preco_de).replace(".", ",")) : ""}" placeholder="maior que o preço"></div></div>
+      <div class="check"><input type="checkbox" id="iDestaque" ${it.destaque ? "checked" : ""}><label for="iDestaque" style="margin:0;font-size:.84rem;color:var(--text)">Destaque na home do site</label></div>
+      <div class="check"><input type="checkbox" id="pAtivo" ${!p || p.ativo ? "checked" : ""}><label for="pAtivo" style="margin:0;font-size:.84rem;color:var(--text)">Vender nesta loja / mostrar no site</label></div>
       <div class="check"><input type="checkbox" id="iAtivo" ${it.ativo ? "checked" : ""}><label for="iAtivo" style="margin:0;font-size:.84rem;color:var(--text)">Item ativo (todas as lojas)</label></div>
-      <label>Adicionar sabor</label><div class="row"><input class="field grow" id="sNome" placeholder="Nome do sabor" style="margin:0"><input class="field" id="sQtd" type="number" min="0" value="0" style="margin:0;width:90px" title="Quantidade inicial"><button class="abtn dark" data-a="catSabor" data-id="${esc(id)}">+</button></div>
-      <small style="color:var(--muted)">Sabores: ${esc(saboresDe(id).map(s => s.nome).join(", ") || "nenhum")}</small>
+      ${sabs.length ? `<label>Sabores (renomear muda o nome no site; o estoque do sabor continua o mesmo)</label>${sabs.map(sb_ => `<input class="field sabNome" data-id="${esc(sb_.id)}" maxlength="60" value="${esc(sb_.nome)}">`).join("")}` : ""}
+      <label>Adicionar sabor</label><div class="row"><input class="field grow" id="sNome" placeholder="Nome do sabor" style="margin:0"><input class="field" id="sQtd" type="number" min="0" value="0" style="width:80px;margin:0"><button class="abtn soft sm" data-a="catSabor" data-id="${esc(id)}">+ Sabor</button></div>
       <div class="modal-actions"><button class="btn btn-soft" data-a="fechar">Cancelar</button><button class="btn btn-red" data-a="catSalvar" data-id="${esc(id)}">Salvar</button></div>`);
   },
   async salvar(id, btn) {
-    const raw = $("pPreco").value.trim(), preco = raw === "" ? null : num(raw);
-    if (preco !== null && (!Number.isFinite(preco) || preco < 0)) return toast("Preço inválido", true);
+    const it = itemById(id); if (!it) return;
+    const nome = $("iNome").value.trim(); if (nome.length < 2) return toast("Informe o nome do item (mínimo 2 letras)", true);
+    const raw = $("pPreco").value.trim(), preco = raw === "" ? null : num(raw), rawDe = $("pDe").value.trim(), de = rawDe === "" ? null : num(rawDe);
+    if (preco !== null && (!Number.isFinite(preco) || preco < 0 || !centavosOk(preco) && preco !== 0)) return toast("Preço inválido (até 2 casas decimais)", true);
+    if (de !== null && (!Number.isFinite(de) || !centavosOk(de))) return toast('Preço "de" inválido (até 2 casas decimais)', true);
+    if (de !== null && (preco === null || de <= preco)) return toast('O preço "de" precisa ser maior que o preço atual (ou deixe em branco)', true);
+    const img = $("iImg").value.trim(); if (img && !/^https:\/\/[^\s]+$/i.test(img)) return toast("A imagem precisa ser um endereço https:// sem espaços", true);
+    const ordem = parseInt($("iOrdem").value || "0", 10); if (!Number.isInteger(ordem) || Math.abs(ordem) > 9999) return toast("Ordem inválida (número inteiro entre -9999 e 9999)", true);
+    const sabs = [...document.querySelectorAll(".sabNome")].map(i => ({ id: i.dataset.id, nome: i.value.trim() }));
+    if (sabs.some(x => !x.nome)) return toast("Sabor sem nome", true);
+    if (new Set(sabs.map(x => norm(x.nome))).size !== sabs.length) return toast("Há sabores repetidos", true);
     await busy(btn, async () => {
-      if (preco !== null) ok(await sb.from("precos_loja").upsert({ loja_id: S.loja.id, item_id: id, preco: Math.round(preco * 100) / 100, ativo: $("pAtivo").checked }, { onConflict: "loja_id,item_id" }));
-      ok(await sb.from("itens").update({ ativo: $("iAtivo").checked }).eq("id", id));
-      await Promise.all([DB.catalogo(), DB.precos()]); closeModal(); toast("Salvo"); Views.catalogo.render();
+      if (preco !== null) ok(await sb.from("precos_loja").upsert({ loja_id: S.loja.id, item_id: id, preco: Math.round(preco * 100) / 100, preco_de: de, ativo: $("pAtivo").checked }, { onConflict: "loja_id,item_id" }));
+      ok(await sb.from("itens").update({ nome, emoji: $("iEmoji").value.trim() || null, descricao: $("iDesc").value.trim() || null, imagem_url: img || null, destaque: $("iDestaque").checked, ordem, ativo: $("iAtivo").checked }).eq("id", id));
+      for (const x of sabs) { const antigo = saborById(x.id); if (antigo && antigo.nome !== x.nome) ok(await sb.from("sabores").update({ nome: x.nome }).eq("id", x.id)); }
+      await Promise.all([DB.catalogo(), DB.precos(), DB.estoque()]); closeModal(); toast("Salvo — o site atualiza em até 1 minuto"); Views.catalogo.render();
     });
+  },
+  marcaForm(id) {
+    const m = S.marcas.find(x => x.id === id); if (!m) return;
+    const cor = (v, d) => /^#[0-9a-fA-F]{6}$/.test(v || "") ? v : d;
+    openModal(`<h3>Marca ${esc(m.nome)}</h3>
+      <label>Nome</label><input class="field" id="mNome" maxlength="60" value="${esc(m.nome)}">
+      <label>Descrição no site (opcional)</label><input class="field" id="mDesc" maxlength="200" value="${esc(m.descricao || "")}">
+      <div class="grid2"><div><label>Cor do fundo</label><input class="field" id="mFundo" type="color" value="${cor(m.cor_fundo, "#1A1A22")}"></div><div><label>Cor da fita</label><input class="field" id="mFita" type="color" value="${cor(m.cor_fita, "#2A2A30")}"></div></div>
+      <div class="grid2"><div><label>Degradê — início</label><input class="field" id="mGa" type="color" value="${cor(m.cor_grad_a, "#E3132B")}"></div><div><label>Degradê — fim</label><input class="field" id="mGb" type="color" value="${cor(m.cor_grad_b, "#FF8C2B")}"></div></div>
+      <div class="grid2"><div><label>Ordem</label><input class="field" id="mOrdem" type="number" min="-9999" max="9999" value="${esc(String(m.ordem ?? 0))}"></div></div>
+      <div class="check"><input type="checkbox" id="mAtivo" ${m.ativo ? "checked" : ""}><label for="mAtivo" style="margin:0;font-size:.84rem;color:var(--text)">Marca visível no site</label></div>
+      <div class="modal-actions"><button class="btn btn-soft" data-a="fechar">Cancelar</button><button class="btn btn-red" data-a="catMarcaOk" data-id="${esc(id)}">Salvar</button></div>`);
+  },
+  async marcaSalvar(id, btn) {
+    const nome = $("mNome").value.trim(); if (nome.length < 2) return toast("Informe o nome da marca", true);
+    const ordem = parseInt($("mOrdem").value || "0", 10); if (!Number.isInteger(ordem) || Math.abs(ordem) > 9999) return toast("Ordem inválida (número inteiro entre -9999 e 9999)", true);
+    await busy(btn, async () => {
+      ok(await sb.from("marcas").update({ nome, descricao: $("mDesc").value.trim() || null, cor_fundo: $("mFundo").value, cor_fita: $("mFita").value, cor_grad_a: $("mGa").value, cor_grad_b: $("mGb").value, ordem, ativo: $("mAtivo").checked }).eq("id", id));
+      await DB.catalogo(); closeModal(); toast("Marca salva — o site atualiza em até 1 minuto"); Views.catalogo.render();
+    });
+  },
+  categoriaForm(id) {
+    const c = S.categorias.find(x => x.id === id); if (!c) return;
+    openModal(`<h3>Categoria ${esc(c.nome)}</h3>
+      <label>Nome</label><input class="field" id="cNome" maxlength="60" value="${esc(c.nome)}">
+      <div class="grid2"><div><label>Cor do banner no site</label><select class="field" id="cCor">${["fogo", "azul", "amarelo", "escuro", "rosa", "roxo", "verde", "vermelho"].map(k => `<option ${c.cor === k ? "selected" : ""}>${k}</option>`).join("")}</select></div>
+        <div><label>Ordem</label><input class="field" id="cOrdem" type="number" min="-9999" max="9999" value="${esc(String(c.ordem ?? 0))}"></div></div>
+      <div class="modal-actions"><button class="btn btn-soft" data-a="fechar">Cancelar</button><button class="btn btn-red" data-a="catCategoriaOk" data-id="${esc(id)}">Salvar</button></div>`);
+  },
+  async categoriaSalvar(id, btn) {
+    const nome = $("cNome").value.trim(); if (nome.length < 2) return toast("Informe o nome da categoria", true);
+    if (S.categorias.some(c => c.id !== id && norm(c.nome) === norm(nome))) return toast("Já existe uma categoria com esse nome", true);
+    const ordem = parseInt($("cOrdem").value || "0", 10); if (!Number.isInteger(ordem) || Math.abs(ordem) > 9999) return toast("Ordem inválida (número inteiro entre -9999 e 9999)", true);
+    await busy(btn, async () => { ok(await sb.from("categorias").update({ nome, cor: $("cCor").value, ordem }).eq("id", id)); await DB.catalogo(); closeModal(); toast("Categoria salva — o site atualiza em até 1 minuto"); Views.catalogo.render(); });
   },
   async sabor(id, btn) {
     const nome = $("sNome").value.trim(); if (!nome) return toast("Informe o sabor", true);
@@ -2000,6 +2067,7 @@ const Act = {
   acDesativar: (id) => Views.acessos.desativarForm(id), acDesativarOk: (id, b) => Views.acessos.definir(id, false, b), acReativar: (id, b) => Views.acessos.definir(id, true, b),
   waCopiar: () => Views.whats.copiar(), waEnviar: () => Views.whats.enviar(),
   catGrupo: (id, b) => Views.catalogo.grupo(id, b), catItem: (id, b) => Views.catalogo.item(b), catEditar: (id) => Views.catalogo.editar(id),
+  catMarca: (id) => Views.catalogo.marcaForm(id), catMarcaOk: (id, b) => Views.catalogo.marcaSalvar(id, b), catCategoria: (id) => Views.catalogo.categoriaForm(id), catCategoriaOk: (id, b) => Views.catalogo.categoriaSalvar(id, b),
   catSalvar: (id, b) => Views.catalogo.salvar(id, b), catSabor: (id, b) => Views.catalogo.sabor(id, b), catWpp: (id, b) => Views.catalogo.wpp(b),
 };
 document.addEventListener("click", ev => {

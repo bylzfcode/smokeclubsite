@@ -25,10 +25,12 @@ echo ">> validação dos resumos de rateios (pilha real)"; node real_api_resumos
 echo ">> validação de comunicados (pilha real)"; node real_api_comunicados.test.js || RC=1
 echo ">> validação de acessos, recorrência e calendário (pilha real)"; node real_api_admin.test.js || RC=1
 echo ">> validação de séries compartilhadas e retomada (pilha real)"; node real_api_series_comp.test.js || RC=1
+echo ">> validação do catálogo online (pilha real)"; node real_api_catalogo.test.js || RC=1
 if [ -f real_ui.test.js ]; then echo ">> validação no navegador (pilha real)"; NODE_PATH=/opt/node22/lib/node_modules node real_ui.test.js || RC=1; fi
 if [ -f real_ui_resumos.test.js ]; then echo ">> validação dos resumos de rateios no navegador (pilha real)"; NODE_PATH=/opt/node22/lib/node_modules node real_ui_resumos.test.js || RC=1; fi
 if [ -f real_ui_rateios.test.js ]; then echo ">> validação de rateios no navegador (pilha real)"; NODE_PATH=/opt/node22/lib/node_modules node real_ui_rateios.test.js || RC=1; fi
 if [ -f real_ui_comunicados.test.js ]; then echo ">> validação de comunicados no navegador (pilha real)"; NODE_PATH=/opt/node22/lib/node_modules node real_ui_comunicados.test.js || RC=1; fi
 if [ -f real_ui_admin.test.js ]; then echo ">> validação de acessos, recorrência e calendário no navegador (pilha real)"; NODE_PATH=/opt/node22/lib/node_modules node real_ui_admin.test.js || RC=1; fi
+if [ -f real_ui_catalogo.test.js ]; then echo ">> validação do site e da dashboard (catálogo online) no navegador (pilha real)"; NODE_PATH=/opt/node22/lib/node_modules node real_ui_catalogo.test.js || RC=1; fi
 [ "$1" = "--keep" ] || { pkill -f "node gateway.js" || true; $DC down >/dev/null 2>&1; }
 exit $RC

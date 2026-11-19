@@ -60,7 +60,9 @@ with marcadores (migracao, ordem, descricao, ok) as (
   ('013_series_compartilhadas.sql', 13, 'coluna contas_series.escopo', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'contas_series' and column_name = 'escopo')),
   ('013_series_compartilhadas.sql', 13, 'coluna rateios.serie_id', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'rateios' and column_name = 'serie_id')),
   ('013_series_compartilhadas.sql', 13, 'tabela series_auditoria', to_regclass('public.series_auditoria') is not null),
-  ('013_series_compartilhadas.sql', 13, 'função serie_retomar_previa', exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'serie_retomar_previa'))
+  ('013_series_compartilhadas.sql', 13, 'função serie_retomar_previa', exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'serie_retomar_previa')),
+  -- 014
+  ('014_catalogo_online.sql', 14, 'função catalogo_publico (site público)', exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'catalogo_publico'))
 )
 select migracao as "migração", ordem,
        count(*) filter (where ok) || ' de ' || count(*) as marcadores,
