@@ -82,8 +82,8 @@ const semRolagem = page => page.evaluate(() => document.documentElement.scrollWi
   await page.close();
   const ctx2 = await browser.newContext({ viewport: { width: 390, height: 800 } });
   ({ page, erros } = await pagina(browser, ctx2, "site", { bloquearCatalogo: true }));
-  await page.evaluate(() => App.passGate()); await page.waitForFunction(() => document.body.textContent.includes("Seda king size"), null, { timeout: 15000 });
-  check("sem banco e sem catálogo recente: usa os dados embutidos no arquivo (sem quebrar)", true && erros.length === 0, erros.join("|"));
+  await page.evaluate(() => App.passGate()); await page.waitForFunction(() => /Não conseguimos carregar o catálogo/.test(document.body.textContent), null, { timeout: 15000 });
+  check("sem banco e sem catálogo recente: NÃO mostra produtos de exemplo do arquivo — avisa que o catálogo não carregou", !(await nomes(page)).length && !/Seda king size|Piteira de vidro/.test(await page.innerText("body")) && erros.length === 0, erros.join("|"));
   check("celular (390 px): sem rolagem horizontal", await semRolagem(page));
   await ctx2.close();
 

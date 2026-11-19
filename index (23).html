@@ -924,7 +924,7 @@ const App = (() => {
   /* ═══ CATÁLOGO AO VIVO — produtos, preços e ESTOQUE vêm do mesmo banco da dashboard (somente leitura, sem login) ═══
      Cada sabor é uma linha ("Essência 50g — Uva"); o que está sem estoque aparece como ESGOTADO e não entra no carrinho.
      Se o banco não responder, a loja usa o último catálogo recebido (até 6 h) ou, na falta dele, os dados embutidos neste arquivo. */
-  const LIVE = { ativo: true, url: "https://viqgnzppazhcvthaknzi.supabase.co", key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpcWduenBwYXpoY3Z0aGFrbnppIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyNTYwMjMsImV4cCI6MjEwMDgzMjAyM30.NyGmfSLNAdq0CqjSx1kq6kK_L2iSSV5RtzgwgI0_ncc", loja: "smoke-club", intervalo: 60000, validade: 6*3600*1000, ok: false, ultimo: 0, busy: false, erro: null, linhas: 0, esgotadas: 0 };
+  const LIVE = { ativo: true, url: "https://viqgnzppazhcvthaknzi.supabase.co", key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpcWduenBwYXpoY3Z0aGFrbnppIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyNTYwMjMsImV4cCI6MjEwMDgzMjAyM30.NyGmfSLNAdq0CqjSx1kq6kK_L2iSSV5RtzgwgI0_ncc", loja: "smoke-club", intervalo: 60000, validade: 6*3600*1000, fallbackEstatico: false, ok: false, ultimo: 0, busy: false, erro: null, linhas: 0, esgotadas: 0 };
   const CORES_CAT = ["fogo","azul","amarelo","escuro","rosa","roxo","verde","vermelho"];
   const hexOk = v => typeof v === "string" && /^#[0-9a-fA-F]{6}$/.test(v);
   async function liveFetch(){
@@ -1008,16 +1008,17 @@ const App = (() => {
     LIVE.busy = true;
     try {
       const wa0 = DATA.whatsapp; const j = await liveFetch(); liveApply(j); gravarSnap(j);
-      LIVE.ok = true; LIVE.erro = null; LIVE.ultimo = Date.now(); state.aguardandoLive = false; delete DATA.__estatico;
+      LIVE.ok = true; LIVE.erro = null; LIVE.ultimo = Date.now(); state.aguardandoLive = false; state.liveFalhou = false; delete DATA.__estatico;
       if(!LIVE.montou || DATA.whatsapp !== wa0){ LIVE.montou = true; build(); } else refreshCatalog();
       return true;
     } catch(e){
       LIVE.erro = String(e && e.message || e); console.warn(LIVE.erro);
       if(state.aguardandoLive){          // nunca respondeu: usa os dados embutidos no arquivo
-        const est = DATA.__estatico; state.aguardandoLive = false;
-        if(est) trocarCatalogo(est.produtos, est.marcas, est.categorias);
+        const est = DATA.__estatico; state.aguardandoLive = false; state.liveFalhou = true;
+        if(est && LIVE.fallbackEstatico) { trocarCatalogo(est.produtos, est.marcas, est.categorias); state.liveFalhou = false; }   // por padrão NÃO mostra os produtos de exemplo do arquivo
         delete DATA.__estatico;
         refreshCatalog();
+        setTimeout(syncLive, 15000);        // tenta de novo logo
       }
       return false;
     } finally { LIVE.busy = false; }
@@ -1345,6 +1346,7 @@ const App = (() => {
   }
   function renderProducts(){
     if(state.aguardandoLive){ $("productSections").innerHTML = `<p class="live-nota">Carregando produtos…</p>`; return; }
+    if(state.liveFalhou && !DATA.produtos.length){ $("productSections").innerHTML = `<p class="live-nota">Não conseguimos carregar o catálogo agora. Tentando de novo…<br>Se demorar, chame a gente no WhatsApp 😉</p>`; return; }
     const q = state.query;
     const match = p => !q || (p.nome+" "+(p.desc||"")+" "+p.cat).toLowerCase().includes(q);
     let html = "";
